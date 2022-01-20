@@ -507,10 +507,8 @@ class WISEDataBase(abc.ABC):
                              chunks=None, overwrite=False, remove_chunks=False):
         """
         Load photometric data from the IRSA server for the matched sample
-        :param cluster_jobs_per_chunk: int, if greater than zero uses the DESY cluster
         :param tables: list like, WISE tables to use for photometry query, defaults to AllWISE and NOEWISER photometry
         :param perc: float, percentage of sources to load photometry for, default 1
-        :param use_cluster: bool, submits to DESY cluster if True
         :param nthreads: int, max number of threads to launch
         :param flux: bool, get flux values if True
         :param mag: bool, gets magnitude values if True
@@ -915,10 +913,6 @@ class WISEDataBase(abc.ABC):
                     time.sleep(60 * 6)
                     if '404 Client Error: Not Found for url' in str(e):
                         _ntries -= 1
-                    # if '404 Client Error: Not Found for url' in str(e):
-                    #     raise vo.dal.exceptions.DALServiceError(f'{i}th query of {t}: {e}')
-                    # else:
-                    #     logger.warning(f"{i}th query of {t}: DALServiceError: {e}; try again")
 
             if phase in self.running_tap_phases:
                 self.queue.put((t, i))
