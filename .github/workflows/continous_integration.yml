@@ -102,7 +102,7 @@ jobs:
 
       - name: Test install from TestPyPi
         run: |
-          python -m pip install --no-deps --index-url https://test.pypi.org/simple/timewise
+          python -m pip install --no-deps --index-url https://test.pypi.org/simple/ timewise
           pip install -r requirements.txt
           python -c 'import timewise'
 
