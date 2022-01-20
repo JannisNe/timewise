@@ -73,7 +73,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         # closest_ind = np.argsort(sep)
         #
         # self.assertLess(sep[closest_ind][0], 0.5 * u.arcsec)
-        wise_data.parent_sample.plot_cutout(0, arcsec=40)
+        wise_data.parent_sample.plot_cutout(0, arcsec=40, save=True)
 
         logger.info(f"\n\n Testing getting photometry \n")
         for s in ['gator', 'tap']:
