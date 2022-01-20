@@ -118,9 +118,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
             logger.debug(f'waiting for chunk {chunk} (Cluster job {job_id})')
             self.wait_for_job(job_id)
             logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}). Start combining')
-            self._combine_lcs('tap', chunk_number=chunk, remove=True, overwrite=True)
-            self._combine_metadata('tap', chunk_number=chunk, remove=True, overwrite=True)
-            self._cluster_queue.task_done()
+            try:
+                self._combine_lcs('tap', chunk_number=chunk, remove=True, overwrite=True)
+                self._combine_metadata('tap', chunk_number=chunk, remove=True, overwrite=True)
+            finally:
+                self._cluster_queue.task_done()
 
     # ----------------------------------------------------------------------------------- #
     # START using cluster for downloading and binning      #
@@ -363,19 +365,6 @@ if __name__ == '__main__':
     wd._load_cluster_info()
     wd.clear_unbinned_photometry_when_binning = cfg.clear_unbinned
     chunk_number = wd._get_chunk_number_for_job(cfg.job_id)
-
-    if cfg.download:
-        tables = np.atleast_1d(cfg.tables)
-        for table in tables:
-            wd._submit_job_to_TAP(
-                chunk_number=cfg.chunk_number,
-                table_name=table,
-                mag=cfg.mag,
-                flux=cfg.flux
-            )
-        wd._run_tap_worker_threads(nthreads=1)
-    else:
-        logger.info('assuming lightcurves are already downloaded!')
 
     wd._subprocess_select_and_bin(chunk_number=chunk_number, jobID=cfg.job_id)
     wd.calculate_metadata(service='tap', chunk_number=chunk_number, jobID=cfg.job_id)
