@@ -1156,7 +1156,7 @@ class WISEDataBase(abc.ABC):
                     F = (F_nu / f_c) * 10 ^ (-m / 2.5)
 
         where F_nu is the zeropoint flux for the corresponding band and f_c a color correction factor.
-        See https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#conv2flux
+        See `this <https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#conv2flux>`_
 
         :param vegamag:
         :type vegamag: float or numpy.ndarray
