@@ -88,7 +88,7 @@ class WISEDataBase(abc.ABC):
         }
     }
 
-    _this_dir = os.path.dirname(__file__)
+    _this_dir = os.path.abspath(os.path.dirname(__file__))
     magnitude_zeropoints_corrections = ascii.read(f'{_this_dir}/wise_flux_conversion_correction.dat',
                                                   delimiter='\t').to_pandas()
 
