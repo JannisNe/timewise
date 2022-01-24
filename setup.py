@@ -7,7 +7,7 @@ with open("README.md", "r") as fh:
 if __name__ == '__main__':
     setuptools.setup(
         name="timewise",
-        version="0.1.3",
+        version="0.1.3test2",
         author="Jannis Necker",
         author_email="jannis.necker@gmail.com",
         description="A small package to download infrared data from the WISE satellite",
@@ -24,7 +24,8 @@ if __name__ == '__main__':
             "License :: OSI Approved :: MIT License",
             "Operating System :: OS Independent",
             "Programming Language :: Python :: 3.8",
-            "Programming Language :: Python :: 3.9"
+            "Programming Language :: Python :: 3.9",
+            "Programming Language :: Python :: 3.10"
         ],
         python_requires='>=3.9',
         install_requires=[
@@ -37,5 +38,8 @@ if __name__ == '__main__':
             "matplotlib==3.5.1",
             "coveralls==3.3.1",
             "scikit-image==0.19.1",
-        ]
+        ],
+        package_data={'timewise': [
+            'wise_flux_conversion_correction.dat'
+        ]}
     )
