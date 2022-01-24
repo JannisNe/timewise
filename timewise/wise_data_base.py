@@ -1133,7 +1133,7 @@ class WISEDataBase(abc.ABC):
     def find_color_correction(self, w1_minus_w2):
         """
         Find the color correction based on the W1-W2 color.
-        See https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#conv2flux
+        See `this <https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#conv2flux>`_
 
         :param w1_minus_w2:
         :type w1_minus_w2: float
