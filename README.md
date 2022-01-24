@@ -1,6 +1,8 @@
 [![CI](https://github.com/JannisNe/timewise/actions/workflows/continous_integration.yml/badge.svg)](https://github.com/JannisNe/timewise/actions/workflows/continous_integration.yml)
 [![Coverage Status](https://coveralls.io/repos/github/JannisNe/timewise/badge.svg?branch=main)](https://coveralls.io/github/JannisNe/timewise?branch=main)
 [![PyPI version](https://badge.fury.io/py/timewise.svg)](https://badge.fury.io/py/timewise)
+[![Documentation Status](https://readthedocs.org/projects/timewise/badge/?version=latest)](https://timewise.readthedocs.io/en/latest/?badge=latest)
+
 
 
 # `timewise` is great, love it!
