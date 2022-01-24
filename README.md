@@ -38,6 +38,7 @@ python -m unittest discover tests/
 
 
 ## Usage
+Detailed documentation can be found [here](https://timewise.readthedocs.io/en/latest/)
 
 ### Data directory
 ``timewise`` is capable of downloading a lot of data. You can specify the location of all that data:
