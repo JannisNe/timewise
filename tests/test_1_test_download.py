@@ -79,7 +79,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         for s in ['gator', 'tap']:
 
             logger.info(f"\nTesting {s.upper()}")
-            wise_data.get_photometric_data(service=s, mag=True, flux=True)
+            wise_data.get_photometric_data(service=s)
 
             logger.info(f" --- Test adding flux densities --- ")
             wise_data.add_flux_densities_to_saved_lightcurves(s)
