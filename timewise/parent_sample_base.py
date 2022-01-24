@@ -10,6 +10,15 @@ logger = main_logger.getChild(__name__)
 
 
 class ParentSampleBase(abc.ABC):
+    """
+    Base class for parent sample.
+    Any subclass must implement
+
+    - `ParentSample.df`: A `pandas.DataFrame` consisting of minimum three columns: two columns holding the sky positions of each object in the form of right ascension and declination and one row with a unique identifier.
+    - `ParentSample.default_keymap`: a dictionary, mapping the column in `ParentSample.df` to 'ra', 'dec' and 'id'
+
+    :param base_name: determining the location of any data in the `timewise` data directory.
+    """
 
     df = pd.DataFrame()
     default_keymap = dict()
@@ -28,6 +37,15 @@ class ParentSampleBase(abc.ABC):
     def plot_cutout(self, ind, arcsec=20, interactive=False, **kwargs):
         """
         Plot the coutout images in all filters around the position of object with index i
+
+        :param ind: the index in the sample
+        :type ind: int or list-like
+        :param arcsec: the radius of the cutout
+        :type arcsec: float
+        :param interactive: interactive mode
+        :type interactive: bool
+        :param kwargs: any additional kwargs will be passed to `matplotlib.pyplot.subplots()`
+        :return: figure and axes if `interactive=True`
         """
         sel = self.df.iloc[np.atleast_1d(ind)]
         ra, dec = sel[self.default_keymap["ra"]], sel[self.default_keymap["dec"]]

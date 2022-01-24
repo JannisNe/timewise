@@ -50,7 +50,7 @@ The subclass has to define two key attributes:
 * `ParentSample.df`: A `pandas.DataFrame` consisting of minimum three columns: two columns holding the sky positions of each object in the form of right ascension and declination and one row with a unique identifier.
 * `ParentSample.default_keymap`: a dictionary, mapping the column in `ParentSample.df` to 'ra', 'dec' and 'id'
 
-Further, `ParentSampleBase` requires a `base_name` determining the location of any data in the 
+Further, `ParentSampleBase` requires a `base_name` determining the location of any data in the `timewise` data directory.
 
 ```python
 from timewise import ParentSampleBase

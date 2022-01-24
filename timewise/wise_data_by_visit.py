@@ -10,8 +10,24 @@ logger = main_logger.getChild(__name__)
 
 
 class WiseDataByVisit(WISEDataBase):
+    """
+    WISEData class to bin lightcurve by visit
+    """
 
     def bin_lightcurve(self, lightcurve):
+        """
+        Combine the data by visits of the satellite of one region in the sky.
+        The visits typically consist of some tens of observations. The individual visits are separated by about
+        six months.
+        The mean flux for one visit is calculated by the weighted mean of the data.
+        The rror on that mean is calculated bu the root-mean-squared.
+
+        :param lightcurve: the unbnned lightcurve
+        :type lightcurve: pandas.DataFrame
+        :return: the binned lightcurve
+        :rtype: pandas.DataFrame
+        """
+
         # bin lightcurves in time intervals where observations are closer than 100 days together
         sorted_mjds = np.sort(lightcurve.mjd)
         epoch_bounds_mask = (sorted_mjds[1:] - sorted_mjds[:-1]) > 100
@@ -57,7 +73,20 @@ class WiseDataByVisit(WISEDataBase):
 
         return binned_lc
 
-    def _calculate_metadata(self, lcs):
+    def calculate_metadata_single(self, lcs):
+        """
+        Calculates some metadata, describing the variability of the lightcurves.
+
+        - `max_dif`: maximum difference in magnitude between any two datapoints
+        - `min_rms`: the minimum errorbar of all datapoints
+        - `N_datapoints`: The number of datapoints
+        - `max_deltat`: the maximum time difference between any two datapoints
+
+        :param lcs: the lightcurves
+        :type lcs: dict
+        :return: the metadata
+        :rtype: dict
+        """
         metadata = dict()
 
         for ID, lc_dict in tqdm.tqdm(lcs.items(), desc='calculating metadata', total=len(lcs)):

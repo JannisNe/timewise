@@ -31,8 +31,29 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._tap_queue = queue.Queue()
         self._cluster_queue = queue.Queue()
 
-    def get_sample_photometric_data(self, max_nTAPjobs=8, perc=1, mag=True, flux=False, tables=None, chunks=None,
+    def get_sample_photometric_data(self, max_nTAPjobs=8, perc=1, tables=None, chunks=None,
                                     cluster_jobs_per_chunk=100, wait=5, remove_chunks=True):
+        """
+        An alternative to `get_photometric_data()` that uses the DESY cluster and is optimised for large datasets.
+
+        :param max_nTAPjobs: The maximum number of TAP jobs active at the same time.
+        :type max_nTAPjobs: int
+        :param perc: The percentage of chunks to download
+        :type perc: float
+        :param tables: The tables to query
+        :type tables: str or list-like
+        :param chunks: chunks to download, default is all of the chunks
+        :type chunks: list-like
+        :param cluster_jobs_per_chunk: number of cluster jobs per chunk
+        :type cluster_jobs_per_chunk: int
+        :param wait: time in hours to wait after submitting TAP jobs
+        :type wait: float
+        :param remove_chunks: remove single chink files after binning
+        :type remove_chunks: bool
+        """
+
+        mag = True
+        flux = False
 
         if tables is None:
             tables = [
@@ -138,7 +159,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         return str(tmp)
 
     @staticmethod
-    def get_ids(qstat_command):
+    def _get_ids(qstat_command):
         """Takes a command that queries the DESY cluster and returns a list of job IDs"""
         st = WISEDataDESYCluster._qstat_output(qstat_command)
         # If the output is an empty string there are no tasks left
@@ -152,19 +173,25 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def _ntasks_from_qstat_command(self, qstat_command, job_id):
         """Returns the number of tasks from the output of qstat_command"""
         # get the output of qstat_command
-        ids = self.get_ids(qstat_command)
+        ids = self._get_ids(qstat_command)
         ntasks = 0 if len(ids) == 0 else len(ids[ids == job_id])
         return ntasks
 
-    def ntasks_total(self, job_id):
+    def _ntasks_total(self, job_id):
         """Returns the total number of tasks"""
         return self._ntasks_from_qstat_command(self.status_cmd, job_id)
 
-    def ntasks_running(self, job_id):
+    def _ntasks_running(self, job_id):
         """Returns the number of running tasks"""
         return self._ntasks_from_qstat_command(self.status_cmd + " -s r", job_id)
 
     def wait_for_job(self, job_id=None):
+        """
+        Wait until the cluster job is done
+
+        :param job_id: the ID of the cluster job, if `None` use `self.job_ID`
+        :type job_id: int
+        """
         _job_id = job_id if job_id else self.job_id
 
         if _job_id:
@@ -172,12 +199,12 @@ class WISEDataDESYCluster(WiseDataByVisit):
             time.sleep(10)
             i = 31
             j = 6
-            while self.ntasks_total(_job_id) != 0:
+            while self._ntasks_total(_job_id) != 0:
                 if i > 3:
                     logger.info(f'{time.asctime(time.localtime())} - Job{_job_id}:'
-                                f' {self.ntasks_total(_job_id)} entries in queue. '
-                                f'Of these, {self.ntasks_running(_job_id)} are running tasks, and '
-                                f'{self.ntasks_total(_job_id) - self.ntasks_running(_job_id)} '
+                                f' {self._ntasks_total(_job_id)} entries in queue. '
+                                f'Of these, {self._ntasks_running(_job_id)} are running tasks, and '
+                                f'{self._ntasks_total(_job_id) - self._ntasks_running(_job_id)} '
                                 f'are tasks still waiting to be executed.')
                     i = 0
                     j += 1
@@ -236,6 +263,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
             self.cluster_jobID_map, self.clusterJob_chunk_map = pickle.load(f)
 
     def clear_cluster_log_dir(self):
+        """
+        Clears the directory where cluster logs are stored
+        """
         fns = os.listdir(self.cluster_log_dir)
         for fn in fns:
             os.remove(os.path.join(self.cluster_log_dir, fn))
@@ -299,6 +329,25 @@ class WISEDataDESYCluster(WiseDataByVisit):
         os.system(cmd)
 
     def submit_to_cluster(self, cluster_cpu, cluster_h, cluster_ram, tables, service, single_chunk=None):
+        """
+        Submit jobs to cluster
+
+        :param cluster_cpu: Number of cluster CPUs
+        :type cluster_cpu: int
+        :param cluster_h: Time for cluster jobs
+        :type cluster_h: str
+        :param cluster_ram: RAM for cluster jobs
+        :type cluster_ram: str
+        :param tables: Table to query
+        :type tables: str or list-like
+        :param service: service to use for querying the data
+        :type service: str
+        :param single_chunk: number of single chunk to run on the cluster
+        :type single_chunk: int
+        :return: ID of the cluster job
+        :rtype: int
+        """
+
         if isinstance(single_chunk, type(None)):
             ids = f'1-{self.n_chunks*self.n_cluster_jobs_per_chunk}'
         else:
@@ -330,6 +379,19 @@ class WISEDataDESYCluster(WiseDataByVisit):
         return job_id
 
     def run_cluster(self, cluster_cpu, cluster_h, cluster_ram, service):
+        """
+        Run the DESY cluster
+
+        :param cluster_cpu: Number of cluster CPUs
+        :type cluster_cpu: int
+        :param cluster_h: Time for cluster jobs
+        :type cluster_h: str
+        :param cluster_ram: RAM for cluster jobs
+        :type cluster_ram: str
+        :param service: service to use for querying the data
+        :type service: str
+        """
+
         self.clear_cluster_log_dir()
         self._save_cluster_info()
         self.submit_to_cluster(cluster_cpu, cluster_h, cluster_ram, tables=None, service=service)

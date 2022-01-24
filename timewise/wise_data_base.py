@@ -17,6 +17,18 @@ logger = main_logger.getChild(__name__)
 
 
 class WISEDataBase(abc.ABC):
+    """
+    Base class for WISE Data
+
+    :param base_name: unique name to determine storage directories
+    :type base_name: str
+    :param parent_sample_class: class for parent sample
+    :type parent_sample_class: `ParentSample` class
+    :param min_sep_arcsec: minimum separation required to the parent sample sources
+    :type min_sep_arcsec: float
+    :param n_chunks: number of chunks in declination
+    :type n_chunks: int
+    """
 
     service_url = 'https://irsa.ipac.caltech.edu/TAP'
     service = vo.dal.TAPService(service_url)
@@ -111,14 +123,6 @@ class WISEDataBase(abc.ABC):
                  parent_sample_class,
                  min_sep_arcsec,
                  n_chunks):
-        """
-        Initialise a class instance
-        :param base_name: str, unique name to determine storage directories
-        :param parent_sample_class: object, class for parent sample
-        :param min_sep_arcsec: float, minimum separation required to the parent sample sources
-        :param n_chunks: int, number of chunks in declination
-        """
-
         #######################################################################################
         # START SET-UP          #
         #########################
@@ -242,6 +246,7 @@ class WISEDataBase(abc.ABC):
     def get_db_name(table_name, nice=False):
         """
         Get the right table name
+
         :param table_name: str, table name
         :param nice: bool, whether to get the nice table name
         :return: str
@@ -260,11 +265,27 @@ class WISEDataBase(abc.ABC):
     # START MATCH PARENT SAMPLE TO WISE SOURCES         #
     #####################################################
 
-    def match_all_chunks(self, table_name="AllWISE Source Catalog", rematch=False, rematch_to_neowise=False, save_when_done=True):
+    def match_all_chunks(self,
+                         table_name="AllWISE Source Catalog",
+                         save_when_done=True):
+        """
+        Some descritopn
+
+        :param table_name: The name of the table you want to match against
+        :type table_name: str
+        :param save_when_done: save the parent sample dataframe with the matching info when done
+        :type save_when_done: bool
+        :return:
+        """
+
         for i in range(self.n_chunks):
             self._match_single_chunk(i, table_name)
 
         _dupe_mask = self._get_dubplicated_wise_id_mask()
+
+        # vvvvvvvvvvvv                        THIS IS DEAD CODE                          vvvvvvvvvvvv #
+        rematch = False
+        rematch_to_neowise = False
         if np.any(_dupe_mask) and rematch:
             self._rematch_duplicates(table_name, _dupe_mask, filext="_rematch1")
 
@@ -279,6 +300,7 @@ class WISEDataBase(abc.ABC):
                         self._rematch_duplicates(table_name='NEOWISE-R Single Exposure (L1b) Source Table',
                                                  mask=_interval_inf_mask,
                                                  filext=f"_rematch2_c{mi}")
+        # ^^^^^^^^^^^^^^                      THIS IS DEAD CODE                         ^^^^^^^^^^^^^^ #
 
         self._no_allwise_source = self.parent_sample.df[self.parent_sample_wise_skysep_key] == np.inf
         if np.any(self._no_allwise_source):
@@ -394,8 +416,11 @@ class WISEDataBase(abc.ABC):
     def _match_single_chunk(self, chunk_number, table_name):
         """
         Match the parent sample to WISE
-        :param chunk_number: int, number of the declination chunk
-        :param table_name: str, optional, WISE table to match to, default is AllWISE Source Catalog
+
+        :param chunk_number: number of the declination chunk
+        :type chunk_number: int
+        :param table_name: optional, WISE table to match to, default is AllWISE Source Catalog
+        :type table_name: str
         """
 
         dec_intervall_mask = self.chunk_map == chunk_number
@@ -503,19 +528,33 @@ class WISEDataBase(abc.ABC):
     # START GET PHOTOMETRY DATA       #
     ###################################
 
-    def get_photometric_data(self, tables=None, perc=1, wait=0, service=None, mag=True, flux=False, nthreads=100,
+    def get_photometric_data(self, tables=None, perc=1, wait=0, service=None, nthreads=100,
                              chunks=None, overwrite=False, remove_chunks=False):
         """
-        Load photometric data from the IRSA server for the matched sample
-        :param tables: list like, WISE tables to use for photometry query, defaults to AllWISE and NOEWISER photometry
-        :param perc: float, percentage of sources to load photometry for, default 1
-        :param nthreads: int, max number of threads to launch
-        :param flux: bool, get flux values if True
-        :param mag: bool, gets magnitude values if True
-        :param service: str, either of 'gator' or 'tap', selects base on elements per chunk by default
-        :param wait: float, time in hours to wait after submitting TAP jobs
-        :param chunks: list-like, containing indices of chunks to download
+        Load photometric data from the IRSA server for the matched sample. The result will be saved under
+
+            </path/to/timewise/data/dir>/output/<base_name>/lightcurves/binned_lightcurves_<service>.json
+
+        :param remove_chunks: remove single chunk files after binning
+        :type remove_chunks: bools
+        :param overwrite: overwrite already existing lightcurves and metadata
+        :type overwrite: bool
+        :param tables: WISE tables to use for photometry query, defaults to AllWISE and NOEWISER photometry
+        :type tables: str or list-like
+        :param perc: percentage of sources to load photometry for, default 1
+        :type perc: float
+        :param nthreads: max number of threads to launch
+        :type nthreads: int
+        :param service: either of 'gator' or 'tap', selects base on elements per chunk by default
+        :type service: str
+        :param wait: time in hours to wait after submitting TAP jobs
+        :type wait: float
+        :param chunks: containing indices of chunks to download
+        :type chunks: list-like
         """
+
+        mag = True
+        flux = False
 
         if tables is None:
             tables = [
@@ -586,6 +625,16 @@ class WISEDataBase(abc.ABC):
             json.dump(lcs, f)
 
     def load_binned_lcs(self, service):
+        """Loads the binned lightcurves. For any int `ID` the lightcurves can convieniently read into a pandas.DataFrame
+        via
+
+            lc = pandas.DataFrame.from_dict(json_dictionary[ID])
+
+        :param service: the service with which the lightcuvres were downloaded
+        :type service: str
+        :return: the binned lightcurves
+        :rtype: dict
+        """
         return self._load_lightcurves(service)
 
     def _combine_lcs(self, service=None, chunk_number=None, remove=False, overwrite=False):
@@ -749,14 +798,6 @@ class WISEDataBase(abc.ABC):
                 f_ul_key=f'{self.flux_density_key_ext}{self.upper_limit_key}'
             )
 
-            # if self.parent_sample:
-            #     wise_id = self.parent_sample.df.loc[int(parent_sample_idx), self.parent_wise_source_id_key]
-            # else:
-            #     wise_id = np.nan
-            # # print(wise_id, type(wise_id), parent_sample_idx)
-            # if not isinstance(wise_id, str):
-            #     if not np.isnan(wise_id):
-            #         wise_id = int(wise_id)
 
             binned_lcs[f"{int(parent_sample_idx)}"] = binned_lc.to_dict()
 
@@ -775,6 +816,7 @@ class WISEDataBase(abc.ABC):
         """
         Construct a query string to submit to IRSA
         :param table_name: str, table name
+        :type table_name: str
         :return: str
         """
         logger.debug(f"constructing query for {table_name}")
@@ -847,7 +889,6 @@ class WISEDataBase(abc.ABC):
                 logger.warning(f"{chunk_number}th query of {table_name}: Could not submit TAP job!\n"
                                f"{e}. Waiting {wait}s and try again. {N_tries} tries left.")
                 time.sleep(wait)
-
 
     def _chunk_photometry_cache_filename(self, table_nice_name, chunk_number, additional_neowise_query=False):
         table_name = self.get_db_name(table_nice_name)
@@ -1072,7 +1113,12 @@ class WISEDataBase(abc.ABC):
     @abc.abstractmethod
     def bin_lightcurve(self, lightcurve):
         """
-        :return: pd.DataFrame
+        Bins a lightcurve
+
+        :param lightcurve: The unbinned lightcurve
+        :type lightcurve: pandas.DataFrame
+        :return: the binned lightcurve
+        :rtype: pd.DataFrame
         """
         raise NotImplementedError
 
@@ -1085,6 +1131,15 @@ class WISEDataBase(abc.ABC):
     # ---------------------------------------------------- #
 
     def find_color_correction(self, w1_minus_w2):
+        """
+        Find the color correction based on the W1-W2 color.
+        See https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#conv2flux
+
+        :param w1_minus_w2:
+        :type w1_minus_w2: float
+        :return: the color correction factor
+        :rtype: float
+        """
         w1_minus_w2 = np.atleast_1d(w1_minus_w2)
         c = pd.DataFrame(columns=self.magnitude_zeropoints_corrections.columns)
         power_law_values = self.magnitude_zeropoints_corrections.loc[8:16]['[W1 - W2]']
@@ -1101,12 +1156,18 @@ class WISEDataBase(abc.ABC):
                     F = (F_nu / f_c) * 10 ^ (-m / 2.5)
 
         where F_nu is the zeropoint flux for the corresponding band and f_c a color correction factor.
-        :param vegamag: float or ndarray
-        :param band: str
-        :param unit: str, unit to convert the flux density to
-        :param color_correction: float or ndarray or dict thereof, the colorcorection factor,
-            if dict the keys have to be 'f_c("band")'
-        :return: ndarray
+        See https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#conv2flux
+
+        :param vegamag:
+        :type vegamag: float or numpy.ndarray
+        :param band:
+        :type band: str
+        :param unit: unit to convert the flux density to
+        :type unit: str
+        :param color_correction: the colorcorection factor, if dict the keys have to be 'f_c("band")'
+        :type color_correction: float or numpy.ndarray or dict
+        :return: the flux densities
+        :rtype: ndarray
         """
         if not isinstance(color_correction, type(None)):
             key = f'f_c({band})'
@@ -1133,6 +1194,27 @@ class WISEDataBase(abc.ABC):
     def add_flux_density(self, lightcurve,
                          mag_key, emag_key, mag_ul_key,
                          f_key, ef_key, f_ul_key, do_color_correction=False):
+        """Adds flux densities to a lightcurves
+
+        :param lightcurve:
+        :type lightcurve: pandas.DataFrame
+        :param mag_key: the key in `lightcurve` that holds the magnitude
+        :type mag_key: str
+        :param emag_key: the key in `lightcurve` that holds the error of the magnitude
+        :type emag_key: str
+        :param mag_ul_key: the key in `lightcurve` that holds the upper limit for the magnitude
+        :type mag_ul_key: str
+        :param f_key: the key that will hold the flux density
+        :type f_key: str
+        :param ef_key: the key that will hold the flux density error
+        :type ef_key: str
+        :param f_ul_key: the key that will hold the flux density upper limit
+        :type f_ul_key: str
+        :param do_color_correction:
+        :type do_color_correction: bool
+        :return: the lightcurve with flux density
+        :rtype: pandas.DataFrame
+        """
 
         if isinstance(lightcurve, dict):
             lightcurve = pd.DataFrame.from_dict(lightcurve, orient='columns')
@@ -1159,7 +1241,12 @@ class WISEDataBase(abc.ABC):
 
         return lightcurve
 
-    def _add_flux_densities_to_saved_lightcurves(self, service):
+    def add_flux_densities_to_saved_lightcurves(self, service):
+        """Adds flux densities to all downloaded lightcurves
+
+        :param service: The service with which the lightcurves were downloaded
+        :type service: str
+        """
         lcs = self.load_binned_lcs(service=service)
         for i, lc in tqdm.tqdm(lcs.items(), desc='adding flux densities'):
             lcs[i] = self.add_flux_density(
@@ -1185,13 +1272,21 @@ class WISEDataBase(abc.ABC):
                                      unit='erg s-1', flux_density_unit='mJy'):
         """
         Converts a flux density into a luminosity
-        :param flux_density: float or ndarray
-        :param band: str
-        :param distance: astropy.Quantity, distance to source, if not given will use luminosity distance from redshift
-        :param redshift: float, redshift to use when calculating luminosity distance
-        :param unit: str or astropy.unit, unit in which to give the luminosity, default is erg s-1 sm-2
-        :param flux_density_unit: str or astropy.unit, unit in which the flux density is given, default is mJy
-        :return: float or ndarray
+
+        :param flux_density:
+        :type flux_density: float or numpy.ndarray
+        :param band:
+        :type band: str
+        :param distance: distance to source, if not given will use luminosity distance from redshift
+        :type distance: astropy.Quantity
+        :param redshift: redshift to use when calculating luminosity distance
+        :type redshift: float
+        :param unit: unit in which to give the luminosity, default is erg s-1 sm-2
+        :type unit: str or astropy.unit
+        :param flux_density_unit: unit in which the flux density is given, default is mJy
+        :type flux_density_unit: str or astropy.unit
+        :return: the resulting luminosities
+        :rtype: float or ndarray
         """
 
         if not distance:
@@ -1216,7 +1311,16 @@ class WISEDataBase(abc.ABC):
             lightcurve[band + lum_ul_key] = lightcurve[band + f_ul_key]
         return lightcurve
 
-    def _add_luminosity_to_saved_lightcurves(self, service, redshift_key=None, distance_key=None):
+    def add_luminosity_to_saved_lightcurves(self, service, redshift_key=None, distance_key=None):
+        """Add luminosities to all lightcurves, calculated from flux desnities and distance or redshift
+
+        :param service: the service with which the lightcurves were downloaded
+        :type service: str
+        :param redshift_key: the key in the parent sample data frame that holds the redshift info
+        :type redshift_key: str
+        :param distance_key: the key in the parent sample data frame that holds the distance info
+        :type distance_key: str
+        """
 
         if (not redshift_key) and (not distance_key):
             raise ValueError('Either distance key or redshift key has to be given!')
@@ -1258,8 +1362,29 @@ class WISEDataBase(abc.ABC):
     # START MAKE PLOTTING FUNCTIONS     #
     #####################################
 
-    def plot_lc(self, parent_sample_idx=None, service='tap', plot_unbinned=False, plot_binned=True,
+    def plot_lc(self, parent_sample_idx, service='tap', plot_unbinned=False, plot_binned=True,
                 interactive=False, fn=None, ax=None, save=True, lum_key='flux_density', **kwargs):
+        """Make a pretty plot of a lightcurve
+
+        :param parent_sample_idx: The index in the parent sample of the lightcurve
+        :type parent_sample_idx: int
+        :param service: the service with which the lightcurves were downloaded
+        :type service: str
+        :param plot_unbinned: plot unbinned data
+        :type plot_unbinned: bool
+        :param plot_binned: plot binned lightcurve
+        :type plot_binned: bool
+        :param interactive: interactive mode
+        :type interactive: bool
+        :param fn: filename, defaults to </path/to/timewise/data/dir>/output/plots/<base_name>/<parent_sample_index>_<lum_key>.pdf
+        :type fn: str
+        :param ax: pre-existing matplotlib.Axis
+        :param save: save the plot
+        :type save: bool
+        :param lum_key: the unit of luminosity to use in the plot, either of 'mag', 'flux_density' or 'luminosity'
+        :param kwargs: any additional kwargs will be passed on to `matplotlib.pyplot.subplots()`
+        :return: the matplotlib.Figure and matplotlib.Axes if `interactive=True`
+        """
 
         logger.debug(f"loading binned lightcurves")
         lcs = self.load_binned_lcs(service)
@@ -1384,11 +1509,32 @@ class WISEDataBase(abc.ABC):
             json.dump(metadata, f)
 
     def load_metadata(self, service):
+        """Load the metadata
+
+        :param service: The service with which the lightcurves were downloaded
+        :type service: str
+        :return: the metadata
+        :rtype: dict
+        """
         return self._load_metadata(service)
 
     def calculate_metadata(self, service, chunk_number=None, jobID=None, overwrite=True):
+        """Calculates the metadata for all downloaded lightcurves.
+         Results will be saved under
+
+            </path/to/timewise/data/dir>/output/<base_name>/lightcurves/metadata_<service>.json
+
+        :param service: the service with which the lightcurves were downloaded
+        :type service: str
+        :param chunk_number: the chunk number to use, default uses all chunks
+        :type chunk_number: int
+        :param jobID:  the job ID to use, default uses all lightcurves
+        :type jobID: int
+        :param overwrite: overwrite existing metadata file
+        :type overwrite: bool
+        """
         lcs = self._load_lightcurves(service, chunk_number, jobID)
-        metadata = self._calculate_metadata(lcs)
+        metadata = self.calculate_metadata_single(lcs)
         self._save_metadata(metadata, service, chunk_number, jobID, overwrite=overwrite)
 
     def _combine_metadata(self, service=None, chunk_number=None, remove=False, overwrite=False):
@@ -1423,7 +1569,13 @@ class WISEDataBase(abc.ABC):
         self._save_metadata(lcs, service=service, chunk_number=chunk_number, overwrite=overwrite)
 
     @abc.abstractmethod
-    def _calculate_metadata(self, lcs):
+    def calculate_metadata_single(self, lcs):
+        """
+        Calculates some properties of the lightcurves
+
+        :param lcs: the lightcurve
+        :type lcs: pandas.DataFrame
+        """
         raise NotImplementedError
 
     #####################################

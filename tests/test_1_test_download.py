@@ -82,10 +82,10 @@ class TestMIRFlareCatalogue(unittest.TestCase):
             wise_data.get_photometric_data(service=s, mag=True, flux=True)
 
             logger.info(f" --- Test adding flux densities --- ")
-            wise_data._add_flux_densities_to_saved_lightcurves(s)
+            wise_data.add_flux_densities_to_saved_lightcurves(s)
 
             logger.info(f" --- Test adding luminosities --- ")
-            wise_data._add_luminosity_to_saved_lightcurves(s, redshift_key='Z')
+            wise_data.add_luminosity_to_saved_lightcurves(s, redshift_key='Z')
 
             logger.info(f" --- Test calculating metadata --- ")
             wise_data.calculate_metadata(service=s)
