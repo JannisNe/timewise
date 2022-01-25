@@ -1,6 +1,18 @@
 Usage
 =====
 
+.. image:: https://github.com/JannisNe/timewise/actions/workflows/continous_integration.yml/badge.svg
+    :target: https://github.com/JannisNe/timewise/actions/workflows/continous_integration.yml
+
+.. image:: https://coveralls.io/repos/github/JannisNe/timewise/badge.svg?branch=main
+    :target: https://coveralls.io/github/JannisNe/timewise?branch=main
+
+.. image:: https://badge.fury.io/py/timewise.svg
+    :target: https://badge.fury.io/py/timewise
+
+.. image:: https://zenodo.org/badge/449677569.svg
+   :target: https://zenodo.org/badge/latestdoi/449677569
+
 
 ************
 Installation
@@ -34,6 +46,13 @@ the unittest
 .. code-block:: console
 
     python -m unittest discover tests/
+
+
+****
+Cite
+****
+
+If you use `timewise` please cite `this <https://zenodo.org/badge/latestdoi/449677569>`_
 
 **************
 Data directory

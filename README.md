@@ -2,6 +2,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/JannisNe/timewise/badge.svg?branch=main)](https://coveralls.io/github/JannisNe/timewise?branch=main)
 [![PyPI version](https://badge.fury.io/py/timewise.svg)](https://badge.fury.io/py/timewise)
 [![Documentation Status](https://readthedocs.org/projects/timewise/badge/?version=latest)](https://timewise.readthedocs.io/en/latest/?badge=latest)
+[![DOI](https://zenodo.org/badge/449677569.svg)](https://zenodo.org/badge/latestdoi/449677569)
 
 
 
@@ -36,6 +37,8 @@ As soon as required you will be required to enter your username and password.
 python -m unittest discover tests/
 ```
 
+## Cite
+If you you `timewise` please cite [this](https://zenodo.org/badge/latestdoi/449677569).
 
 ## Usage
 Detailed documentation can be found [here](https://timewise.readthedocs.io/en/latest/)
