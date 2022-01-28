@@ -838,7 +838,7 @@ class WISEDataBase(abc.ABC):
         q += f'RIGHT JOIN\n\t{db_name} \n'
         q += 'WHERE \n'
         q += f"\tCONTAINS(POINT('J2000',{db_name}.ra,{db_name}.dec)," \
-             f"CIRCLE('J2000',mine.ra_in,mine.dec_in,0.00083))=1 "
+             f"CIRCLE('J2000',mine.ra_in,mine.dec_in,{self.min_sep.to('deg').value}))=1 "
         if len(self.constraints) > 0:
             q += ' AND (\n'
             for c in self.constraints:
