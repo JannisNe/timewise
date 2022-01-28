@@ -103,7 +103,6 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._cluster_queue.join()
         logger.debug('cluster done')
 
-
         self._combine_lcs(service=service, overwrite=True, remove=remove_chunks)
         self._combine_metadata(service=service, overwrite=True, remove=remove_chunks)
 
