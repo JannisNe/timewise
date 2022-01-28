@@ -7,7 +7,7 @@ with open("README.md", "r") as fh:
 if __name__ == '__main__':
     setuptools.setup(
         name="timewise",
-        version="0.1.5",
+        version="0.1.6",
         author="Jannis Necker",
         author_email="jannis.necker@gmail.com",
         description="A small package to download infrared data from the WISE satellite",
@@ -26,7 +26,7 @@ if __name__ == '__main__':
             "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
         ],
-        python_requires='>=3.9',
+        python_requires='>=3.8',
         install_requires=[
             "tqdm==4.62.3",
             "requests==2.27.1",
