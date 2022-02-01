@@ -14,6 +14,11 @@ class WiseDataByVisit(WISEDataBase):
     WISEData class to bin lightcurve by visit
     """
 
+    mean_key = '_mean'
+    rms_key = '_rms'
+    upper_limit_key = '_ul'
+    Npoints_key = '_Npoints'
+
     def bin_lightcurve(self, lightcurve):
         """
         Combine the data by visits of the satellite of one region in the sky.
@@ -66,6 +71,7 @@ class WiseDataByVisit(WISEDataBase):
                         r[f'{b}{self.mean_key}{lum_ext}'] = mean
                         r[f'{b}{lum_ext}{self.rms_key}'] = max(u_rms, u_mes)
                         r[f'{b}{lum_ext}{self.upper_limit_key}'] = bool(ul)
+                        r[f'{b}{lum_ext}{self.Npoints_key}'] = len(f)
                     except KeyError:
                         pass
 
@@ -81,6 +87,7 @@ class WiseDataByVisit(WISEDataBase):
         - `min_rms`: the minimum errorbar of all datapoints
         - `N_datapoints`: The number of datapoints
         - `max_deltat`: the maximum time difference between any two datapoints
+        - `mean_weighted_ppb`: the weighted average brightness where the weights are the points per bin
 
         :param lcs: the lightcurves
         :type lcs: dict
@@ -97,17 +104,21 @@ class WiseDataByVisit(WISEDataBase):
                     llumkey = f"{band}{self.mean_key}{lum_key}"
                     errkey = f"{band}{lum_key}{self.rms_key}"
                     ul_key = f'{band}{lum_key}{self.upper_limit_key}'
+                    ppb_key = f'{band}{lum_key}{self.Npoints_key}'
 
                     difk = f"{band}_max_dif{lum_key}"
                     rmsk = f"{band}_min_rms{lum_key}"
                     Nk = f"{band}_N_datapoints{lum_key}"
                     dtk = f"{band}_max_deltat{lum_key}"
+                    mean_weighted_ppb_key = f"{band}_mean_weighted_ppb{lum_key}"
 
                     try:
                         ilc = lc[~np.array(lc[ul_key]).astype(bool)]
                         imetadata[Nk] = len(ilc)
 
                         if len(ilc) > 0:
+                            imetadata[mean_weighted_ppb_key] = np.average(ilc[llumkey], weights=ilc[ppb_key])
+
                             imin = ilc[llumkey].min()
                             imax = ilc[llumkey].max()
                             imin_rms_ind = ilc[errkey].argmin()
