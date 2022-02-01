@@ -32,7 +32,7 @@ if __name__ == '__main__':
             "requests==2.27.1",
             "pandas==1.4.0",
             "numpy==1.22.1",
-            "pyvo==1.1",
+            "pyvo==1.2.1",
             "astropy==5.0",
             "matplotlib==3.5.1",
             "coveralls==3.3.1",
