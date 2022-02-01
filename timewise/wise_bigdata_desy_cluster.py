@@ -153,6 +153,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         process = subprocess.Popen(qstat_command, stdout=subprocess.PIPE, shell=True)
         # read the output
         tmp = process.stdout.read().decode()
+        process.terminate()
         return str(tmp)
 
     @staticmethod
@@ -368,6 +369,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         process = subprocess.Popen(submit_cmd, stdout=subprocess.PIPE, shell=True)
         msg = process.stdout.read().decode()
+        process.terminate()
         logger.info(str(msg))
         job_id = int(str(msg).split('job-array')[1].split('.')[0])
         logger.info(f"Running on cluster with ID {job_id}")
