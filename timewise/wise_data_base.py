@@ -53,10 +53,6 @@ class WISEDataBase(abc.ABC):
     error_key_ext = "_error"
     band_plot_colors = {'W1': 'r', 'W2': 'b'}
 
-    mean_key = '_mean'
-    rms_key = '_rms'
-    upper_limit_key = '_ul'
-
     photometry_table_keymap = {
         'AllWISE Multiepoch Photometry Table': {
             'flux': {
@@ -362,7 +358,7 @@ class WISEDataBase(abc.ABC):
             logger.info(out_msg.decode())
         if err_msg:
             logger.error(err_msg.decode())
-
+        process.terminate()
         if os.path.isfile(out_file):
             return 1
         else:
@@ -714,8 +710,8 @@ class WISEDataBase(abc.ABC):
     def _gator_photometry_worker_thread(self):
         while True:
             try:
-                args = self.queue.get()
-            except AttributeError:
+                args = self.queue.get(block=False)
+            except (AttributeError, queue.Empty):
                 logger.debug('No more tasks, exiting')
                 break
             logger.debug(f"{args}")
@@ -726,7 +722,7 @@ class WISEDataBase(abc.ABC):
     def _query_for_photometry_gator(self, tables, chunks, mag, flux, nthreads):
         nthreads = min(nthreads, len(chunks))
         logger.debug(f'starting {nthreads} workers')
-        threads = [threading.Thread(target=self._gator_photometry_worker_thread, daemon=True) for _ in range(nthreads)]
+        threads = [threading.Thread(target=self._gator_photometry_worker_thread) for _ in range(nthreads)]
 
         logger.debug(f"using {len(chunks)} chunks")
         self.queue = queue.Queue()
@@ -739,6 +735,9 @@ class WISEDataBase(abc.ABC):
             t.start()
         self.queue.join()
         self.queue = None
+
+        for t in threads:
+            t.join()
 
     def _get_unbinned_lightcurves_gator(self, chunk_number, clear=False):
         # load only the files for this chunk
@@ -967,12 +966,12 @@ class WISEDataBase(abc.ABC):
             else:
                 logger.warning(f'queue {i} of {t}: Job not active! Phase is {phase}')
 
-            time.sleep(np.random.uniform(600))
+            time.sleep(np.random.uniform(60))
 
         logger.debug("closing thread")
 
     def _run_tap_worker_threads(self, nthreads):
-        threads = [threading.Thread(target=self._tap_photometry_worker_thread, daemon=True)
+        threads = [threading.Thread(target=self._tap_photometry_worker_thread)
                    for _ in range(nthreads)]
 
         for t in threads:
@@ -987,6 +986,8 @@ class WISEDataBase(abc.ABC):
         for i, t in enumerate(threads):
             logger.debug(f"{i}th thread alive: {t.is_alive()}")
 
+        for t in threads:
+            t.join()
         self.tap_jobs = None
         del threads
 
