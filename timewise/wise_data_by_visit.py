@@ -4,7 +4,7 @@ import numpy as np
 
 from timewise.general import main_logger
 from timewise.wise_data_base import WISEDataBase
-
+from timewise.utils import get_excess_variance
 
 logger = main_logger.getChild(__name__)
 
@@ -111,13 +111,16 @@ class WiseDataByVisit(WISEDataBase):
                     Nk = f"{band}_N_datapoints{lum_key}"
                     dtk = f"{band}_max_deltat{lum_key}"
                     mean_weighted_ppb_key = f"{band}_mean_weighted_ppb{lum_key}"
-
+                    excess_variance_key= f"{band}_excess_variance_{lum_key}"
+                    excess_variance_err_key= f"{band}_excess_variance_err_{lum_key}"
+                    
                     try:
                         ilc = lc[~np.array(lc[ul_key]).astype(bool)]
                         imetadata[Nk] = len(ilc)
 
                         if len(ilc) > 0:
                             imetadata[mean_weighted_ppb_key] = np.average(ilc[llumkey], weights=ilc[ppb_key])
+                            imetadata[excess_variance_key], imetadata[excess_variance_err_key] = get_excess_variance(ilc[llumkey], ilc[errkey], imetadata[mean_weighted_ppb_key])                   
 
                             imin = ilc[llumkey].min()
                             imax = ilc[llumkey].max()
