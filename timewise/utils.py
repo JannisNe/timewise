@@ -112,6 +112,43 @@ def plot_sdss_cutout(ra, dec, arcsec=20, arcsec_per_px=0.1, interactive=False, f
 
     plt.close()
 
+
 #####################################################
 #            END SDSS UTILS                         #
 ###########################################################################################################
+
+
+# calculate excess variance as done in section 7.3.4 of (Boller et al)
+# https://www.aanda.org/articles/aa/full_html/2016/04/aa25648-15/aa25648-15.html#S26
+
+def calc_Expectation(a):
+     
+    # variable prb is for probability
+    # of each element which is same for
+    # each element
+    n = len(a)
+    prb = 1 / n
+    # calculating expectation overall
+    sum = 0
+    for i in range(0, n):
+        sum += (a[i] * prb)
+    # returning expectation as sum
+    return float(sum)
+
+def get_excess_variance(y, y_err, mu):
+    import numpy as np
+    N = len(y)
+    sum_variance = 0
+    for i, (X, sig) in enumerate(zip(y, y_err)):
+        sum_variance += np.power(X-mu,2) - np.power(sig,2)
+       
+    excess_variance = (sum_variance)/(N*mu**2)
+    
+    # calculate the uncertainty
+    F_var = np.sqrt(np.abs(excess_variance))/mu
+    std_exp = calc_Expectation(y_err**2)
+    term1 = np.sqrt(2/N)*std_exp/(np.power(mu,2))
+    term2 = np.sqrt((std_exp*2*F_var)/(N*mu))
+    
+    uncertainty = np.sqrt(term1**2 + term2**2)
+    return excess_variance, uncertainty
