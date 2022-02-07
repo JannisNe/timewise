@@ -61,7 +61,7 @@ jobs:
           SDSS_USERID: ${{ secrets.SDSS_USERID }}
           SDSS_USERPW: ${{ secrets.SDSS_USERPW }}
         run: |
-          coverage run --concurrency=multiprocessing -m unittest discover tests/
+          coverage run -m unittest discover tests/
           coverage combine
 
       - name: Run Coveralls
