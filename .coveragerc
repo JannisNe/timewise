@@ -3,7 +3,7 @@
 source = timewise
 omit = timewise/wise_bigdata_desy_cluster.py
 parallel = True
-concurrency = thread
+concurrency = thread, multiprocessing
 
 [report]
 # Regexes for lines to exclude from consideration
