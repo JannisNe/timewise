@@ -1,4 +1,4 @@
-import os, subprocess, copy, json, argparse, tqdm, time, threading, math, queue, pickle, getpass, requests, abc
+import os, subprocess, copy, json, tqdm, time, threading, queue, requests, abc
 import multiprocessing as mp
 import pandas as pd
 import numpy as np
@@ -85,6 +85,7 @@ class WISEDataBase(abc.ABC):
     }
 
     # zero points come from https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#conv2flux
+    # published in Jarret et al. (2011): https://ui.adsabs.harvard.edu/abs/2011ApJ...735..112J/abstract
     magnitude_zeropoints = {
         'F_nu': {
             'W1': 309.54 * u.Jy,
@@ -93,7 +94,16 @@ class WISEDataBase(abc.ABC):
         'Fstar_nu': {
             'W1': 306.682 * u.Jy,
             'W2': 170.663 * u.Jy
+        },
+        'Mag': {
+            'W1': 20.752,
+            'W2': 19.596
         }
+    }
+
+    aperture_corrections = {
+        'W1': 0.222,
+        'W2': 0.280
     }
 
     _this_dir = os.path.abspath(os.path.dirname(__file__))
@@ -221,10 +231,10 @@ class WISEDataBase(abc.ABC):
             logger.warning("No parent sample given! Can not calculate dec interval masks!")
 
     def _get_chunk_number(self, wise_id=None, parent_sample_index=None):
-        if (not wise_id) and (not parent_sample_index):
+        if isinstance(wise_id, type(None)) and isinstance(parent_sample_index, type(None)):
             raise Exception
 
-        if wise_id:
+        if not isinstance(wise_id, type(None)):
             parent_sample_index = np.where(self.parent_sample.df[self.parent_wise_source_id_key] == int(wise_id))[0]
             logger.debug(f"wise ID {wise_id} at index {parent_sample_index}")
 
@@ -550,7 +560,7 @@ class WISEDataBase(abc.ABC):
         """
 
         mag = True
-        flux = False
+        flux = True
 
         if tables is None:
             tables = [
@@ -787,16 +797,6 @@ class WISEDataBase(abc.ABC):
             lum_keys = [c for c in lightcurves.columns if ("W1" in c) or ("W2" in c)]
             lightcurve = selected_data[['mjd'] + lum_keys]
             binned_lc = self.bin_lightcurve(lightcurve)
-            binned_lc = self.add_flux_density(
-                binned_lc,
-                mag_key=f'{self.mean_key}{self.mag_key_ext}',
-                emag_key=f'{self.mag_key_ext}{self.rms_key}',
-                mag_ul_key=f'{self.mag_key_ext}{self.upper_limit_key}',
-                f_key=f'{self.mean_key}{self.flux_density_key_ext}',
-                ef_key=f'{self.flux_density_key_ext}{self.rms_key}',
-                f_ul_key=f'{self.flux_density_key_ext}{self.upper_limit_key}'
-            )
-
 
             binned_lcs[f"{int(parent_sample_idx)}"] = binned_lc.to_dict()
 
@@ -1071,7 +1071,6 @@ class WISEDataBase(abc.ABC):
         lightcurves = self._get_unbinned_lightcurves(chunk_number, clear=self.clear_unbinned_photometry_when_binning)
 
         if jobID:
-            # _chunk_number = self.clusterJob_chunk_map.loc[jobID, 'chunk_number']
             indices = np.where(self.cluster_jobID_map == jobID)[0]
         else:
             indices = lightcurves[self._tap_orig_id_key].unique()
@@ -1087,17 +1086,7 @@ class WISEDataBase(abc.ABC):
                 logger.warning(f"No data for {parent_sample_entry_id}")
                 continue
 
-            # ID = lightcurve[self._tap_wise_id_key].iloc[0]
             binned_lc = self.bin_lightcurve(lightcurve)
-            binned_lc = self.add_flux_density(
-                binned_lc,
-                mag_key=f'{self.mean_key}{self.mag_key_ext}',
-                emag_key=f'{self.mag_key_ext}{self.rms_key}',
-                mag_ul_key=f'{self.mag_key_ext}{self.upper_limit_key}',
-                f_key=f'{self.mean_key}{self.flux_density_key_ext}',
-                ef_key=f'{self.flux_density_key_ext}{self.rms_key}',
-                f_ul_key=f'{self.flux_density_key_ext}{self.upper_limit_key}'
-            )
             binned_lcs[f"{int(parent_sample_entry_id)}"] = binned_lc.to_dict()
 
         logger.debug(f"chunk {chunk_number}: saving {len(binned_lcs.keys())} binned lcs")
