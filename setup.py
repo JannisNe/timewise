@@ -30,7 +30,7 @@ if __name__ == '__main__':
         install_requires=[
             "tqdm==4.62.3",
             "requests==2.27.1",
-            "pandas==1.4.0",
+            "pandas==1.4.1",
             "numpy==1.22.1",
             "pyvo==1.3",
             "astropy==5.0",
