@@ -53,7 +53,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         """
 
         mag = True
-        flux = False
+        flux = True
 
         if tables is None:
             tables = [
@@ -150,11 +150,12 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def _qstat_output(qstat_command):
         """return the output of the qstat_command"""
         # start a subprocess to query the cluster
-        process = subprocess.Popen(qstat_command, stdout=subprocess.PIPE, shell=True)
-        # read the output
-        tmp = process.stdout.read().decode()
-        process.terminate()
-        return str(tmp)
+        with subprocess.Popen(qstat_command, stdout=subprocess.PIPE, shell=True) as process:
+            # read the output
+            tmp = process.stdout.read().decode()
+            process.terminate()
+            msg = str(tmp)
+        return msg
 
     @staticmethod
     def _get_ids(qstat_command):
@@ -367,9 +368,10 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         self._make_cluster_script(cluster_h, cluster_ram, tables, service)
 
-        process = subprocess.Popen(submit_cmd, stdout=subprocess.PIPE, shell=True)
-        msg = process.stdout.read().decode()
-        process.terminate()
+        with subprocess.Popen(submit_cmd, stdout=subprocess.PIPE, shell=True) as process:
+            msg = process.stdout.read().decode()
+            process.terminate()
+
         logger.info(str(msg))
         job_id = int(str(msg).split('job-array')[1].split('.')[0])
         logger.info(f"Running on cluster with ID {job_id}")
