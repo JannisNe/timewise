@@ -185,6 +185,10 @@ class WISEDataBase(abc.ABC):
         self.tap_jobs = None
         self.queue = queue.Queue()
         self.clear_unbinned_photometry_when_binning = False
+        self._cached_final_products = {
+            'lightcurves': dict(),
+            'metadata': dict()
+        }
 
         self._tap_wise_id_key = 'wise_id'
         self._tap_orig_id_key = 'orig_id'
@@ -619,6 +623,9 @@ class WISEDataBase(abc.ABC):
         fn = self._lightcurve_filename(service, chunk_number, jobID)
         logger.debug(f"saving {len(lcs)} new lightcurves to {fn}")
 
+        if fn == self._lightcurve_filename(service):
+            self._cached_final_products['lightcurves'][service] = lcs
+
         if not overwrite:
             try:
                 old_lcs = self._load_lightcurves(service=service, chunk_number=chunk_number, jobID=jobID)
@@ -641,7 +648,9 @@ class WISEDataBase(abc.ABC):
         :return: the binned lightcurves
         :rtype: dict
         """
-        return self._load_lightcurves(service)
+        if service not in self._cached_final_products['lightcurves']:
+            self._cached_final_products['lightcurves'][service] = self._load_lightcurves(service)
+        return self._cached_final_products['lightcurves'][service]
 
     def _combine_lcs(self, service=None, chunk_number=None, remove=False, overwrite=False):
         if not service:
@@ -826,7 +835,7 @@ class WISEDataBase(abc.ABC):
             lum_keys += list(self.photometry_table_keymap[nice_name]['mag'].keys())
         if flux:
             lum_keys += list(self.photometry_table_keymap[nice_name]['flux'].keys())
-        keys = ['mjd'] + lum_keys
+        keys = ['ra', 'dec', 'mjd'] + lum_keys
         id_key = 'cntr_mf' if 'allwise' in db_name else 'allwise_cntr'
 
         q = 'SELECT \n\t'
@@ -1486,6 +1495,9 @@ class WISEDataBase(abc.ABC):
     def _save_metadata(self, metadata, service, chunk_number=None, jobID=None, overwrite=False):
         fn = self._metadata_filename(service, chunk_number, jobID)
 
+        if fn == self._metadata_filename(service):
+            self._cached_final_products['metadata'][service] = metadata
+
         if not overwrite:
             try:
                 old_metadata = self._load_metadata(service=service, chunk_number=chunk_number, jobID=jobID)
@@ -1506,7 +1518,9 @@ class WISEDataBase(abc.ABC):
         :return: the metadata
         :rtype: dict
         """
-        return self._load_metadata(service)
+        if not service in self._cached_final_products['metadata']:
+            self._cached_final_products['metadata'][service] = self._load_metadata(service)
+        return self._cached_final_products['metadata'][service]
 
     def calculate_metadata(self, service, chunk_number=None, jobID=None, overwrite=True):
         """Calculates the metadata for all downloaded lightcurves.
