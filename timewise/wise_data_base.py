@@ -1,4 +1,4 @@
-import os, subprocess, copy, json, argparse, tqdm, time, threading, math, queue, pickle, getpass, requests, abc
+import os, subprocess, copy, json, tqdm, time, threading, queue, requests, abc
 import multiprocessing as mp
 import pandas as pd
 import numpy as np
@@ -85,6 +85,7 @@ class WISEDataBase(abc.ABC):
     }
 
     # zero points come from https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#conv2flux
+    # published in Jarret et al. (2011): https://ui.adsabs.harvard.edu/abs/2011ApJ...735..112J/abstract
     magnitude_zeropoints = {
         'F_nu': {
             'W1': 309.54 * u.Jy,
@@ -93,7 +94,16 @@ class WISEDataBase(abc.ABC):
         'Fstar_nu': {
             'W1': 306.682 * u.Jy,
             'W2': 170.663 * u.Jy
+        },
+        'Mag': {
+            'W1': 20.752,
+            'W2': 19.596
         }
+    }
+
+    aperture_corrections = {
+        'W1': 0.222,
+        'W2': 0.280
     }
 
     _this_dir = os.path.abspath(os.path.dirname(__file__))
@@ -175,6 +185,10 @@ class WISEDataBase(abc.ABC):
         self.tap_jobs = None
         self.queue = queue.Queue()
         self.clear_unbinned_photometry_when_binning = False
+        self._cached_final_products = {
+            'lightcurves': dict(),
+            'metadata': dict()
+        }
 
         self._tap_wise_id_key = 'wise_id'
         self._tap_orig_id_key = 'orig_id'
@@ -221,10 +235,10 @@ class WISEDataBase(abc.ABC):
             logger.warning("No parent sample given! Can not calculate dec interval masks!")
 
     def _get_chunk_number(self, wise_id=None, parent_sample_index=None):
-        if (not wise_id) and (not parent_sample_index):
+        if isinstance(wise_id, type(None)) and isinstance(parent_sample_index, type(None)):
             raise Exception
 
-        if wise_id:
+        if not isinstance(wise_id, type(None)):
             parent_sample_index = np.where(self.parent_sample.df[self.parent_wise_source_id_key] == int(wise_id))[0]
             logger.debug(f"wise ID {wise_id} at index {parent_sample_index}")
 
@@ -550,7 +564,7 @@ class WISEDataBase(abc.ABC):
         """
 
         mag = True
-        flux = False
+        flux = True
 
         if tables is None:
             tables = [
@@ -609,6 +623,9 @@ class WISEDataBase(abc.ABC):
         fn = self._lightcurve_filename(service, chunk_number, jobID)
         logger.debug(f"saving {len(lcs)} new lightcurves to {fn}")
 
+        if fn == self._lightcurve_filename(service):
+            self._cached_final_products['lightcurves'][service] = lcs
+
         if not overwrite:
             try:
                 old_lcs = self._load_lightcurves(service=service, chunk_number=chunk_number, jobID=jobID)
@@ -631,7 +648,9 @@ class WISEDataBase(abc.ABC):
         :return: the binned lightcurves
         :rtype: dict
         """
-        return self._load_lightcurves(service)
+        if service not in self._cached_final_products['lightcurves']:
+            self._cached_final_products['lightcurves'][service] = self._load_lightcurves(service)
+        return self._cached_final_products['lightcurves'][service]
 
     def _combine_lcs(self, service=None, chunk_number=None, remove=False, overwrite=False):
         if not service:
@@ -787,16 +806,6 @@ class WISEDataBase(abc.ABC):
             lum_keys = [c for c in lightcurves.columns if ("W1" in c) or ("W2" in c)]
             lightcurve = selected_data[['mjd'] + lum_keys]
             binned_lc = self.bin_lightcurve(lightcurve)
-            binned_lc = self.add_flux_density(
-                binned_lc,
-                mag_key=f'{self.mean_key}{self.mag_key_ext}',
-                emag_key=f'{self.mag_key_ext}{self.rms_key}',
-                mag_ul_key=f'{self.mag_key_ext}{self.upper_limit_key}',
-                f_key=f'{self.mean_key}{self.flux_density_key_ext}',
-                ef_key=f'{self.flux_density_key_ext}{self.rms_key}',
-                f_ul_key=f'{self.flux_density_key_ext}{self.upper_limit_key}'
-            )
-
 
             binned_lcs[f"{int(parent_sample_idx)}"] = binned_lc.to_dict()
 
@@ -826,7 +835,7 @@ class WISEDataBase(abc.ABC):
             lum_keys += list(self.photometry_table_keymap[nice_name]['mag'].keys())
         if flux:
             lum_keys += list(self.photometry_table_keymap[nice_name]['flux'].keys())
-        keys = ['mjd'] + lum_keys
+        keys = ['ra', 'dec', 'mjd'] + lum_keys
         id_key = 'cntr_mf' if 'allwise' in db_name else 'allwise_cntr'
 
         q = 'SELECT \n\t'
@@ -1071,7 +1080,6 @@ class WISEDataBase(abc.ABC):
         lightcurves = self._get_unbinned_lightcurves(chunk_number, clear=self.clear_unbinned_photometry_when_binning)
 
         if jobID:
-            # _chunk_number = self.clusterJob_chunk_map.loc[jobID, 'chunk_number']
             indices = np.where(self.cluster_jobID_map == jobID)[0]
         else:
             indices = lightcurves[self._tap_orig_id_key].unique()
@@ -1087,17 +1095,7 @@ class WISEDataBase(abc.ABC):
                 logger.warning(f"No data for {parent_sample_entry_id}")
                 continue
 
-            # ID = lightcurve[self._tap_wise_id_key].iloc[0]
             binned_lc = self.bin_lightcurve(lightcurve)
-            binned_lc = self.add_flux_density(
-                binned_lc,
-                mag_key=f'{self.mean_key}{self.mag_key_ext}',
-                emag_key=f'{self.mag_key_ext}{self.rms_key}',
-                mag_ul_key=f'{self.mag_key_ext}{self.upper_limit_key}',
-                f_key=f'{self.mean_key}{self.flux_density_key_ext}',
-                ef_key=f'{self.flux_density_key_ext}{self.rms_key}',
-                f_ul_key=f'{self.flux_density_key_ext}{self.upper_limit_key}'
-            )
             binned_lcs[f"{int(parent_sample_entry_id)}"] = binned_lc.to_dict()
 
         logger.debug(f"chunk {chunk_number}: saving {len(binned_lcs.keys())} binned lcs")
@@ -1497,6 +1495,9 @@ class WISEDataBase(abc.ABC):
     def _save_metadata(self, metadata, service, chunk_number=None, jobID=None, overwrite=False):
         fn = self._metadata_filename(service, chunk_number, jobID)
 
+        if fn == self._metadata_filename(service):
+            self._cached_final_products['metadata'][service] = metadata
+
         if not overwrite:
             try:
                 old_metadata = self._load_metadata(service=service, chunk_number=chunk_number, jobID=jobID)
@@ -1517,7 +1518,9 @@ class WISEDataBase(abc.ABC):
         :return: the metadata
         :rtype: dict
         """
-        return self._load_metadata(service)
+        if not service in self._cached_final_products['metadata']:
+            self._cached_final_products['metadata'][service] = self._load_metadata(service)
+        return self._cached_final_products['metadata'][service]
 
     def calculate_metadata(self, service, chunk_number=None, jobID=None, overwrite=True):
         """Calculates the metadata for all downloaded lightcurves.

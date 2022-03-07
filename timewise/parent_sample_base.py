@@ -50,7 +50,13 @@ class ParentSampleBase(abc.ABC):
         sel = self.df.iloc[np.atleast_1d(ind)]
         ra, dec = sel[self.default_keymap["ra"]], sel[self.default_keymap["dec"]]
         title = [r[self.default_keymap["id"]] for i, r in sel.iterrows()]
-        fn = kwargs.pop("fn", [f"{i}_{r[self.default_keymap['id']]}.pdf" for i, r in sel.iterrows()])
+
+        fn = kwargs.pop(
+            "fn",
+            [os.path.join(self.plots_dir, f"{i}_{r[self.default_keymap['id']]}.pdf")
+             for i, r in sel.iterrows()]
+        )
+
         logger.debug(f"\nRA: {ra}\nDEC: {dec}\nTITLE: {title}\nFN: {fn}")
         ou = list()
 

@@ -15,9 +15,11 @@ class WiseDataByVisit(WISEDataBase):
     """
 
     mean_key = '_mean'
+    median_key = '_median'
     rms_key = '_rms'
     upper_limit_key = '_ul'
     Npoints_key = '_Npoints'
+    zeropoint_key_ext = '_zeropoint'
 
     def bin_lightcurve(self, lightcurve):
         """
@@ -25,7 +27,7 @@ class WiseDataByVisit(WISEDataBase):
         The visits typically consist of some tens of observations. The individual visits are separated by about
         six months.
         The mean flux for one visit is calculated by the weighted mean of the data.
-        The rror on that mean is calculated bu the root-mean-squared.
+        The error on that mean is calculated by the root-mean-squared.
 
         :param lightcurve: the unbnned lightcurve
         :type lightcurve: pandas.DataFrame
@@ -33,7 +35,7 @@ class WiseDataByVisit(WISEDataBase):
         :rtype: pandas.DataFrame
         """
 
-        # bin lightcurves in time intervals where observations are closer than 100 days together
+        # -------------------------   find epoch intervals   -------------------------- #
         sorted_mjds = np.sort(lightcurve.mjd)
         epoch_bounds_mask = (sorted_mjds[1:] - sorted_mjds[:-1]) > 100
         epoch_bounds = np.array(
@@ -43,18 +45,63 @@ class WiseDataByVisit(WISEDataBase):
         )
         epoch_intervals = np.array([epoch_bounds[:-1], epoch_bounds[1:]]).T
 
+        # -------------------------   loop through epoch intervals   -------------------------- #
         binned_lc = pd.DataFrame()
         for ei in epoch_intervals:
             r = dict()
             epoch_mask = (lightcurve.mjd >= ei[0]) & (lightcurve.mjd < ei[1])
             r['mean_mjd'] = np.median(lightcurve.mjd[epoch_mask])
 
+            epoch = dict()
+        # -------------------------   loop through bands   -------------------------- #
             for b in self.bands:
+                # loop through magnitude and flux and save the respective datapoints
+                for lum_ext in [self.flux_key_ext, self.mag_key_ext]:
+                    f = lightcurve[f"{b}{lum_ext}"][epoch_mask]
+                    e = lightcurve[f"{b}{lum_ext}{self.error_key_ext}"][epoch_mask]
+                    ulims = pd.isna(e)
+
+                    epoch[f"{b}{lum_ext}"] = f
+                    epoch[f"{b}{lum_ext}{self.error_key_ext}"] = e
+                    epoch[f"{b}{lum_ext}{self.upper_limit_key}"] = ulims
+
+                # -------  calculate the zeropoints per exposure ------- #
+                mags = epoch[f'{b}{self.mag_key_ext}']
+                inst_fluxes = epoch[f'{b}{self.flux_key_ext}']
+                pos_m = inst_fluxes > 0  # select only positive fluxes, i.e. detections
+
+                if sum(pos_m) == 0:
+                    # if there are only non-detections then fall back to default zeropoint
+                    zp_med = self.magnitude_zeropoints['Mag'][b]
+                else:
+                    # calculate zeropoints and save median
+                    zps = mags[pos_m] + 2.5 * np.log10(inst_fluxes[pos_m])
+                    zp_med = np.median(zps)
+
+                r[f'{b}{self.median_key}{self.zeropoint_key_ext}'] = zp_med
+
+        # ---------------------   calculate flux density from instrument flux   ----------------------- #
+                # get the instrument flux [digital numbers], i.e. source count
+                fl = epoch[f'{b}{self.flux_key_ext}']
+                fl_err = epoch[f'{b}{self.flux_key_ext}{self.error_key_ext}']
+                fl_ul = epoch[f"{b}{self.flux_key_ext}{self.upper_limit_key}"]
+
+                # calculate the proportinality constant between flux density and source count
+                mag_zp = self.magnitude_zeropoints['F_nu'][b].to('mJy').value
+                app_co = self.aperture_corrections[b]
+                flux_dens_const = mag_zp * 10 ** (-zp_med / 2.5) * 10 ** (app_co / 2.5)
+
+                # save values in epoch dictionary
+                epoch[f"{b}{self.flux_density_key_ext}"] = fl * flux_dens_const
+                epoch[f"{b}{self.flux_density_key_ext}{self.error_key_ext}"] = fl_err * flux_dens_const
+                epoch[f"{b}{self.flux_density_key_ext}{self.upper_limit_key}"] = fl_ul
+
+        # ---------------------   loop through different brightness units   ---------------------- #
                 for lum_ext in [self.flux_key_ext, self.mag_key_ext, self.flux_density_key_ext]:
                     try:
-                        f = lightcurve[f"{b}{lum_ext}"][epoch_mask]
-                        e = lightcurve[f"{b}{lum_ext}{self.error_key_ext}"][epoch_mask]
-                        ulims = pd.isna(e)
+                        f = epoch[f"{b}{lum_ext}"]
+                        e = epoch[f"{b}{lum_ext}{self.error_key_ext}"]
+                        ulims = epoch[f"{b}{lum_ext}{self.upper_limit_key}"]
                         ul = np.all(pd.isna(e))
 
                         if ul:
@@ -75,7 +122,7 @@ class WiseDataByVisit(WISEDataBase):
                     except KeyError:
                         pass
 
-            binned_lc = binned_lc.append(r, ignore_index=True)
+            binned_lc = pd.concat([binned_lc, pd.DataFrame(r, index=[0])], ignore_index=True)
 
         return binned_lc
 
