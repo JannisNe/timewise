@@ -36,6 +36,8 @@ class WISEDataBase(abc.ABC):
     running_tap_phases = ["QUEUED", "EXECUTING", "RUN"]
     done_tap_phases = {"COMPLETED", "ABORTED", "ERROR"}
 
+    query_types = ['positional', 'by_allwise_id']
+
 
     table_names = pd.DataFrame([
         ('AllWISE Multiepoch Photometry Table', 'allwise_p3as_mep'),
@@ -539,7 +541,7 @@ class WISEDataBase(abc.ABC):
     ###################################
 
     def get_photometric_data(self, tables=None, perc=1, wait=0, service=None, nthreads=100,
-                             chunks=None, overwrite=False, remove_chunks=False):
+                             chunks=None, overwrite=False, remove_chunks=False, query_type='positional'):
         """
         Load photometric data from the IRSA server for the matched sample. The result will be saved under
 
@@ -561,6 +563,8 @@ class WISEDataBase(abc.ABC):
         :type wait: float
         :param chunks: containing indices of chunks to download
         :type chunks: list-like
+        :param query_type: 'positional': query photometry based on distance from object, 'by_allwise_id': select all photometry points within a radius of 50 arcsec with the corresponding AllWISE ID
+        :type query_type: str
         """
 
         mag = True
@@ -571,6 +575,9 @@ class WISEDataBase(abc.ABC):
                 'AllWISE Multiepoch Photometry Table',
                 'NEOWISE-R Single Exposure (L1b) Source Table'
             ]
+
+        if query_type not in self.query_types:
+            raise ValueError(f"Unknown query type {query_type}! Choose one of {self.query_types}")
 
         if chunks is None:
             chunks = list(range(round(int(self.n_chunks * perc))))
@@ -584,7 +591,7 @@ class WISEDataBase(abc.ABC):
                      f"from {tables}")
 
         if service == 'tap':
-            self._query_for_photometry(tables, chunks, wait, mag, flux, nthreads)
+            self._query_for_photometry(tables, chunks, wait, mag, flux, nthreads, query_type)
 
         elif service == 'gator':
             self._query_for_photometry_gator(tables, chunks, mag, flux, nthreads)
@@ -820,7 +827,7 @@ class WISEDataBase(abc.ABC):
     # START using TAP to get photometry        #
     # ---------------------------------------- #
 
-    def _get_photometry_query_string(self, table_name, mag, flux):
+    def _get_photometry_query_string(self, table_name, mag, flux, query_type):
         """
         Construct a query string to submit to IRSA
         :param table_name: str, table name
@@ -830,26 +837,37 @@ class WISEDataBase(abc.ABC):
         logger.debug(f"constructing query for {table_name}")
         db_name = self.get_db_name(table_name)
         nice_name = self.get_db_name(table_name, nice=True)
+        id_key = 'cntr_mf' if 'allwise' in db_name else 'allwise_cntr'
         lum_keys = list()
         if mag:
             lum_keys += list(self.photometry_table_keymap[nice_name]['mag'].keys())
         if flux:
             lum_keys += list(self.photometry_table_keymap[nice_name]['flux'].keys())
-        keys = ['ra', 'dec', 'mjd'] + lum_keys
-        id_key = 'cntr_mf' if 'allwise' in db_name else 'allwise_cntr'
+        keys = ['ra', 'dec', 'mjd', id_key] + lum_keys
+        _constraints = list(self.constraints)
 
         q = 'SELECT \n\t'
         for k in keys:
             q += f'{db_name}.{k}, '
         q += f'\n\tmine.{self._tap_orig_id_key} \n'
         q += f'FROM\n\tTAP_UPLOAD.ids AS mine \n'
-        q += f'RIGHT JOIN\n\t{db_name} \n'
+
+        if query_type == 'positional':
+            q += f'RIGHT JOIN\n\t{db_name} \n'
+            radius = self.min_sep
+
+        if query_type == 'by_allwise_id':
+            q += f'INNER JOIN\n\t{db_name} ON {db_name}.{id_key} = mine.{self._tap_wise_id_key} \n'
+            radius = 50 * u.arcsec
+            _constraints.append(f"{id_key} IN (SELECT mine.{self._tap_wise_id_key} FROM TAP_UPLOAD.ids AS mine)")
+
         q += 'WHERE \n'
         q += f"\tCONTAINS(POINT('J2000',{db_name}.ra,{db_name}.dec)," \
-             f"CIRCLE('J2000',mine.ra_in,mine.dec_in,{self.min_sep.to('deg').value}))=1 "
-        if len(self.constraints) > 0:
+             f"CIRCLE('J2000',mine.ra_in,mine.dec_in,{radius.to('deg').value}))=1 "
+
+        if len(_constraints) > 0:
             q += ' AND (\n'
-            for c in self.constraints:
+            for c in _constraints:
                 q += f'\t{db_name}.{c} AND \n'
             q = q.strip(" AND \n")
             q += '\t)'
@@ -857,34 +875,34 @@ class WISEDataBase(abc.ABC):
         logger.debug(f"\n{q}")
         return q
 
-    def _submit_job_to_TAP(self, chunk_number, table_name, mag, flux):
+    def _submit_job_to_TAP(self, chunk_number, table_name, mag, flux, query_type):
         i = chunk_number
         t = table_name
         m = self.chunk_map == i
 
         # if perc is smaller than one select only a subset of wise IDs
         sel = self.parent_sample.df[np.array(m)]
-        # wise_id_sel = np.array(sel[self.parent_wise_source_id_key]).astype(int)
-        id_sel = np.array(sel.index).astype(int)
-        ra_sel = np.array(sel[self.parent_sample.default_keymap['ra']]).astype(float)
-        dec_sel = np.array(sel[self.parent_sample.default_keymap['dec']]).astype(float)
+
+        tab_d = dict()
+
+        tab_d[self._tap_orig_id_key] = np.array(sel.index).astype(int)
+        tab_d['ra_in'] = np.array(sel[self.parent_sample.default_keymap['ra']]).astype(float)
+        tab_d['dec_in'] = np.array(sel[self.parent_sample.default_keymap['dec']]).astype(float)
+
+        if query_type == 'by_allwise_id':
+            tab_d[self._tap_wise_id_key] = np.array(sel[self.parent_wise_source_id_key]).astype(int)
+
         del sel
 
-        upload_table = Table({
-            # self._tap_wise_id_key: wise_id_sel,
-            self._tap_orig_id_key: id_sel,
-            'ra_in': ra_sel,
-            'dec_in': dec_sel
-        })
-        logger.debug(f"{chunk_number}th query of {table_name}: uploading {len(upload_table)} objects.")
-        qstring = self._get_photometry_query_string(t, mag, flux)
+        logger.debug(f"{chunk_number}th query of {table_name}: uploading {len(list(tab_d.values())[0])} objects.")
+        qstring = self._get_photometry_query_string(t, mag, flux, query_type)
 
         N_tries = 5
         while True:
             if N_tries == 0:
                 logger.warning("No more tries left!")
             try:
-                job = WISEDataBase.service.submit_job(qstring, uploads={'ids': upload_table})
+                job = WISEDataBase.service.submit_job(qstring, uploads={'ids': Table(tab_d)})
                 job.run()
                 logger.info(f'submitted job for {t} for chunk {i}: ')
                 logger.debug(f'Job: {job.url}; {job.phase}')
@@ -1000,7 +1018,7 @@ class WISEDataBase(abc.ABC):
         self.tap_jobs = None
         del threads
 
-    def _query_for_photometry(self, tables, chunks, wait, mag, flux, nthreads):
+    def _query_for_photometry(self, tables, chunks, wait, mag, flux, nthreads, query_type):
         # ----------------------------------------------------------------------
         #     Do the query
         # ----------------------------------------------------------------------
@@ -1011,7 +1029,7 @@ class WISEDataBase(abc.ABC):
         for t in tables:
             self.tap_jobs[t] = dict()
             for i in chunks:
-                self._submit_job_to_TAP(i, t, mag, flux)
+                self._submit_job_to_TAP(i, t, mag, flux, query_type)
                 logger.info("waiting for 2 minutes")
                 time.sleep(2*60)
 
