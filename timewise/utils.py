@@ -105,6 +105,7 @@ def plot_sdss_cutout(ra, dec, arcsec=20, arcsec_per_px=0.1, interactive=False, f
         ax.set_title(title)
 
     if save:
+        logger.debug(f"saving under {fn}")
         fig.savefig(fn)
 
     if interactive:
