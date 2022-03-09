@@ -32,7 +32,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._cluster_queue = queue.Queue()
 
     def get_sample_photometric_data(self, max_nTAPjobs=8, perc=1, tables=None, chunks=None,
-                                    cluster_jobs_per_chunk=100, wait=5, remove_chunks=True):
+                                    cluster_jobs_per_chunk=100, wait=5, remove_chunks=True, query_type='positional'):
         """
         An alternative to `get_photometric_data()` that uses the DESY cluster and is optimised for large datasets.
 
@@ -63,6 +63,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         if chunks is None:
             chunks = list(range(round(int(self.n_chunks * perc))))
+
+        if query_type not in self.query_types:
+            raise ValueError(f"Unknown query type {query_type}! Choose one of {self.query_types}")
 
         service = 'tap'
         self.queue = queue.Queue()
@@ -95,7 +98,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         logger.debug(f'started {len(tap_threads)} TAP threads and {len(cluster_threads)} cluster threads.')
 
         for c in chunks:
-            self._tap_queue.put((tables, c, wait, mag, flux, cluster_time))
+            self._tap_queue.put((tables, c, wait, mag, flux, cluster_time, query_type))
 
         logger.debug(f'added {self._tap_queue.qsize()} tasks to tap queue')
         self._tap_queue.join()
@@ -109,11 +112,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def _tap_thread(self):
         logger.debug('started tap thread')
         while True:
-            tables, chunk, wait, mag, flux, cluster_time = self._tap_queue.get(block=True)
+            tables, chunk, wait, mag, flux, cluster_time, query_type = self._tap_queue.get(block=True)
             logger.debug(f'querying IRSA for chunk {chunk}')
 
             for t in tables:
-                self._submit_job_to_TAP(chunk, t, mag, flux)
+                self._submit_job_to_TAP(chunk, t, mag, flux, query_type)
                 logger.info(f'wating for {wait} hours')
                 time.sleep(wait * 3600)
                 self._thread_wait_and_get_results(t, chunk)
