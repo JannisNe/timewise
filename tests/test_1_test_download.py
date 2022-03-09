@@ -39,9 +39,10 @@ class MirongParentSample(ParentSampleBase):
 
 
 class WISEDataTestVersion(WiseDataByVisit):
+    base_name = "test/test_wise_data"
 
-    def __init__(self):
-        super().__init__(base_name="test/test_wise_data",
+    def __init__(self, base_name=base_name):
+        super().__init__(base_name=base_name,
                          parent_sample_class=MirongParentSample,
                          min_sep_arcsec=8,
                          n_chunks=2)
@@ -63,16 +64,6 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         wise_data = WISEDataTestVersion()
         wise_data.match_all_chunks()
 
-        df = wise_data.parent_sample.df
-        parent_ra = df[wise_data.parent_sample.default_keymap['dec']]
-        parent_dec = df[wise_data.parent_sample.default_keymap['ra']]
-
-        # c1 = SkyCoord(parent_ra * u.degree, parent_dec * u.degree)
-        # c2 = SkyCoord(float(test_ra) * u.degree, float(test_dec) * u.degree)
-        # sep = c1.separation(c2)
-        # closest_ind = np.argsort(sep)
-        #
-        # self.assertLess(sep[closest_ind][0], 0.5 * u.arcsec)
         wise_data.parent_sample.plot_cutout(0, arcsec=40, save=True)
 
         logger.info(f"\n\n Testing getting photometry \n")
@@ -126,8 +117,35 @@ class TestMIRFlareCatalogue(unittest.TestCase):
                 wait=0,
             )
 
-    # @classmethod
-    # def tearDownClass(cls):
-    #     logger.info('\n clean up \n')
-    #     wd = WISEDataTestVersion()
-    #     wd.clean_up()
+    def test_c_test_photometry_download_by_allwise_id(self):
+        logger.info('\n\n Testing WISE Data \n')
+        wise_data = WISEDataTestVersion(
+            base_name=WISEDataTestVersion.base_name + '_query_by_allwise_id'
+        )
+        s = 'tap'
+
+        logger.info(f"\nTesting {s.upper()} and query type 'by_allwise_id'")
+        wise_data.get_photometric_data(service=s, query_type='by_allwise_id')
+
+        logger.info(f" --- Test adding flux densities --- ")
+        wise_data.add_flux_densities_to_saved_lightcurves(s)
+
+        logger.info(f" --- Test adding luminosities --- ")
+        wise_data.add_luminosity_to_saved_lightcurves(s, redshift_key='Z')
+
+        logger.info(f" --- Test calculating metadata --- ")
+        wise_data.calculate_metadata(service=s)
+
+        logger.info(f" --- Test plot lightcurves --- ")
+        lcs = wise_data.load_binned_lcs(s)
+        plot_id = list(lcs.keys())[0].split('_')[0]
+        for lumk in ['mag', 'flux_density', 'luminosity']:
+            fn = os.path.join(wise_data.plots_dir, f"{plot_id}_{lumk}.pdf")
+            plot_unbinned = True if lumk == 'mag' else False
+            wise_data.plot_lc(
+                parent_sample_idx=plot_id,
+                plot_unbinned=plot_unbinned,
+                lum_key=lumk,
+                service=s,
+                fn=fn
+            )
