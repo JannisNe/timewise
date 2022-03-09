@@ -586,6 +586,9 @@ class WISEDataBase(abc.ABC):
             elements_per_chunk = len(self.parent_sample.df) / self.n_chunks
             service = 'tap' if elements_per_chunk > 300 else 'gator'
 
+        if query_type == 'by_allwise_id' and service == 'tap':
+            raise ValueError(f"Query type 'by_allwise_id' only implemented for service 'tap'!")
+
         logger.debug(f"Getting {perc * 100:.2f}% of lightcurve chunks ({len(chunks)}) via {service} "
                      f"in {'magnitude' if mag else ''} {'flux' if flux else ''} "
                      f"from {tables}")
