@@ -290,6 +290,7 @@ class WISEDataBase(abc.ABC):
         :return:
         """
 
+        logger.info(f'matching all chunks to {table_name}')
         for i in range(self.n_chunks):
             self._match_single_chunk(i, table_name)
 
@@ -861,7 +862,7 @@ class WISEDataBase(abc.ABC):
 
         if query_type == 'by_allwise_id':
             q += f'INNER JOIN\n\t{db_name} ON {db_name}.{id_key} = mine.{self._tap_wise_id_key} \n'
-            radius = 50 * u.arcsec
+            radius = 15 * u.arcsec
             _constraints.append(f"{id_key} IN (SELECT mine.{self._tap_wise_id_key} FROM TAP_UPLOAD.ids AS mine)")
 
         q += 'WHERE \n'
