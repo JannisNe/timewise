@@ -64,6 +64,8 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         wise_data = WISEDataTestVersion()
         wise_data.match_all_chunks()
 
+        logger.info('\n' + wise_data.parent_sample.df.to_string())
+
         wise_data.parent_sample.plot_cutout(0, arcsec=40, save=True)
 
         logger.info(f"\n\n Testing getting photometry \n")
