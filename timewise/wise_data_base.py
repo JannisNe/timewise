@@ -187,7 +187,7 @@ class WISEDataBase(abc.ABC):
         self.tap_jobs = None
         self.queue = queue.Queue()
         self.clear_unbinned_photometry_when_binning = False
-        self._select_by_alwise_id = False
+        self._query_type = 'positional'
         self._cached_final_products = {
             'lightcurves': dict(),
             'metadata': dict()
@@ -572,6 +572,8 @@ class WISEDataBase(abc.ABC):
         mag = True
         flux = True
 
+        self._query_type = query_type
+
         if tables is None:
             tables = [
                 'AllWISE Multiepoch Photometry Table',
@@ -786,7 +788,8 @@ class WISEDataBase(abc.ABC):
 
             t = 'allwise_p3as_mep' if 'allwise' in fn else 'neowiser_p1bs_psd'
             nice_name = self.get_db_name(t, nice=True)
-            cols = dict(self.photometry_table_keymap[nice_name]['mag'])
+            cols = {'index_01': self._tap_orig_id_key}
+            cols.update(self.photometry_table_keymap[nice_name]['mag'])
             cols.update(self.photometry_table_keymap[nice_name]['flux'])
             if 'allwise' in fn:
                 cols['cntr_mf'] = 'allwise_cntr'
@@ -864,18 +867,24 @@ class WISEDataBase(abc.ABC):
         if query_type == 'by_allwise_id':
             q += f'INNER JOIN\n\t{db_name} ON {db_name}.{id_key} = mine.{self._tap_wise_id_key} \n'
             radius = 15 * u.arcsec
-            _constraints.append(f"{id_key} IN (SELECT mine.{self._tap_wise_id_key} FROM TAP_UPLOAD.ids AS mine)")
 
         q += 'WHERE \n'
-        q += f"\tCONTAINS(POINT('J2000',{db_name}.ra,{db_name}.dec)," \
-             f"CIRCLE('J2000',mine.ra_in,mine.dec_in,{radius.to('deg').value}))=1 "
+
+        if query_type == 'positional':
+            q += f"\tCONTAINS(POINT('J2000',{db_name}.ra,{db_name}.dec)," \
+                 f"CIRCLE('J2000',mine.ra_in,mine.dec_in,{radius.to('deg').value}))=1 "
 
         if len(_constraints) > 0:
-            q += ' AND (\n'
+
+            if query_type == 'positional':
+                q += ' AND (\n'
+
             for c in _constraints:
                 q += f'\t{db_name}.{c} AND \n'
             q = q.strip(" AND \n")
-            q += '\t)'
+
+            if query_type == 'positional':
+                q += '\t)'
 
         logger.debug(f"\n{q}")
         return q
@@ -954,6 +963,8 @@ class WISEDataBase(abc.ABC):
         logger.debug(f"{i}th query of {t}: saving under {fn}")
         cols = dict(self.photometry_table_keymap[t]['mag'])
         cols.update(self.photometry_table_keymap[t]['flux'])
+        if 'allwise' in t:
+            cols['cntr_mf'] = 'allwise_cntr'
         lightcurve.rename(columns=cols).to_csv(fn)
         return
 
@@ -1114,7 +1125,7 @@ class WISEDataBase(abc.ABC):
             m = lightcurves[self._tap_orig_id_key] == parent_sample_entry_id
             lightcurve = lightcurves[m]
 
-            if self._select_by_alwise_id:
+            if self._query_type == 'by_allwise_id':
                 na_mask = lightcurve[self._tap_wise_id_key].isna()
                 allwise_ids_in_lc = lightcurve[self._tap_wise_id_key][~na_mask].unique()
 
