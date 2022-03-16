@@ -296,25 +296,6 @@ class WISEDataBase(abc.ABC):
 
         _dupe_mask = self._get_dubplicated_wise_id_mask()
 
-        # vvvvvvvvvvvv                        THIS IS DEAD CODE                          vvvvvvvvvvvv #
-        rematch = False
-        rematch_to_neowise = False
-        if np.any(_dupe_mask) and rematch:
-            self._rematch_duplicates(table_name, _dupe_mask, filext="_rematch1")
-
-            _inf_mask = ~(self.parent_sample.df[self.parent_sample_wise_skysep_key] < np.inf)
-            if np.any(_inf_mask) and rematch_to_neowise:
-                logger.info(f"Still {len(self.parent_sample.df[_inf_mask])} entries without match."
-                            f"Looking in NoeWISE Photometry")
-                for mi in range(self.n_chunks):
-                    m = self.chunk_map == mi
-                    _interval_inf_mask = _inf_mask & m
-                    if np.any(_interval_inf_mask):
-                        self._rematch_duplicates(table_name='NEOWISE-R Single Exposure (L1b) Source Table',
-                                                 mask=_interval_inf_mask,
-                                                 filext=f"_rematch2_c{mi}")
-        # ^^^^^^^^^^^^^^                      THIS IS DEAD CODE                         ^^^^^^^^^^^^^^ #
-
         self._no_allwise_source = self.parent_sample.df[self.parent_sample_wise_skysep_key] == np.inf
         if np.any(self._no_allwise_source):
             logger.warning(f"{len(self.parent_sample.df[self._no_allwise_source])} of {len(self.parent_sample.df)} "
@@ -480,58 +461,6 @@ class WISEDataBase(abc.ABC):
             _N_dupe = len(self.parent_sample.df[_dupe_mask])
             logger.info(f"{_N_dupe} duplicated entries in parent sample")
         return _dupe_mask
-
-    def _rematch_duplicates(self, table_name, mask=None, filext=""):
-        if mask is None:
-            mask = self._get_dubplicated_wise_id_mask()
-
-        for k, default in self.parent_sample_default_entries.items():
-            self.parent_sample.df.loc[mask, k] = default
-
-        _dupe_infile = os.path.join(self.cache_dir, f"parent_sample_duplicated{filext}.xml")
-        _dupe_output_file = os.path.join(self.cache_dir, f"parent_sample_duplicated{filext}.tbl")
-        _gator_res = self._match_to_wise(
-            in_filename=_dupe_infile,
-            out_filename=_dupe_output_file,
-            mask=mask,
-            table_name=table_name,
-            one_to_one=False
-        ).to_pandas()
-
-        if len(_gator_res) == 0:
-            logger.debug('No additional matches found')
-            return
-
-        _dupe_inds = list(self.parent_sample.df[mask].index)
-        for in_id in tqdm.tqdm(_dupe_inds, desc='finding match for duplicates'):
-            _m = _gator_res.index_01 == in_id
-            _sorted_sel = _gator_res[_m].sort_values('dist_x')
-            for _, r in _sorted_sel.iterrows():
-                _wise_id = r['cntr' if 'allwise' in self.get_db_name(table_name) else 'allwise_cntr']
-                _skysep = r['dist_x']
-                __m = self.parent_sample.df[self.parent_wise_source_id_key] == _wise_id
-
-                if not np.any(__m):
-                    self.parent_sample.df.loc[in_id, self.parent_sample_wise_skysep_key] = _skysep
-                    self.parent_sample.df.loc[in_id, self.parent_wise_source_id_key] = _wise_id
-                    break
-
-                else:
-                    __msep = self.parent_sample.df[self.parent_sample_wise_skysep_key][__m] > _skysep
-                    if np.any(__msep):
-                        columns = ['ra', 'dec', self.parent_sample_wise_skysep_key, self.parent_wise_source_id_key]
-                        txt = f"WISE ID: {_wise_id} with skysep {_skysep}:\n" \
-                              f"{self.parent_sample.df.loc[in_id].to_string()}" \
-                              f" \n" \
-                              f"{self.parent_sample.df.loc[__m].to_string(columns=columns)}"
-                        if len(self.parent_sample.df[self.parent_wise_source_id_key][__m][__msep]) == 1:
-                            logger.warning(txt)
-                            self.parent_sample.df.loc[in_id, self.parent_sample_wise_skysep_key] = _skysep
-                            self.parent_sample.df.loc[in_id, self.parent_wise_source_id_key] = _wise_id
-                            for k in [self.parent_wise_source_id_key, self.parent_sample_wise_skysep_key]:
-                                self.parent_sample.df.loc[np.where(__m)[0][__msep], k] = self.parent_sample_default_entries[k]
-                        else:
-                            raise Exception(txt)
 
     ###################################################
     # END MATCH PARENT SAMPLE TO WISE SOURCES         #
@@ -799,30 +728,6 @@ class WISEDataBase(abc.ABC):
 
         lightcurves = pd.concat(_data)
         return lightcurves
-
-    def _subprocess_select_and_bin_gator(self, chunk_number=None, jobID=None):
-        binned_lcs = dict()
-        lightcurves = self._get_unbinned_lightcurves_gator(chunk_number,
-                                                           clear=self.clear_unbinned_photometry_when_binning)
-
-        if jobID:
-            _indices = np.where(self.cluster_jobID_map == jobID)[0]
-
-        else:
-            _indices = lightcurves[self._tap_orig_id_key].unique()
-
-        for parent_sample_idx in _indices:
-            parent_sample_idx_mask = lightcurves[self._tap_orig_id_key] == parent_sample_idx
-            selected_data = lightcurves[parent_sample_idx_mask]
-
-            lum_keys = [c for c in lightcurves.columns if ("W1" in c) or ("W2" in c)]
-            lightcurve = selected_data[['mjd'] + lum_keys]
-            binned_lc = self.bin_lightcurve(lightcurve)
-
-            binned_lcs[f"{int(parent_sample_idx)}"] = binned_lc.to_dict()
-
-        logger.debug(f"chunk {chunk_number}: saving {len(binned_lcs.keys())} binned lcs")
-        self._save_lightcurves(binned_lcs, service='gator', chunk_number=chunk_number, jobID=jobID, overwrite=True)
 
     # ------------------------------------------ #
     # END using GATOR to get photometry          #
