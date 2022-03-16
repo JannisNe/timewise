@@ -1,4 +1,4 @@
-import getpass, os, time, subprocess, math, pickle, queue, threading, argparse
+import getpass, os, time, subprocess, math, pickle, queue, threading, argparse, time
 import numpy as np
 import pandas as pd
 
@@ -28,11 +28,17 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self.clusterJob_chunk_map = None
         self.cluster_info_file = os.path.join(self.cluster_dir, 'cluster_info.pkl')
 
+        # status attributes
+        self.start_time = None
+        self._total_tasks = None
+        self._done_tasks = None
+
         self._tap_queue = queue.Queue()
         self._cluster_queue = queue.Queue()
 
     def get_sample_photometric_data(self, max_nTAPjobs=8, perc=1, tables=None, chunks=None,
-                                    cluster_jobs_per_chunk=100, wait=5, remove_chunks=True, query_type='positional'):
+                                    cluster_jobs_per_chunk=100, wait=5, remove_chunks=True,
+                                    query_type='positional', overwrite=True):
         """
         An alternative to `get_photometric_data()` that uses the DESY cluster and is optimised for large datasets.
 
@@ -50,7 +56,13 @@ class WISEDataDESYCluster(WiseDataByVisit):
         :type wait: float
         :param remove_chunks: remove single chink files after binning
         :type remove_chunks: bool
+        :param query_type: 'positional': query photometry based on distance from object, 'by_allwise_id': select all photometry points within a radius of 50 arcsec with the corresponding AllWISE ID
+        :type query_type: str
+        :param overwrite: overwrite already existing lightcurves and metadata
+        :type overwrite: bool
         """
+
+        # --------------------- set defaults --------------------------- #
 
         mag = True
         flux = True
@@ -60,6 +72,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 'AllWISE Multiepoch Photometry Table',
                 'NEOWISE-R Single Exposure (L1b) Source Table'
             ]
+        tables = np.atleast_1d(tables)
 
         if chunks is None:
             chunks = list(range(round(int(self.n_chunks * perc))))
@@ -68,8 +81,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
             raise ValueError(f"Unknown query type {query_type}! Choose one of {self.query_types}")
 
         service = 'tap'
+
+        # set up queue
         self.queue = queue.Queue()
-        tables = np.atleast_1d(tables)
+
+        # set up dictionary to store jobs in
         self.tap_jobs = {t: dict() for t in tables}
 
         logger.debug(f"Getting {perc * 100:.2f}% of lightcurve chunks ({len(chunks)}) via {service} "
@@ -77,6 +93,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
                      f"from {tables}")
 
         input('Correct? [hit enter] ')
+
+        # --------------------------- set up cluster info --------------------------- #
 
         self.n_cluster_jobs_per_chunk = cluster_jobs_per_chunk
         cluster_time_s = max(len(self.parent_sample.df) / self._n_chunks / self.n_cluster_jobs_per_chunk, 59 * 60)
@@ -88,8 +106,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self.clear_cluster_log_dir()
         self._save_cluster_info()
 
+        # --------------------------- starting threads --------------------------- #
+
         tap_threads = [threading.Thread(target=self._tap_thread, daemon=True) for _ in range(max_nTAPjobs)]
         cluster_threads = [threading.Thread(target=self._cluster_thread, daemon=True) for _ in range(max_nTAPjobs)]
+        status_thread = threading.Thread(target=self._status_thread, daemon=True)
 
         for t in tap_threads + cluster_threads:
             logger.debug('starting thread')
@@ -97,8 +118,16 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         logger.debug(f'started {len(tap_threads)} TAP threads and {len(cluster_threads)} cluster threads.')
 
+        # --------------------------- filling queue with tasks --------------------------- #
+
+        self.start_time = time.time()
+        self._total_tasks = len(chunks)
+        self._done_tasks = 0
         for c in chunks:
             self._tap_queue.put((tables, c, wait, mag, flux, cluster_time, query_type))
+        status_thread.start()
+
+        # --------------------------- wait for completion --------------------------- #
 
         logger.debug(f'added {self._tap_queue.qsize()} tasks to tap queue')
         self._tap_queue.join()
@@ -106,8 +135,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._cluster_queue.join()
         logger.debug('cluster done')
 
-        self._combine_lcs(service=service, overwrite=True, remove=remove_chunks)
-        self._combine_metadata(service=service, overwrite=True, remove=remove_chunks)
+        self._combine_lcs(service=service, overwrite=overwrite, remove=remove_chunks)
+        self._combine_metadata(service=service, overwrite=overwrite, remove=remove_chunks)
 
     def _tap_thread(self):
         logger.debug('started tap thread')
@@ -144,6 +173,27 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 self._combine_metadata('tap', chunk_number=chunk, remove=True, overwrite=True)
             finally:
                 self._cluster_queue.task_done()
+                self._done_tasks += 1
+
+    def _status_thread(self):
+        logger.debug('started status thread')
+        while True:
+            n_tap_tasks_queued = self._tap_queue.qsize()
+            n_cluster_tasks_queued = self._cluster_queue.qsize()
+            n_remaining = self._total_tasks - self._done_tasks
+            elapsed_time = time.time() - self.start_time
+            time_per_task = elapsed_time / self._done_tasks if self._done_tasks > 0 else np.nan
+            remaining_time = n_remaining * time_per_task
+
+            msg = f"\n-----------------     STATUS     -----------------\n" \
+                  f"\ttasks in TAP queue:_______{n_tap_tasks_queued}\n" \
+                  f"\ttasks in cluster queue:___{n_cluster_tasks_queued}\n" \
+                  f"\tdone total:_______________{self._done_tasks}/{self._total_tasks}\n" \
+                  f"\truntime:__________________{elapsed_time/3600:.2f} hours\n" \
+                  f"\tremaining:________________{remaining_time/3600:.2f} hours"
+
+            logger.info(msg)
+            time.sleep(5*3600)
 
     # ----------------------------------------------------------------------------------- #
     # START using cluster for downloading and binning      #
@@ -431,5 +481,5 @@ if __name__ == '__main__':
     wd.clear_unbinned_photometry_when_binning = cfg.clear_unbinned
     chunk_number = wd._get_chunk_number_for_job(cfg.job_id)
 
-    wd._subprocess_select_and_bin(chunk_number=chunk_number, jobID=cfg.job_id)
+    wd._subprocess_select_and_bin(service='tap', chunk_number=chunk_number, jobID=cfg.job_id)
     wd.calculate_metadata(service='tap', chunk_number=chunk_number, jobID=cfg.job_id)
