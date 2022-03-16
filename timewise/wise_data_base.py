@@ -1090,7 +1090,7 @@ class WISEDataBase(abc.ABC):
             p.close()
             p.join()
         else:
-            r = list(map(fct, service_list, chunk_list))
+            r = list(map(self._subprocess_select_and_bin, service_list, chunk_list))
 
     def _get_unbinned_lightcurves(self, chunk_number, clear=False):
         # load only the files for this chunk
