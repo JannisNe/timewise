@@ -97,33 +97,12 @@ class TestMIRFlareCatalogue(unittest.TestCase):
                     fn=fn
                 )
 
-    def test_b_wise_bigdata_desy_cluster(self):
-        host = socket.gethostname()
-        if np.logical_or("ifh.de" in host, "zeuthen.desy.de" in host):
-            host_server = "DESY"
-        else:
-            host_server = None
-        logger.info(f"host name is {host_server}")
-
-        if host_server == "DESY":
-            logger.info("\n\n Testing WiseBigDataDESYCLUSTER")
-            wise_desy_bigdata = WISEDataDESYCluster(
-                base_name="test/test_desy_bigdata",
-                parent_sample_class=MirongParentSample,
-                min_sep_arcsec=8,
-                n_chunks=2
-            )
-
-            wise_desy_bigdata.get_sample_photometric_data(
-                cluster_jobs_per_chunk=2,
-                wait=0,
-            )
-
-    def test_c_test_photometry_download_by_allwise_id(self):
+    def test_b_test_photometry_download_by_allwise_id(self):
         logger.info('\n\n Testing WISE Data \n')
         wise_data = WISEDataTestVersion(
             base_name=WISEDataTestVersion.base_name + '_query_by_allwise_id'
         )
+        wise_data.match_all_chunks()
         s = 'tap'
 
         logger.info(f"\nTesting {s.upper()} and query type 'by_allwise_id'")
@@ -154,4 +133,26 @@ class TestMIRFlareCatalogue(unittest.TestCase):
                 lum_key=lumk,
                 service=s,
                 fn=fn
+            )
+
+    def test_c_wise_bigdata_desy_cluster(self):
+        host = socket.gethostname()
+        if np.logical_or("ifh.de" in host, "zeuthen.desy.de" in host):
+            host_server = "DESY"
+        else:
+            host_server = None
+        logger.info(f"host name is {host_server}")
+
+        if host_server == "DESY":
+            logger.info("\n\n Testing WiseBigDataDESYCLUSTER")
+            wise_desy_bigdata = WISEDataDESYCluster(
+                base_name="test/test_desy_bigdata",
+                parent_sample_class=MirongParentSample,
+                min_sep_arcsec=8,
+                n_chunks=2
+            )
+
+            wise_desy_bigdata.get_sample_photometric_data(
+                cluster_jobs_per_chunk=2,
+                wait=0,
             )
