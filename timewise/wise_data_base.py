@@ -809,10 +809,10 @@ class WISEDataBase(abc.ABC):
             _indices = np.where(self.cluster_jobID_map == jobID)[0]
 
         else:
-            _indices = lightcurves['index_01'].unique()
+            _indices = lightcurves[self._tap_orig_id_key].unique()
 
         for parent_sample_idx in _indices:
-            parent_sample_idx_mask = lightcurves['index_01'] == parent_sample_idx
+            parent_sample_idx_mask = lightcurves[self._tap_orig_id_key] == parent_sample_idx
             selected_data = lightcurves[parent_sample_idx_mask]
 
             lum_keys = [c for c in lightcurves.columns if ("W1" in c) or ("W2" in c)]
@@ -1432,11 +1432,11 @@ class WISEDataBase(abc.ABC):
 
             if service == 'tap':
                 unbinned_lcs = self._get_unbinned_lightcurves(_chunk_number)
-                unbinned_lc = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == int(parent_sample_idx)]
 
             else:
                 unbinned_lcs = self._get_unbinned_lightcurves_gator(_chunk_number)
-                unbinned_lc = unbinned_lcs[unbinned_lcs.index_01 == int(parent_sample_idx)]
+
+            unbinned_lc = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == int(parent_sample_idx)]
 
         else:
             unbinned_lc = None
