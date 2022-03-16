@@ -127,7 +127,11 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         s = 'tap'
 
         logger.info(f"\nTesting {s.upper()} and query type 'by_allwise_id'")
-        wise_data.get_photometric_data(service=s, query_type='by_allwise_id')
+        wise_data.get_photometric_data(
+            service=s,
+            query_type='by_allwise_id',
+            tables=["AllWISE Multiepoch Photometry Table"]
+        )
 
         logger.info(f" --- Test adding flux densities --- ")
         wise_data.add_flux_densities_to_saved_lightcurves(s)
