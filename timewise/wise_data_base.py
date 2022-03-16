@@ -187,7 +187,6 @@ class WISEDataBase(abc.ABC):
         self.tap_jobs = None
         self.queue = queue.Queue()
         self.clear_unbinned_photometry_when_binning = False
-        self._query_type = 'positional'
         self._cached_final_products = {
             'lightcurves': dict(),
             'metadata': dict()
@@ -571,8 +570,6 @@ class WISEDataBase(abc.ABC):
 
         mag = True
         flux = True
-
-        self._query_type = query_type
 
         if tables is None:
             tables = [
@@ -1124,17 +1121,6 @@ class WISEDataBase(abc.ABC):
         for parent_sample_entry_id in tqdm.tqdm(indices):
             m = lightcurves[self._tap_orig_id_key] == parent_sample_entry_id
             lightcurve = lightcurves[m]
-
-            if self._query_type == 'by_allwise_id':
-                na_mask = lightcurve[self._tap_wise_id_key].isna()
-                allwise_ids_in_lc = lightcurve[self._tap_wise_id_key][~na_mask].unique()
-
-                if len(allwise_ids_in_lc) != 1:
-                    raise Exception(f"AllWISE IDs: {allwise_ids_in_lc} for chunk {chunk_number} and job {jobID}")
-
-                allwise_id = allwise_ids_in_lc[0]
-                allwise_id_m = lightcurve[self._tap_wise_id_key] == allwise_id_m
-                lightcurve = lightcurve[allwise_id_m]
 
             if len(lightcurve) < 1:
                 logger.warning(f"No data for {parent_sample_entry_id}")
