@@ -542,7 +542,7 @@ class WISEDataBase(abc.ABC):
     ###################################
 
     def get_photometric_data(self, tables=None, perc=1, wait=0, service=None, nthreads=100,
-                             chunks=None, overwrite=False, remove_chunks=False, query_type='positional'):
+                             chunks=None, overwrite=True, remove_chunks=False, query_type='positional'):
         """
         Load photometric data from the IRSA server for the matched sample. The result will be saved under
 
@@ -604,8 +604,8 @@ class WISEDataBase(abc.ABC):
         for c in chunks:
             self.calculate_metadata(service=service, chunk_number=c, overwrite=True)
 
-        self._combine_lcs(service=service, overwrite=True, remove=remove_chunks)
-        self._combine_metadata(service=service, overwrite=True, remove=remove_chunks)
+        self._combine_lcs(service=service, overwrite=overwrite, remove=remove_chunks)
+        self._combine_metadata(service=service, overwrite=overwrite, remove=remove_chunks)
 
     def _lightcurve_filename(self, service, chunk_number=None, jobID=None):
         if (chunk_number is None) and (jobID is None):
@@ -1061,14 +1061,9 @@ class WISEDataBase(abc.ABC):
         logger.info('selecting individual lightcurves and bin ...')
         ncpu = min(self.n_chunks, ncpu)
         logger.debug(f"using {ncpu} CPUs")
-        args = list(range(self.n_chunks)) if not chunks else chunks
-        logger.debug(f"multiprocessing arguments: {args}")
-
-        _fcts = {
-            'gator': self._subprocess_select_and_bin_gator,
-            'tap': self._subprocess_select_and_bin
-        }
-        fct = _fcts[service]
+        chunk_list = list(range(self.n_chunks)) if not chunks else chunks
+        service_list = [service] * len(chunk_list)
+        logger.debug(f"multiprocessing arguments: chunks: {chunk_list}, service: {service_list}")
 
         while True:
             try:
@@ -1082,13 +1077,20 @@ class WISEDataBase(abc.ABC):
                 ncpu = int(round(ncpu - 1))
 
         if ncpu > 1:
-            r = list(tqdm.tqdm(
-                p.imap(fct, args), total=self.n_chunks, desc='select and bin'
-            ))
+            r = list(
+                tqdm.tqdm(
+                    p.starmap(
+                        self._subprocess_select_and_bin,
+                        zip(service_list, chunk_list)
+                    ),
+                    total=self.n_chunks,
+                    desc='select and bin'
+                )
+            )
             p.close()
             p.join()
         else:
-            r = list(map(fct, args))
+            r = list(map(fct, service_list, chunk_list))
 
     def _get_unbinned_lightcurves(self, chunk_number, clear=False):
         # load only the files for this chunk
@@ -1106,9 +1108,20 @@ class WISEDataBase(abc.ABC):
 
         return lightcurves
 
-    def _subprocess_select_and_bin(self, chunk_number=None, jobID=None):
+    def _subprocess_select_and_bin(self, service, chunk_number=None, jobID=None):
         # run through the ids and bin the lightcurves
-        lightcurves = self._get_unbinned_lightcurves(chunk_number, clear=self.clear_unbinned_photometry_when_binning)
+        if service == 'tap':
+            lightcurves = self._get_unbinned_lightcurves(
+                chunk_number,
+                clear=self.clear_unbinned_photometry_when_binning
+            )
+        elif service == 'gator':
+            lightcurves = self._get_unbinned_lightcurves_gator(
+                chunk_number,
+                clear=self.clear_unbinned_photometry_when_binning
+            )
+        else:
+            raise ValueError(f"Service {service} not known!")
 
         if jobID:
             indices = np.where(self.cluster_jobID_map == jobID)[0]
