@@ -33,7 +33,7 @@ if __name__ == '__main__':
             "pandas==1.4.1",
             "numpy==1.22.2",
             "pyvo==1.3",
-            "astropy==5.0",
+            "astropy==5.0.1",
             "matplotlib==3.5.1",
             "coveralls==3.3.1",
             "scikit-image==0.19.2",
