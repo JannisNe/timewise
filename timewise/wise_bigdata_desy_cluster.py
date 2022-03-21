@@ -1,6 +1,7 @@
 import getpass, os, time, subprocess, math, pickle, queue, threading, argparse, time
 import numpy as np
 import pandas as pd
+import pyvo as vo
 
 from timewise.general import main_logger, DATA_DIR_KEY, data_dir
 from timewise.wise_data_by_visit import WiseDataByVisit
@@ -35,6 +36,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         self._tap_queue = queue.Queue()
         self._cluster_queue = queue.Queue()
+        self._io_queue = queue.Queue()
+        self._io_queue_done = queue.Queue()
 
     def get_sample_photometric_data(self, max_nTAPjobs=8, perc=1, tables=None, chunks=None,
                                     cluster_jobs_per_chunk=100, wait=5, remove_chunks=True,
@@ -108,11 +111,15 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         # --------------------------- starting threads --------------------------- #
 
-        tap_threads = [threading.Thread(target=self._tap_thread, daemon=True) for _ in range(max_nTAPjobs)]
-        cluster_threads = [threading.Thread(target=self._cluster_thread, daemon=True) for _ in range(max_nTAPjobs)]
+        tap_threads = [threading.Thread(target=self._tap_thread, daemon=True, name=f"TAP_thread{_}")
+                       for _ in range(max_nTAPjobs)]
+        cluster_threads = [threading.Thread(target=self._cluster_thread, daemon=True, name=f"cluster_thread{_}")
+                           for _ in range(max_nTAPjobs)]
+        io_threads = [threading.Thread(target=self._io_thread, daemon=True, name="io_thread")
+                      for _ in range(1)]
         status_thread = threading.Thread(target=self._status_thread, daemon=True)
 
-        for t in tap_threads + cluster_threads:
+        for t in tap_threads + cluster_threads + io_threads:
             logger.debug('starting thread')
             t.start()
 
@@ -138,19 +145,94 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._combine_lcs(service=service, overwrite=overwrite, remove=remove_chunks)
         self._combine_metadata(service=service, overwrite=overwrite, remove=remove_chunks)
 
+    def _wait_for_job(self, t, i):
+        thread_name = threading.currentThread().getName()
+        logger.info(f"{thread_name}: Waiting on {i}th query of {t} ........")
+        _job = self.tap_jobs[t][i]
+        # Sometimes a connection Error occurs.
+        # In that case try again until job.wait() exits normally
+        _ntries = 10
+        while True:
+            try:
+                _job.wait()
+                break
+            except vo.dal.exceptions.DALServiceError as e:
+                msg = f"{i}th query of {t}: DALServiceError: {e}; trying again in 6 min"
+                if _ntries < 10:
+                    msg += f' ({_ntries} tries left)'
+
+                logger.warning(f"{thread_name}: {msg}")
+                time.sleep(60 * 6)
+                if '404 Client Error: Not Found for url' in str(e):
+                    _ntries -= 1
+
+        logger.info(f'{thread_name}: {i}th query of {t}: Done!')
+
+    def _get_results_from_job(self, t, i):
+        thread_name = threading.currentThread().getName()
+        logger.debug(f"{thread_name}: getting results for {i}th query of {t} .........")
+        _job = self.tap_jobs[t][i]
+        lightcurve = _job.fetch_result().to_table().to_pandas()
+        fn = self._chunk_photometry_cache_filename(t, i)
+        logger.debug(f"{i}th query of {t}: saving under {fn}")
+        cols = dict(self.photometry_table_keymap[t]['mag'])
+        cols.update(self.photometry_table_keymap[t]['flux'])
+        if 'allwise' in t:
+            cols['cntr_mf'] = 'allwise_cntr'
+        lightcurve.rename(columns=cols).to_csv(fn)
+        return
+
+    def _io_queue_hash(self, method_name, args):
+        return f"{method_name}_{args}"
+
+    def _wait_for_io_task(self, method_name, args):
+        h = self._io_queue_hash(method_name, args)
+        logger.debug(f"waiting on io-task {h}")
+
+        while True:
+            _io_queue_done = list(self._io_queue_done.queue)
+            if h in _io_queue_done:
+                break
+
+            time.sleep(30)
+
+        logger.debug(f"{h} done!")
+
+    def _io_thread(self):
+        logger.debug("started in-out thread")
+        while True:
+            method_name, args = self._io_queue.get(block=True)
+            logger.debug(f"executing {method_name} with arguments {args}")
+            self.__getattribute__(method_name)(*args)
+            self._io_queue.task_done()
+            self._io_queue_done.put(self._io_queue_hash(method_name, args))
+
     def _tap_thread(self):
-        logger.debug('started tap thread')
+        thread_name = threading.currentThread().getName()
+        logger.debug(f'{thread_name}: started tap thread')
         while True:
             tables, chunk, wait, mag, flux, cluster_time, query_type = self._tap_queue.get(block=True)
-            logger.debug(f'querying IRSA for chunk {chunk}')
+            logger.debug(f'{thread_name}: querying IRSA for chunk {chunk}')
 
             for t in tables:
-                self._submit_job_to_TAP(chunk, t, mag, flux, query_type)
-                logger.info(f'wating for {wait} hours')
-                time.sleep(wait * 3600)
-                self._thread_wait_and_get_results(t, chunk)
+                # -----------  submit jobs via the IRSA TAP ---------- #
+                submit_method = "_submit_job_to_TAP"
+                submit_args = [chunk, t, mag, flux, query_type]
+                self._io_queue.put((submit_method, submit_args))
+                self._wait_for_io_task(submit_method, submit_args)
 
-            logger.info(f'got all TAP results for chunk {chunk}. submitting to cluster')
+                # ---------------  wait for the TAP job -------------- #
+                logger.info(f'{thread_name}: waiting for {wait} hours')
+                time.sleep(wait * 3600)
+                self._wait_for_job(t, chunk)
+
+                # --------------  get results of TAP job ------------- #
+                result_method = "_get_results_from_job"
+                result_args = [t, chunk]
+                self._io_queue.put((result_method, result_args))
+                self._wait_for_io_task(result_method, result_args)
+
+            logger.info(f'{thread_name}: got all TAP results for chunk {chunk}. submitting to cluster')
             job_id = self.submit_to_cluster(cluster_cpu=1,
                                             cluster_h=cluster_time,
                                             cluster_ram='10G',
@@ -162,12 +244,13 @@ class WISEDataDESYCluster(WiseDataByVisit):
             self._cluster_queue.put((job_id, chunk))
 
     def _cluster_thread(self):
-        logger.debug('started cluster thread')
+        thread_name = threading.currentThread().getName()
+        logger.debug(f'{thread_name}: started cluster thread')
         while True:
             job_id, chunk = self._cluster_queue.get(block=True)
-            logger.debug(f'waiting for chunk {chunk} (Cluster job {job_id})')
+            logger.debug(f'{thread_name}: waiting for chunk {chunk} (Cluster job {job_id})')
             self.wait_for_job(job_id)
-            logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}). Start combining')
+            logger.debug(f'{thread_name}: cluster done for chunk {chunk} (Cluster job {job_id}). Start combining')
             try:
                 self._combine_lcs('tap', chunk_number=chunk, remove=True, overwrite=True)
                 self._combine_metadata('tap', chunk_number=chunk, remove=True, overwrite=True)
