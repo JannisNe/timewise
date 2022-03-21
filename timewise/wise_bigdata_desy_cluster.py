@@ -276,6 +276,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             msg = f"\n-----------------     STATUS     -----------------\n" \
                   f"\ttasks in TAP queue:_______{n_tap_tasks_queued}\n" \
                   f"\ttasks in cluster queue:___{n_cluster_tasks_queued}\n" \
+                  f"\tperformed io tasks:_______{len(list(self._io_queue_done.queue))}\n" \
                   f"\tdone total:_______________{self._done_tasks}/{self._total_tasks}\n" \
                   f"\truntime:__________________{elapsed_time/3600:.2f} hours\n" \
                   f"\tremaining:________________{remaining_time/3600:.2f} hours"
