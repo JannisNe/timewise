@@ -79,6 +79,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         if chunks is None:
             chunks = list(range(round(int(self.n_chunks * perc))))
+        else:
+            cm = [c not in self.chunk_map for c in chunks]
+            if np.any(cm):
+                raise ValueError(f"Chunks {np.array(chunks)[cm]} are not in chunk map. "
+                                 f"Probably they are larger than the set chunk number of {self._n_chunks}")
 
         if query_type not in self.query_types:
             raise ValueError(f"Unknown query type {query_type}! Choose one of {self.query_types}")

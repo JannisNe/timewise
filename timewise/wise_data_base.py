@@ -222,8 +222,6 @@ class WISEDataBase(abc.ABC):
             logger.warning(f"Very large number of chunks ({value})! "
                            f"Pay attention when getting photometry to not kill IRSA!")
 
-        self._n_chunks = value
-
         if self.parent_sample:
 
             self.chunk_map = np.zeros(len(self.parent_sample.df))
@@ -232,6 +230,11 @@ class WISEDataBase(abc.ABC):
                 start_ind = i * N_in_chunk
                 end_ind = start_ind + N_in_chunk
                 self.chunk_map[start_ind:end_ind] = int(i)
+
+            self._n_chunks = int(max(self.chunk_map)) + 1
+
+            if self._n_chunks != value:
+                logger.info(f"All objectes included in {self._n_chunks:.0f} chunks.")
 
         else:
             logger.warning("No parent sample given! Can not calculate dec interval masks!")
@@ -511,6 +514,11 @@ class WISEDataBase(abc.ABC):
 
         if chunks is None:
             chunks = list(range(round(int(self.n_chunks * perc))))
+        else:
+            cm = [c not in self.chunk_map for c in chunks]
+            if np.any(cm):
+                raise ValueError(f"Chunks {np.array(chunks)[cm]} are not in chunk map. "
+                                 f"Probably they are larger than the set chunk number of {self._n_chunks}")
 
         if service is None:
             elements_per_chunk = len(self.parent_sample.df) / self.n_chunks
