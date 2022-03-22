@@ -36,7 +36,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         self._tap_queue = queue.Queue()
         self._cluster_queue = queue.Queue()
-        self._io_queue = queue.Queue()
+        self._io_queue = queue.PriorityQueue()
         self._io_queue_done = queue.Queue()
 
     def get_sample_photometric_data(self, max_nTAPjobs=8, perc=1, tables=None, chunks=None,
@@ -206,7 +206,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def _io_thread(self):
         logger.debug("started in-out thread")
         while True:
-            method_name, args = self._io_queue.get(block=True)
+            rank, method_name, args = self._io_queue.get(block=True)
             logger.debug(f"executing {method_name} with arguments {args}")
             self.__getattribute__(method_name)(*args)
             self._io_queue.task_done()
@@ -223,7 +223,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 # -----------  submit jobs via the IRSA TAP ---------- #
                 submit_method = "_submit_job_to_TAP"
                 submit_args = [chunk, t, mag, flux, query_type]
-                self._io_queue.put((submit_method, submit_args))
+                self._io_queue.put((1, submit_method, submit_args))
                 self._wait_for_io_task(submit_method, submit_args)
 
                 # ---------------  wait for the TAP job -------------- #
@@ -234,7 +234,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 # --------------  get results of TAP job ------------- #
                 result_method = "_get_results_from_job"
                 result_args = [t, chunk]
-                self._io_queue.put((result_method, result_args))
+                self._io_queue.put((2, result_method, result_args))
                 self._wait_for_io_task(result_method, result_args)
 
             logger.info(f'{thread_name}: got all TAP results for chunk {chunk}. submitting to cluster')
