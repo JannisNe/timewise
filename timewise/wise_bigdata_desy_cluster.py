@@ -151,8 +151,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._combine_metadata(service=service, overwrite=overwrite, remove=remove_chunks)
 
     def _wait_for_job(self, t, i):
-        thread_name = threading.currentThread().getName()
-        logger.info(f"{thread_name}: Waiting on {i}th query of {t} ........")
+        logger.info(f"Waiting on {i}th query of {t} ........")
         _job = self.tap_jobs[t][i]
         # Sometimes a connection Error occurs.
         # In that case try again until job.wait() exits normally
@@ -166,16 +165,15 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 if _ntries < 10:
                     msg += f' ({_ntries} tries left)'
 
-                logger.warning(f"{thread_name}: {msg}")
+                logger.warning(f"{msg}")
                 time.sleep(60 * 6)
                 if '404 Client Error: Not Found for url' in str(e):
                     _ntries -= 1
 
-        logger.info(f'{thread_name}: {i}th query of {t}: Done!')
+        logger.info(f'{i}th query of {t}: Done!')
 
     def _get_results_from_job(self, t, i):
-        thread_name = threading.currentThread().getName()
-        logger.debug(f"{thread_name}: getting results for {i}th query of {t} .........")
+        logger.debug(f"getting results for {i}th query of {t} .........")
         _job = self.tap_jobs[t][i]
         lightcurve = _job.fetch_result().to_table().to_pandas()
         fn = self._chunk_photometry_cache_filename(t, i)
@@ -213,11 +211,10 @@ class WISEDataDESYCluster(WiseDataByVisit):
             self._io_queue_done.put(self._io_queue_hash(method_name, args))
 
     def _tap_thread(self):
-        thread_name = threading.currentThread().getName()
-        logger.debug(f'{thread_name}: started tap thread')
+        logger.debug(f'started tap thread')
         while True:
             tables, chunk, wait, mag, flux, cluster_time, query_type = self._tap_queue.get(block=True)
-            logger.debug(f'{thread_name}: querying IRSA for chunk {chunk}')
+            logger.debug(f'querying IRSA for chunk {chunk}')
 
             for t in tables:
                 # -----------  submit jobs via the IRSA TAP ---------- #
@@ -227,7 +224,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 self._wait_for_io_task(submit_method, submit_args)
 
                 # ---------------  wait for the TAP job -------------- #
-                logger.info(f'{thread_name}: waiting for {wait} hours')
+                logger.info(f'waiting for {wait} hours')
                 time.sleep(wait * 3600)
                 self._wait_for_job(t, chunk)
 
@@ -237,7 +234,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 self._io_queue.put((2, result_method, result_args))
                 self._wait_for_io_task(result_method, result_args)
 
-            logger.info(f'{thread_name}: got all TAP results for chunk {chunk}. submitting to cluster')
+            logger.info(f'got all TAP results for chunk {chunk}. submitting to cluster')
             job_id = self.submit_to_cluster(cluster_cpu=1,
                                             cluster_h=cluster_time,
                                             cluster_ram='10G',
@@ -250,12 +247,12 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
     def _cluster_thread(self):
         thread_name = threading.currentThread().getName()
-        logger.debug(f'{thread_name}: started cluster thread')
+        logger.debug(f'started cluster thread')
         while True:
             job_id, chunk = self._cluster_queue.get(block=True)
-            logger.debug(f'{thread_name}: waiting for chunk {chunk} (Cluster job {job_id})')
+            logger.debug(f'waiting for chunk {chunk} (Cluster job {job_id})')
             self.wait_for_job(job_id)
-            logger.debug(f'{thread_name}: cluster done for chunk {chunk} (Cluster job {job_id}). Start combining')
+            logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}). Start combining')
             try:
                 self._combine_lcs('tap', chunk_number=chunk, remove=True, overwrite=True)
                 self._combine_metadata('tap', chunk_number=chunk, remove=True, overwrite=True)
