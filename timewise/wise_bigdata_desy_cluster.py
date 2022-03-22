@@ -116,15 +116,14 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         # --------------------------- starting threads --------------------------- #
 
-        tap_threads = [threading.Thread(target=self._tap_thread, daemon=True, name=f"TAP_thread{_}")
+        tap_threads = [threading.Thread(target=self._tap_thread, daemon=True, name=f"TAPThread{_}")
                        for _ in range(max_nTAPjobs)]
-        cluster_threads = [threading.Thread(target=self._cluster_thread, daemon=True, name=f"cluster_thread{_}")
+        cluster_threads = [threading.Thread(target=self._cluster_thread, daemon=True, name=f"ClusterThread{_}")
                            for _ in range(max_nTAPjobs)]
-        io_threads = [threading.Thread(target=self._io_thread, daemon=True, name="io_thread")
-                      for _ in range(1)]
-        status_thread = threading.Thread(target=self._status_thread, daemon=True)
+        io_thread = threading.Thread(target=self._io_thread, daemon=True, name="IOThread")
+        status_thread = threading.Thread(target=self._status_thread, daemon=True, name='StatusThread')
 
-        for t in tap_threads + cluster_threads + io_threads:
+        for t in tap_threads + cluster_threads + [io_thread]:
             logger.debug('starting thread')
             t.start()
 
@@ -204,8 +203,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def _io_thread(self):
         logger.debug("started in-out thread")
         while True:
-            rank, method_name, args = self._io_queue.get(block=True)
-            logger.debug(f"executing {method_name} with arguments {args}")
+            priority, method_name, args = self._io_queue.get(block=True)
+            logger.debug(f"executing {method_name} with arguments {args} (priority {priority})")
             self.__getattribute__(method_name)(*args)
             self._io_queue.task_done()
             self._io_queue_done.put(self._io_queue_hash(method_name, args))
@@ -246,7 +245,6 @@ class WISEDataDESYCluster(WiseDataByVisit):
             self._cluster_queue.put((job_id, chunk))
 
     def _cluster_thread(self):
-        thread_name = threading.currentThread().getName()
         logger.debug(f'started cluster thread')
         while True:
             job_id, chunk = self._cluster_queue.get(block=True)
