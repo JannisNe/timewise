@@ -554,15 +554,14 @@ class WISEDataBase(abc.ABC):
             else:
                 return os.path.join(self._cache_photometry_dir, fn + f"_{jobID}.json")
 
-    def _load_lightcurves(self, service, chunk_number=None, jobID=None, remove=False):
+    def _load_lightcurves(self, service, chunk_number=None, jobID=None, return_filename=False):
         fn = self._lightcurve_filename(service, chunk_number, jobID)
         logger.debug(f"loading {fn}")
         try:
             with open(fn, "r") as f:
                 lcs = json.load(f)
-            if remove:
-                logger.debug(f"removing {fn}")
-                os.remove(fn)
+            if return_filename:
+                return lcs, fn
             return lcs
         except FileNotFoundError:
             logger.warning(f"No file {fn}")
@@ -618,18 +617,25 @@ class WISEDataBase(abc.ABC):
             raise NotImplementedError
 
         lcs = None
+        fns = list()
         for i in itr[1]:
             kw = dict(kwargs)
             kw[itr[0]] = i
-            kw['remove'] = remove
-            ilcs = self._load_lightcurves(**kw)
-            if not isinstance(ilcs, type(None)):
+            kw['return_filename'] = True
+            res = self._load_lightcurves(**kw)
+            if not isinstance(res, type(None)):
+                ilcs, ifn = res
+                fns.append(ifn)
                 if isinstance(lcs, type(None)):
                     lcs = dict(ilcs)
                 else:
                     lcs.update(ilcs)
 
         self._save_lightcurves(lcs, service=service, chunk_number=chunk_number, overwrite=overwrite)
+
+        if remove:
+            for fn in tqdm.tqdm(fns, desc="removing files"):
+                os.remove(fn)
 
     # ----------------------------------------------------------------------------------- #
     # START using GATOR to get photometry        #
@@ -1436,15 +1442,14 @@ class WISEDataBase(abc.ABC):
         else:
             raise NotImplementedError
 
-    def _load_metadata(self, service, chunk_number=None, jobID=None, remove=False):
+    def _load_metadata(self, service, chunk_number=None, jobID=None, return_filename=False):
         fn = self._metadata_filename(service, chunk_number, jobID)
         try:
             logger.debug(f"loading {fn}")
             with open(fn, "r") as f:
                 metadata = json.load(f)
-            if remove:
-                logger.debug(f"removing")
-                os.remove(fn)
+            if return_filename:
+                return metadata, fn
             return metadata
         except FileNotFoundError:
             logger.warning(f"No file {fn}")
@@ -1515,19 +1520,26 @@ class WISEDataBase(abc.ABC):
         else:
             raise NotImplementedError
 
-        lcs = None
+        metadata = None
+        fns = list()
         for i in itr[1]:
             kw = dict(kwargs)
             kw[itr[0]] = i
-            kw['remove'] = remove
-            ilcs = self._load_metadata(**kw)
-            if not isinstance(ilcs, type(None)):
-                if isinstance(lcs, type(None)):
-                    lcs = dict(ilcs)
+            kw['return_filename'] = True
+            res = self._load_metadata(**kw)
+            if not isinstance(res, type(None)):
+                imetadata, ifn = res
+                fns.append(ifn)
+                if isinstance(metadata, type(None)):
+                    metadata = dict(imetadata)
                 else:
-                    lcs.update(ilcs)
+                    metadata.update(imetadata)
 
-        self._save_metadata(lcs, service=service, chunk_number=chunk_number, overwrite=overwrite)
+        self._save_metadata(metadata, service=service, chunk_number=chunk_number, overwrite=overwrite)
+
+        if remove:
+            for fn in tqdm.tqdm(fns, desc='removing files'):
+                os.remove(fn)
 
     @abc.abstractmethod
     def calculate_metadata_single(self, lcs):
