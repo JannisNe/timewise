@@ -146,8 +146,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._cluster_queue.join()
         logger.debug('cluster done')
 
-        self._combine_lcs(service=service, overwrite=overwrite, remove=remove_chunks)
-        self._combine_metadata(service=service, overwrite=overwrite, remove=remove_chunks)
+        # self._combine_lcs(service=service, overwrite=overwrite, remove=remove_chunks)
+        # self._combine_metadata(service=service, overwrite=overwrite, remove=remove_chunks)
 
     def _wait_for_job(self, t, i):
         logger.info(f"Waiting on {i}th query of {t} ........")
@@ -236,7 +236,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             logger.info(f'got all TAP results for chunk {chunk}. submitting to cluster')
             job_id = self.submit_to_cluster(cluster_cpu=1,
                                             cluster_h=cluster_time,
-                                            cluster_ram='10G',
+                                            cluster_ram='40G',
                                             tables=None,
                                             service='tap',
                                             single_chunk=chunk)
@@ -487,7 +487,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             ids = f'1-{self.n_chunks*self.n_cluster_jobs_per_chunk}'
         else:
             _start_id = int(single_chunk*self.n_cluster_jobs_per_chunk) + 1
-            _end_id = int(_start_id + self.n_cluster_jobs_per_chunk)
+            _end_id = int(_start_id + self.n_cluster_jobs_per_chunk) - 1
             ids = f'{_start_id}-{_end_id}'
 
         parentsample_class_pickle = os.path.join(self.cluster_dir, 'parentsample_class.pkl')
