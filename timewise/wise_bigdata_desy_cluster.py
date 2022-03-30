@@ -1,4 +1,4 @@
-import getpass, os, time, subprocess, math, pickle, queue, threading, argparse, time
+import getpass, os, time, subprocess, math, pickle, queue, threading, argparse, time, backoff
 import numpy as np
 import pandas as pd
 import pyvo as vo
@@ -233,6 +233,14 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 self._io_queue.put((2, result_method, result_args))
                 self._wait_for_io_task(result_method, result_args)
 
+            self._tap_queue.task_done()
+            self._cluster_queue.put((cluster_time, chunk))
+
+    def _cluster_thread(self):
+        logger.debug(f'started cluster thread')
+        while True:
+            cluster_time, chunk = self._cluster_queue.get(block=True)
+
             logger.info(f'got all TAP results for chunk {chunk}. submitting to cluster')
             job_id = self.submit_to_cluster(cluster_cpu=1,
                                             cluster_h=cluster_time,
@@ -241,22 +249,21 @@ class WISEDataDESYCluster(WiseDataByVisit):
                                             service='tap',
                                             single_chunk=chunk)
 
-            self._tap_queue.task_done()
-            self._cluster_queue.put((job_id, chunk))
-
-    def _cluster_thread(self):
-        logger.debug(f'started cluster thread')
-        while True:
-            job_id, chunk = self._cluster_queue.get(block=True)
-            logger.debug(f'waiting for chunk {chunk} (Cluster job {job_id})')
-            self.wait_for_job(job_id)
-            logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}). Start combining')
-            try:
-                self._combine_lcs('tap', chunk_number=chunk, remove=True, overwrite=True)
-                self._combine_metadata('tap', chunk_number=chunk, remove=True, overwrite=True)
-            finally:
+            if not job_id:
+                logger.warning(f"could not submit {chunk} to cluster! Try later")
+                self._cluster_queue.put((cluster_time, chunk))
                 self._cluster_queue.task_done()
-                self._done_tasks += 1
+
+            else:
+                logger.debug(f'waiting for chunk {chunk} (Cluster job {job_id})')
+                self.wait_for_job(job_id)
+                logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}). Start combining')
+                try:
+                    self._combine_lcs('tap', chunk_number=chunk, remove=True, overwrite=True)
+                    self._combine_metadata('tap', chunk_number=chunk, remove=True, overwrite=True)
+                finally:
+                    self._cluster_queue.task_done()
+                    self._done_tasks += 1
 
     def _status_thread(self):
         logger.debug('started status thread')
@@ -463,6 +470,25 @@ class WISEDataDESYCluster(WiseDataByVisit):
         cmd = "chmod +x " + self.submit_file
         os.system(cmd)
 
+    @staticmethod
+    def backoff_hdlr(details):
+        logger.info("Backing off {wait:0.1f} seconds after {tries} tries "
+                    "calling function {target} with args {args} and kwargs "
+                    "{kwargs}".format(**details))
+
+    @backoff.on_exception(
+        backoff.expo,
+        OSError,
+        max_time=2*3600,
+        on_backoff=backoff_hdlr,
+        jitter=backoff.full_jitter,
+    )
+    def _execute_bash_command(self, cmd):
+        with subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True) as process:
+            msg = process.stdout.read().decode()
+            process.terminate()
+        return msg
+
     def submit_to_cluster(self, cluster_cpu, cluster_h, cluster_ram, tables, service, single_chunk=None):
         """
         Submit jobs to cluster
@@ -505,15 +531,16 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         self._make_cluster_script(cluster_h, cluster_ram, tables, service)
 
-        with subprocess.Popen(submit_cmd, stdout=subprocess.PIPE, shell=True) as process:
-            msg = process.stdout.read().decode()
-            process.terminate()
+        try:
+            msg = self._execute_bash_command(submit_cmd)
+            logger.info(str(msg))
+            job_id = int(str(msg).split('job-array')[1].split('.')[0])
+            logger.info(f"Running on cluster with ID {job_id}")
+            self.job_id = job_id
+            return job_id
 
-        logger.info(str(msg))
-        job_id = int(str(msg).split('job-array')[1].split('.')[0])
-        logger.info(f"Running on cluster with ID {job_id}")
-        self.job_id = job_id
-        return job_id
+        except OSError:
+            return
 
     def run_cluster(self, cluster_cpu, cluster_h, cluster_ram, service):
         """
