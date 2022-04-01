@@ -1,4 +1,4 @@
-import os, subprocess, copy, json, tqdm, time, threading, queue, requests, abc
+import os, subprocess, copy, json, tqdm, time, threading, queue, requests, abc, logging
 import multiprocessing as mp
 import pandas as pd
 import numpy as np
@@ -10,7 +10,7 @@ from astropy import constants
 from astropy.cosmology import Planck18
 import matplotlib.pyplot as plt
 
-from timewise.general import main_logger, cache_dir, plots_dir, output_dir
+from timewise.general import main_logger, cache_dir, plots_dir, output_dir, logger_format
 
 
 logger = main_logger.getChild(__name__)
@@ -178,6 +178,11 @@ class WISEDataBase(abc.ABC):
             if not os.path.isdir(d):
                 logger.debug(f"making directory {d}")
                 os.makedirs(d)
+
+        file_handler = logging.FileHandler(filename=self.cache_dir + '/log.err', mode="a")
+        file_handler.setLevel("WARNING")
+        file_handler.setFormatter(logger_format)
+        logger.addHandler(file_handler)
 
         self.submit_file = os.path.join(self.cluster_dir, 'submit.txt')
 
