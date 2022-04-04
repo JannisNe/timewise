@@ -1,4 +1,4 @@
-import os, subprocess, copy, json, tqdm, time, threading, queue, requests, abc, logging
+import os, subprocess, copy, json, tqdm, time, threading, queue, requests, abc, logging, backoff
 import multiprocessing as mp
 import pandas as pd
 import numpy as np
@@ -10,7 +10,7 @@ from astropy import constants
 from astropy.cosmology import Planck18
 import matplotlib.pyplot as plt
 
-from timewise.general import main_logger, cache_dir, plots_dir, output_dir, logger_format
+from timewise.general import main_logger, cache_dir, plots_dir, output_dir, logger_format, backoff_hndlr
 
 
 logger = main_logger.getChild(__name__)
@@ -858,34 +858,34 @@ class WISEDataBase(abc.ABC):
              f"{self._split_chunk_key}{chunk_number}.csv"
         return os.path.join(self._cache_photometry_dir, fn)
 
+    @staticmethod
+    def _give_up_tap(e):
+        return ("Job is not active!" in str(e))
+
+    @backoff.on_exception(
+        backoff.expo,
+        vo.dal.exceptions.DALServiceError,
+        giveup=_give_up_tap,
+        max_tries=50,
+        on_backoff=backoff_hndlr
+    )
     def _thread_wait_and_get_results(self, t, i):
         logger.info(f"Waiting on {i}th query of {t} ........")
+
         _job = self.tap_jobs[t][i]
-        # Sometimes a connection Error occurs.
-        # In that case try again until job.wait() exits normally
-        _ntries = 10
-        while True:
-            try:
-                _job.wait()
-                break
-            except vo.dal.exceptions.DALServiceError as e:
-                msg = f"{i}th query of {t}: DALServiceError: {e}; trying again in 6 min"
-                if _ntries < 10:
-                    msg += f' ({_ntries} tries left)'
-
-                logger.warning(msg)
-                time.sleep(60 * 6)
-                if '404 Client Error: Not Found for url' in str(e):
-                    _ntries -= 1
-
+        _job.wait()
         logger.info(f'{i}th query of {t}: Done!')
+
         lightcurve = _job.fetch_result().to_table().to_pandas()
         fn = self._chunk_photometry_cache_filename(t, i)
         logger.debug(f"{i}th query of {t}: saving under {fn}")
+
         cols = dict(self.photometry_table_keymap[t]['mag'])
         cols.update(self.photometry_table_keymap[t]['flux'])
+
         if 'allwise' in t:
             cols['cntr_mf'] = 'allwise_cntr'
+
         lightcurve.rename(columns=cols).to_csv(fn)
         return
 
