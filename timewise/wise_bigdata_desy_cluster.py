@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pyvo as vo
 
-from timewise.general import main_logger, DATA_DIR_KEY, data_dir
+from timewise.general import main_logger, DATA_DIR_KEY, data_dir, backoff_hndlr
 from timewise.wise_data_by_visit import WiseDataByVisit
 
 
@@ -146,29 +146,17 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._cluster_queue.join()
         logger.debug('cluster done')
 
-        # self._combine_lcs(service=service, overwrite=overwrite, remove=remove_chunks)
-        # self._combine_metadata(service=service, overwrite=overwrite, remove=remove_chunks)
-
+    @backoff.on_exception(
+        backoff.expo,
+        vo.dal.exceptions.DALServiceError,
+        giveup=WiseDataByVisit._give_up_tap,
+        max_tries=50,
+        on_backoff=backoff_hndlr
+    )
     def _wait_for_job(self, t, i):
         logger.info(f"Waiting on {i}th query of {t} ........")
         _job = self.tap_jobs[t][i]
-        # Sometimes a connection Error occurs.
-        # In that case try again until job.wait() exits normally
-        _ntries = 10
-        while True:
-            try:
-                _job.wait()
-                break
-            except vo.dal.exceptions.DALServiceError as e:
-                msg = f"{i}th query of {t}: DALServiceError: {e}; trying again in 6 min"
-                if _ntries < 10:
-                    msg += f' ({_ntries} tries left)'
-
-                logger.warning(f"{msg}")
-                time.sleep(60 * 6)
-                if '404 Client Error: Not Found for url' in str(e):
-                    _ntries -= 1
-
+        _job.wait()
         logger.info(f'{i}th query of {t}: Done!')
 
     def _get_results_from_job(self, t, i):
@@ -225,7 +213,13 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 # ---------------  wait for the TAP job -------------- #
                 logger.info(f'waiting for {wait} hours')
                 time.sleep(wait * 3600)
-                self._wait_for_job(t, chunk)
+
+                try:
+                    self._wait_for_job(t, chunk)
+                except vo.dal.exceptions.DALServiceError:
+                    logger.warning(f"could not wait for {chunk}th query of {t}!")
+                    self._tap_queue.task_done()
+                    continue
 
                 # --------------  get results of TAP job ------------- #
                 result_method = "_get_results_from_job"
@@ -291,15 +285,24 @@ class WISEDataDESYCluster(WiseDataByVisit):
     # ---------------------------------------------------- #
 
     @staticmethod
+    @backoff.on_exception(
+        backoff.expo,
+        OSError,
+        max_time=2*3600,
+        on_backoff=backoff_hndlr,
+        jitter=backoff.full_jitter,
+    )
+    def _execute_bash_command(cmd):
+        with subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True) as process:
+            msg = process.stdout.read().decode()
+            process.terminate()
+        return msg
+
+    @staticmethod
     def _qstat_output(qstat_command):
         """return the output of the qstat_command"""
         # start a subprocess to query the cluster
-        with subprocess.Popen(qstat_command, stdout=subprocess.PIPE, shell=True) as process:
-            # read the output
-            tmp = process.stdout.read().decode()
-            process.terminate()
-            msg = str(tmp)
-        return msg
+        return str(WISEDataDESYCluster._execute_bash_command(qstat_command))
 
     @staticmethod
     def _get_ids(qstat_command):
@@ -343,7 +346,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             i = 31
             j = 6
             while self._ntasks_total(_job_id) != 0:
-                if i > 3:
+                if i > 30:
                     logger.info(f'{time.asctime(time.localtime())} - Job{_job_id}:'
                                 f' {self._ntasks_total(_job_id)} entries in queue. '
                                 f'Of these, {self._ntasks_running(_job_id)} are running tasks, and '
@@ -470,25 +473,6 @@ class WISEDataDESYCluster(WiseDataByVisit):
         cmd = "chmod +x " + self.submit_file
         os.system(cmd)
 
-    @staticmethod
-    def backoff_hdlr(details):
-        logger.info("Backing off {wait:0.1f} seconds after {tries} tries "
-                    "calling function {target} with args {args} and kwargs "
-                    "{kwargs}".format(**details))
-
-    @backoff.on_exception(
-        backoff.expo,
-        OSError,
-        max_time=2*3600,
-        on_backoff=backoff_hdlr,
-        jitter=backoff.full_jitter,
-    )
-    def _execute_bash_command(self, cmd):
-        with subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True) as process:
-            msg = process.stdout.read().decode()
-            process.terminate()
-        return msg
-
     def submit_to_cluster(self, cluster_cpu, cluster_h, cluster_ram, tables, service, single_chunk=None):
         """
         Submit jobs to cluster
@@ -567,6 +551,65 @@ class WISEDataDESYCluster(WiseDataByVisit):
     # ---------------------------------------------------- #
     # END using cluster for downloading and binning        #
     # ----------------------------------------------------------------------------------- #
+
+    def plot_lc(self, parent_sample_idx, service='tap', plot_unbinned=False, plot_binned=True,
+                interactive=False, fn=None, ax=None, save=True, lum_key='flux_density', **kwargs):
+        """Make a pretty plot of a lightcurve
+
+        :param parent_sample_idx: The index in the parent sample of the lightcurve
+        :type parent_sample_idx: int
+        :param service: the service with which the lightcurves were downloaded
+        :type service: str
+        :param plot_unbinned: plot unbinned data
+        :type plot_unbinned: bool
+        :param plot_binned: plot binned lightcurve
+        :type plot_binned: bool
+        :param interactive: interactive mode
+        :type interactive: bool
+        :param fn: filename, defaults to </path/to/timewise/data/dir>/output/plots/<base_name>/<parent_sample_index>_<lum_key>.pdf
+        :type fn: str
+        :param ax: pre-existing matplotlib.Axis
+        :param save: save the plot
+        :type save: bool
+        :param lum_key: the unit of luminosity to use in the plot, either of 'mag', 'flux_density' or 'luminosity'
+        :param kwargs: any additional kwargs will be passed on to `matplotlib.pyplot.subplots()`
+        :return: the matplotlib.Figure and matplotlib.Axes if `interactive=True`
+        """
+
+        logger.debug(f"loading binned lightcurves")
+
+        _get_unbinned_lcs_fct = self._get_unbinned_lightcurves \
+            if service == 'tap' else self._get_unbinned_lightcurves_gator
+
+        wise_id = self.parent_sample.df.loc[int(parent_sample_idx), self.parent_wise_source_id_key]
+        if isinstance(wise_id, float) and not np.isnan(wise_id):
+            wise_id = int(wise_id)
+        logger.debug(f"{wise_id} for {parent_sample_idx}")
+
+        _chunk_number = self._get_chunk_number(parent_sample_index=parent_sample_idx)
+        lcs = self._load_lightcurves(service, chunk_number=_chunk_number)
+        lc = pd.DataFrame.from_dict(lcs[f"{int(parent_sample_idx)}"])
+
+        if plot_unbinned:
+
+            if service == 'tap':
+                unbinned_lcs = self._get_unbinned_lightcurves(_chunk_number)
+
+            else:
+                unbinned_lcs = self._get_unbinned_lightcurves_gator(_chunk_number)
+
+            unbinned_lc = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == int(parent_sample_idx)]
+
+        else:
+            unbinned_lc = None
+
+        _lc = lc if plot_binned else None
+
+        if not fn:
+            fn = os.path.join(self.plots_dir, f"{parent_sample_idx}_{lum_key}.pdf")
+
+        return self._plot_lc(lightcurve=_lc, unbinned_lc=unbinned_lc, interactive=interactive, fn=fn, ax=ax,
+                             save=save, lum_key=lum_key, **kwargs)
 
 
 if __name__ == '__main__':
