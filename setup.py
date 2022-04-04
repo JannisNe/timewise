@@ -31,7 +31,7 @@ if __name__ == '__main__':
             "tqdm==4.63.1",
             "requests==2.27.1",
             "pandas==1.4.1",
-            "numpy==1.22.2",
+            "numpy==1.22.3",
             "pyvo==1.3",
             "astropy==5.0.4",
             "matplotlib==3.5.1",
