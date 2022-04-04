@@ -28,7 +28,7 @@ if __name__ == '__main__':
         ],
         python_requires='>=3.8',
         install_requires=[
-            "tqdm==4.63.0",
+            "tqdm==4.63.1",
             "requests==2.27.1",
             "pandas==1.4.1",
             "numpy==1.22.2",
