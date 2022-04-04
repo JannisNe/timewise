@@ -24,3 +24,9 @@ cache_dir = os.path.join(data_dir, 'cache')
 for d in [data_dir, output_dir, plots_dir, cache_dir]:
     if not os.path.isdir(d):
         os.mkdir(d)
+
+
+def backoff_hndlr(details):
+    logger.info("Backing off {wait:0.1f} seconds after {tries} tries "
+                "calling function {target} with args {args} and kwargs "
+                "{kwargs}".format(**details))
