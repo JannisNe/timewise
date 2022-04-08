@@ -86,7 +86,7 @@ class WiseDataByVisit(WISEDataBase):
                 fl_err = epoch[f'{b}{self.flux_key_ext}{self.error_key_ext}']
                 fl_ul = epoch[f"{b}{self.flux_key_ext}{self.upper_limit_key}"]
 
-                # calculate the proportinality constant between flux density and source count
+                # calculate the proportionality constant between flux density and source count
                 mag_zp = self.magnitude_zeropoints['F_nu'][b].to('mJy').value
                 app_co = self.aperture_corrections[b]
                 flux_dens_const = mag_zp * 10 ** (-zp_med / 2.5) * 10 ** (app_co / 2.5)
@@ -147,7 +147,7 @@ class WiseDataByVisit(WISEDataBase):
             imetadata = dict()
             lc = pd.DataFrame.from_dict(lc_dict)
             for band in self.bands:
-                for lum_key in [self.mag_key_ext, self.flux_key_ext]:
+                for lum_key in [self.mag_key_ext, self.flux_key_ext, self.flux_density_key_ext]:
                     llumkey = f"{band}{self.mean_key}{lum_key}"
                     errkey = f"{band}{lum_key}{self.rms_key}"
                     ul_key = f'{band}{lum_key}{self.upper_limit_key}'
@@ -174,12 +174,8 @@ class WiseDataByVisit(WISEDataBase):
                             imin_rms_ind = ilc[errkey].argmin()
                             imin_rms = ilc[errkey].iloc[imin_rms_ind]
 
-                            if lum_key == self.mag_key_ext:
-                                imetadata[difk] = imax - imin
-                                imetadata[rmsk] = imin_rms
-                            else:
-                                imetadata[difk] = imax / imin
-                                imetadata[rmsk] = imin_rms / ilc[llumkey].iloc[imin_rms_ind]
+                            imetadata[difk] = imax - imin
+                            imetadata[rmsk] = imin_rms
 
                             if len(ilc) == 1:
                                 imetadata[dtk] = 0
@@ -192,7 +188,7 @@ class WiseDataByVisit(WISEDataBase):
                             imetadata[difk] = np.nan
                             imetadata[dtk] = np.nan
                     except KeyError as e:
-                        pass
+                        raise KeyError(e)
 
             metadata[ID] = imetadata
         return metadata
