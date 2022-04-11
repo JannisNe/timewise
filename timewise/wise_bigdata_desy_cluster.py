@@ -1,4 +1,4 @@
-import getpass, os, time, subprocess, math, pickle, queue, threading, argparse, time, backoff
+import getpass, os, time, subprocess, math, pickle, queue, threading, argparse, time, backoff, shutil
 import numpy as np
 import pandas as pd
 import pyvo as vo
@@ -28,6 +28,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self.cluster_jobID_map = None
         self.clusterJob_chunk_map = None
         self.cluster_info_file = os.path.join(self.cluster_dir, 'cluster_info.pkl')
+        self._overwrite = True
+        self._storage_dir = None
 
         # status attributes
         self.start_time = None
@@ -40,8 +42,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._io_queue_done = queue.Queue()
 
     def get_sample_photometric_data(self, max_nTAPjobs=8, perc=1, tables=None, chunks=None,
-                                    cluster_jobs_per_chunk=100, wait=5, remove_chunks=True,
-                                    query_type='positional', overwrite=True):
+                                    cluster_jobs_per_chunk=100, wait=5, remove_chunks=False,
+                                    query_type='positional', overwrite=True,
+                                    storage_directory=None):
         """
         An alternative to `get_photometric_data()` that uses the DESY cluster and is optimised for large datasets.
 
@@ -57,12 +60,14 @@ class WISEDataDESYCluster(WiseDataByVisit):
         :type cluster_jobs_per_chunk: int
         :param wait: time in hours to wait after submitting TAP jobs
         :type wait: float
-        :param remove_chunks: remove single chink files after binning
+        :param remove_chunks: remove single chunk files after binning
         :type remove_chunks: bool
         :param query_type: 'positional': query photometry based on distance from object, 'by_allwise_id': select all photometry points within a radius of 50 arcsec with the corresponding AllWISE ID
         :type query_type: str
         :param overwrite: overwrite already existing lightcurves and metadata
         :type overwrite: bool
+        :param storage_directory: move binned files and raw data here after work is done
+        :type storage_directory: str
         """
 
         # --------------------- set defaults --------------------------- #
@@ -84,6 +89,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
             if np.any(cm):
                 raise ValueError(f"Chunks {np.array(chunks)[cm]} are not in chunk map. "
                                  f"Probably they are larger than the set chunk number of {self._n_chunks}")
+
+        if remove_chunks:
+            raise NotImplementedError("Removing chunks is not implemented yet!")
 
         if query_type not in self.query_types:
             raise ValueError(f"Unknown query type {query_type}! Choose one of {self.query_types}")
@@ -113,6 +121,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
         cluster_time = time.strftime('%H:%M:%S', time.gmtime(cluster_time_s))
         self.clear_cluster_log_dir()
         self._save_cluster_info()
+        self._overwrite = overwrite
+        self._storage_dir = storage_directory
 
         # --------------------------- starting threads --------------------------- #
 
@@ -230,6 +240,32 @@ class WISEDataDESYCluster(WiseDataByVisit):
             self._tap_queue.task_done()
             self._cluster_queue.put((cluster_time, chunk))
 
+    def _move_to_storage(self, product, service, chunk_number=None, job_ID=None):
+
+        if not self._storage_dir:
+            raise ValueError("No storage dir given!")
+
+        fn_fct = {
+            "lcs": self._lightcurve_filename,
+            "metadata": self._metadata_filename
+        }
+
+        src_fn = fn_fct[product](service=service, chunk_number=chunk_number, job_ID=job_ID)
+        dst_fn = src_fn.replace(self.cache_dir, self._storage_dir)
+        logger.debug(f"copy {src_fn} to {dst_fn}")
+
+        try:
+            shutil.copy2(src_fn, dst_fn)
+
+            if os.path.getsize(src_fn) == os.path.getsize(dst_fn):
+                logger.debug(f"copy successful, removing {src_fn}")
+                os.remove(src_fn)
+            else:
+                logger.warning(f"copy from {src_fn} to {dst_fn} gone wrong! Not removing source.")
+
+        except FileNotFoundError as e:
+            logger.warning(f"FileNotFoundError: {e}!")
+
     def _cluster_thread(self):
         logger.debug(f'started cluster thread')
         while True:
@@ -253,8 +289,10 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 self.wait_for_job(job_id)
                 logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}). Start combining')
                 try:
-                    self._combine_lcs('tap', chunk_number=chunk, remove=True, overwrite=True)
-                    self._combine_metadata('tap', chunk_number=chunk, remove=True, overwrite=True)
+                    self._combine_lcs('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
+                    self._combine_metadata('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
+                    self._move_to_storage("lcs", "tap", chunk_number=chunk)
+                    self._move_to_storage("metadata", "tap", chunk_number=chunk)
                 finally:
                     self._cluster_queue.task_done()
                     self._done_tasks += 1
