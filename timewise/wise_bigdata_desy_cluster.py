@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pyvo as vo
 
-from timewise.general import main_logger, DATA_DIR_KEY, data_dir, backoff_hndlr
+from timewise.general import main_logger, DATA_DIR_KEY, data_dir, bigdata_dir, backoff_hndlr
 from timewise.wise_data_by_visit import WiseDataByVisit
 
 
@@ -44,7 +44,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def get_sample_photometric_data(self, max_nTAPjobs=8, perc=1, tables=None, chunks=None,
                                     cluster_jobs_per_chunk=100, wait=5, remove_chunks=False,
                                     query_type='positional', overwrite=True,
-                                    storage_directory=None):
+                                    storage_directory=bigdata_dir):
         """
         An alternative to `get_photometric_data()` that uses the DESY cluster and is optimised for large datasets.
 

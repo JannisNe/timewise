@@ -17,6 +17,14 @@ else:
     logger.warning(f'{DATA_DIR_KEY} not set! Using home directory.')
     data_dir = os.path.expanduser('~/')
 
+BIGDATA_DIR_KEY = 'TIMEWISE_BIGDATA'
+if BIGDATA_DIR_KEY in os.environ:
+    bigdata_dir = os.environ[BIGDATA_DIR_KEY]
+    logger.info(f"Using bigdata directory {bigdata_dir}")
+else:
+    bigdata_dir = None
+    logger.info(f"No bigdata directory set.")
+
 output_dir = os.path.join(data_dir, 'output')
 plots_dir = os.path.join(output_dir, 'plots')
 cache_dir = os.path.join(data_dir, 'cache')
