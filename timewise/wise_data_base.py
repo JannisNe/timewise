@@ -126,6 +126,9 @@ class WISEDataBase(abc.ABC):
         "moon_masked like '00%'"
     ]
 
+    parent_wise_source_id_key = 'AllWISE_id'
+    parent_sample_wise_skysep_key = 'sep_to_WISE_source'
+
     def __init__(self,
                  base_name,
                  parent_sample_class,
@@ -144,8 +147,8 @@ class WISEDataBase(abc.ABC):
         # --------------------------- vvvv set up parent sample vvvv --------------------------- #
         self.parent_ra_key = parent_sample.default_keymap['ra'] if parent_sample else None
         self.parent_dec_key = parent_sample.default_keymap['dec'] if parent_sample else None
-        self.parent_wise_source_id_key = 'AllWISE_id'
-        self.parent_sample_wise_skysep_key = 'sep_to_WISE_source'
+        self.parent_wise_source_id_key = WISEDataBase.parent_wise_source_id_key
+        self.parent_sample_wise_skysep_key = WISEDataBase.parent_sample_wise_skysep_key
         self.parent_sample_default_entries = {
             self.parent_wise_source_id_key: "",
             self.parent_sample_wise_skysep_key: np.inf
