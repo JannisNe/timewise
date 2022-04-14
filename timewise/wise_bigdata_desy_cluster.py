@@ -288,11 +288,15 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 logger.debug(f'waiting for chunk {chunk} (Cluster job {job_id})')
                 self.wait_for_job(job_id)
                 logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}). Start combining')
+
                 try:
                     self._combine_lcs('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
                     self._combine_metadata('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
-                    self._move_to_storage("lcs", "tap", chunk_number=chunk)
-                    self._move_to_storage("metadata", "tap", chunk_number=chunk)
+
+                    if self._storage_dir:
+                        self._move_to_storage("lcs", "tap", chunk_number=chunk)
+                        self._move_to_storage("metadata", "tap", chunk_number=chunk)
+
                 finally:
                     self._cluster_queue.task_done()
                     self._done_tasks += 1
