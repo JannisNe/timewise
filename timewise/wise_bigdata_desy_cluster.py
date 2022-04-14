@@ -250,8 +250,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
             "metadata": self._metadata_filename
         }
 
-        src_fn = fn_fct[product](service=service, chunk_number=chunk_number, job_ID=job_ID)
-        dst_fn = src_fn.replace(self.cache_dir, self._storage_dir)
+        src_fn = fn_fct[product](service=service, chunk_number=chunk_number, jobID=job_ID)
+        dst_fn = src_fn.replace(data_dir, self._storage_dir)
         logger.debug(f"copy {src_fn} to {dst_fn}")
 
         try:
