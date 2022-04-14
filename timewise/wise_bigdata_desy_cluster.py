@@ -252,6 +252,12 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         src_fn = fn_fct[product](service=service, chunk_number=chunk_number, jobID=job_ID)
         dst_fn = src_fn.replace(data_dir, self._storage_dir)
+
+        dst_dir = os.path.dirname(dst_fn)
+        if not os.path.isdir(dst_dir):
+            logger.debug(f"making directory {dst_dir}")
+            os.makedirs(dst_dir)
+
         logger.debug(f"copy {src_fn} to {dst_fn}")
 
         try:
