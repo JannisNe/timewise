@@ -155,11 +155,14 @@ class WiseDataByVisit(WISEDataBase):
 
                     difk = f"{band}_max_dif{lum_key}"
                     rmsk = f"{band}_min_rms{lum_key}"
+                    rmsck = f"{band}_min_rms_comb{lum_key}"
                     Nk = f"{band}_N_datapoints{lum_key}"
                     dtk = f"{band}_max_deltat{lum_key}"
+                    medk = f"{band}_median{lum_key}"
+                    chi2tmk = f"{band}_chi2_to_med{lum_key}"
                     mean_weighted_ppb_key = f"{band}_mean_weighted_ppb{lum_key}"
-                    excess_variance_key= f"{band}_excess_variance_{lum_key}"
-                    excess_variance_err_key= f"{band}_excess_variance_err_{lum_key}"
+                    excess_variance_key = f"{band}_excess_variance_{lum_key}"
+                    excess_variance_err_key = f"{band}_excess_variance_err_{lum_key}"
                     
                     try:
                         ilc = lc[~np.array(lc[ul_key]).astype(bool)]
@@ -174,8 +177,20 @@ class WiseDataByVisit(WISEDataBase):
                             imin_rms_ind = ilc[errkey].argmin()
                             imin_rms = ilc[errkey].iloc[imin_rms_ind]
 
+                            isorted_as_errors = np.argsort(ilc[errkey])
+                            imin_rms_combined = min(
+                                [np.sqrt(np.sum(ilc[errkey][isorted_as_errors[:i + 1]] ** 2)) / (i + 1)
+                                 for i in range(imetadata[Nk])]
+                            )
+
+                            imed = np.median(ilc[llumkey])
+                            ichi2_to_med = sum(((ilc[llumkey] - imed) / ilc[errkey]) ** 2)
+
                             imetadata[difk] = imax - imin
                             imetadata[rmsk] = imin_rms
+                            imetadata[rmsck] = imin_rms_combined
+                            imetadata[medk] = imed
+                            imetadata[chi2tmk] = ichi2_to_med
 
                             if len(ilc) == 1:
                                 imetadata[dtk] = 0
