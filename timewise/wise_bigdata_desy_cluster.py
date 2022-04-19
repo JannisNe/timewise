@@ -1,4 +1,4 @@
-import getpass, os, time, subprocess, math, pickle, queue, threading, argparse, time, backoff, shutil
+import getpass, os, time, subprocess, math, pickle, queue, threading, argparse, time, backoff, shutil, gc
 import numpy as np
 import pandas as pd
 import pyvo as vo
@@ -206,6 +206,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             self.__getattribute__(method_name)(*args)
             self._io_queue.task_done()
             self._io_queue_done.put(self._io_queue_hash(method_name, args))
+            gc.collect()
 
     def _tap_thread(self):
         logger.debug(f'started tap thread')
