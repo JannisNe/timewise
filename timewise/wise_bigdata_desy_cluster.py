@@ -241,34 +241,24 @@ class WISEDataDESYCluster(WiseDataByVisit):
             self._tap_queue.task_done()
             self._cluster_queue.put((cluster_time, chunk))
 
-    def _move_to_storage(self, product, service, chunk_number=None, job_ID=None):
-
-        if not self._storage_dir:
-            raise ValueError("No storage dir given!")
-
-        fn_fct = {
-            "lcs": self._lightcurve_filename,
-            "metadata": self._metadata_filename
-        }
-
-        src_fn = fn_fct[product](service=service, chunk_number=chunk_number, jobID=job_ID)
-        dst_fn = src_fn.replace(data_dir, self._storage_dir)
+    def _move_file_to_storage(self, filename):
+        dst_fn = filename.replace(data_dir, self._storage_dir)
 
         dst_dir = os.path.dirname(dst_fn)
         if not os.path.isdir(dst_dir):
             logger.debug(f"making directory {dst_dir}")
             os.makedirs(dst_dir)
 
-        logger.debug(f"copy {src_fn} to {dst_fn}")
+        logger.debug(f"copy {filename} to {dst_fn}")
 
         try:
-            shutil.copy2(src_fn, dst_fn)
+            shutil.copy2(filename, dst_fn)
 
-            if os.path.getsize(src_fn) == os.path.getsize(dst_fn):
-                logger.debug(f"copy successful, removing {src_fn}")
-                os.remove(src_fn)
+            if os.path.getsize(filename) == os.path.getsize(dst_fn):
+                logger.debug(f"copy successful, removing {filename}")
+                os.remove(filename)
             else:
-                logger.warning(f"copy from {src_fn} to {dst_fn} gone wrong! Not removing source.")
+                logger.warning(f"copy from {filename} to {dst_fn} gone wrong! Not removing source.")
 
         except FileNotFoundError as e:
             logger.warning(f"FileNotFoundError: {e}!")
@@ -301,8 +291,16 @@ class WISEDataDESYCluster(WiseDataByVisit):
                     self._combine_metadata('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
 
                     if self._storage_dir:
-                        self._move_to_storage("lcs", "tap", chunk_number=chunk)
-                        self._move_to_storage("metadata", "tap", chunk_number=chunk)
+                        filenames_to_move = [
+                            self._lightcurve_filename(service='tap', chunk_number=chunk),
+                            self._metadata_filename(service='tap', chunk_number=chunk),
+                        ]
+
+                        for t in self.photometry_table_keymap.keys():
+                            filenames_to_move.append(self._chunk_photometry_cache_filename(t, chunk))
+
+                        for fn in filenames_to_move:
+                            self._move_file_to_storage(fn)
 
                 finally:
                     self._cluster_queue.task_done()
