@@ -3,7 +3,7 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 
-from timewise import WiseDataByVisit, WISEDataDESYCluster, ParentSampleBase
+from timewise import WiseDataByVisit, WISEDataDESYCluster, ParentSampleBase, BigParentSampleBase
 from timewise.general import main_logger
 from timewise.utils import get_mirong_sample
 
@@ -38,12 +38,36 @@ class MirongParentSample(ParentSampleBase):
         self.df = get_mirong_sample()[:10]
 
 
+class BigMirongParentSample(BigParentSampleBase):
+
+    default_keymap = MirongParentSample.default_keymap
+
+    def __init__(self):
+        super().__init__(base_name="test/test_big_mirong_parent_sample",
+                         keep_file_in_memory=30)
+        self.df = get_mirong_sample()[:10]
+
+
 class WISEDataTestVersion(WiseDataByVisit):
     base_name = "test/test_wise_data"
 
     def __init__(self, base_name=base_name):
         super().__init__(base_name=base_name,
                          parent_sample_class=MirongParentSample,
+                         min_sep_arcsec=8,
+                         n_chunks=2)
+
+    def clean_up(self):
+        logger.info(f"removing {self.cache_dir}")
+        shutil.rmtree(self.cache_dir)
+
+
+class WISEDataTestVersionBigParentSample(WiseDataByVisit):
+    base_name = "test/test_wise_data_with_big_parent_sample"
+
+    def __init__(self, base_name=base_name):
+        super().__init__(base_name=base_name,
+                         parent_sample_class=BigMirongParentSample,
                          min_sep_arcsec=8,
                          n_chunks=2)
 
@@ -97,7 +121,21 @@ class TestMIRFlareCatalogue(unittest.TestCase):
                     fn=fn
                 )
 
-    def test_b_test_photometry_download_by_allwise_id(self):
+    def test_b_test_big_prant_sample(self):
+        logger.info('\n\n Testing WISE Data with BigParentSample\n')
+        wise_data = WISEDataTestVersionBigParentSample()
+        wise_data.match_all_chunks()
+
+        logger.info('\n' + wise_data.parent_sample.df.to_string())
+
+        wise_data.parent_sample.plot_cutout(0, arcsec=40, save=True)
+
+        logger.info(f"\n\n Testing getting photometry \n")
+        for s in ['gator', 'tap']:
+            logger.info(f"\nTesting {s.upper()}")
+            wise_data.get_photometric_data(service=s)
+
+    def test_c_test_photometry_download_by_allwise_id(self):
         logger.info('\n\n Testing WISE Data \n')
         wise_data = WISEDataTestVersion(
             base_name=WISEDataTestVersion.base_name + '_query_by_allwise_id'
@@ -135,7 +173,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
                 fn=fn
             )
 
-    def test_c_wise_bigdata_desy_cluster(self):
+    def test_d_wise_bigdata_desy_cluster(self):
         host = socket.gethostname()
         if np.logical_or("ifh.de" in host, "zeuthen.desy.de" in host):
             host_server = "DESY"

@@ -1,3 +1,4 @@
 from timewise.wise_data_by_visit import WiseDataByVisit
 from timewise.wise_bigdata_desy_cluster import WISEDataDESYCluster
 from timewise.parent_sample_base import ParentSampleBase
+from timewise.big_parent_sample import BigParentSampleBase
