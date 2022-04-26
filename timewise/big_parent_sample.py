@@ -15,10 +15,10 @@ class BigParentSampleBase(ParentSampleBase):
     def __init__(self, base_name, keep_file_in_memory=30*60):
         """
         See doc of ParentSampleBase
+
         :param base_name: base name for storage directories
         :type base_name: str
-        :param keep_file_in_memory: time in seconds to keep the parent sample file in the memory,
-            after that gets written to a cache file on disk
+        :param keep_file_in_memory: time in seconds to keep the parent sample file in the memory, after that gets written to a cache file on disk
         :type keep_file_in_memory: float
         """
         super().__init__(base_name=base_name)
@@ -82,6 +82,8 @@ class BigParentSampleBase(ParentSampleBase):
                 self._lock_cache_file = False
                 self._df = None
                 gc.collect()
+
+            time.sleep(self._keep_df_in_memory / 2)
 
         logger.debug('stopped clean thread')
 
