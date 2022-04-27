@@ -233,10 +233,14 @@ class WISEDataDESYCluster(WiseDataByVisit):
                     continue
 
                 # --------------  get results of TAP job ------------- #
-                result_method = "_get_results_from_job"
-                result_args = [t, chunk]
-                self._io_queue.put((2, result_method, result_args))
-                self._wait_for_io_task(result_method, result_args)
+                if self.tap_jobs[t][chunk].phase == "COMPLETED":
+                    result_method = "_get_results_from_job"
+                    result_args = [t, chunk]
+                    self._io_queue.put((2, result_method, result_args))
+                    self._wait_for_io_task(result_method, result_args)
+
+                else:
+                    logger.warning(f"No completion for {chunk}th query of {t}! {self.tap_jobs[t][chunk].phase}!")
 
             self._tap_queue.task_done()
             self._cluster_queue.put((cluster_time, chunk))
