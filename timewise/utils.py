@@ -55,9 +55,12 @@ def get_sdss_credentials():
 
 
 def login_to_sciserver():
-    from SciServer import Authentication
+    try:
+        from SciServer import Authentication
+    except ModuleNotFoundError:
+        Authentication = None
 
-    if isinstance(SkyServer, type(None)) or isinstance(Authentication, type(None)):
+    if isinstance(Authentication, type(None)):
         raise ModuleNotFoundError("Please install SciServer (https://github.com/sciserver/SciScript-Python) "
                                   "if you want to see SDSS cutouts!")
 
@@ -68,9 +71,9 @@ def login_to_sciserver():
 
 def plot_sdss_cutout(ra, dec, arcsec=20, arcsec_per_px=0.1, interactive=False, fn=None, title=None, save=False, ax=False,
                 height=2.5):
-    from SciServer import SkyServer
 
     login_to_sciserver()
+    from SciServer import SkyServer
 
     ang_px = int(arcsec / arcsec_per_px)
     ang_deg = arcsec / 3600
