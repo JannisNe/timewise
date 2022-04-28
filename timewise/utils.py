@@ -2,11 +2,6 @@ import requests, os, getpass
 import pandas as pd
 import matplotlib.pyplot as plt
 
-try:
-    from SciServer import SkyServer, Authentication
-except ModuleNotFoundError:
-    SkyServer = Authentication = None
-
 from timewise.general import main_logger, cache_dir
 
 
@@ -60,6 +55,7 @@ def get_sdss_credentials():
 
 
 def login_to_sciserver():
+    from SciServer import Authentication
 
     if isinstance(SkyServer, type(None)) or isinstance(Authentication, type(None)):
         raise ModuleNotFoundError("Please install SciServer (https://github.com/sciserver/SciScript-Python) "
@@ -72,6 +68,7 @@ def login_to_sciserver():
 
 def plot_sdss_cutout(ra, dec, arcsec=20, arcsec_per_px=0.1, interactive=False, fn=None, title=None, save=False, ax=False,
                 height=2.5):
+    from SciServer import SkyServer
 
     login_to_sciserver()
 
