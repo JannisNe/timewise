@@ -3,7 +3,7 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 
-from timewise import WiseDataByVisit, WISEDataDESYCluster, ParentSampleBase, BigParentSampleBase
+from timewise import WiseDataByVisit, WISEDataDESYCluster, ParentSampleBase
 from timewise.general import main_logger
 from timewise.utils import get_mirong_sample
 
