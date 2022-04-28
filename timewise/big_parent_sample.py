@@ -11,6 +11,10 @@ logger = main_logger.getChild(__name__)
 
 
 class BigParentSampleBase(ParentSampleBase):
+    """
+    This should not be used. It was a bad idea. The better way would be to implement a
+    ParentSample class that splits the sample file in separate files and then maybe use Dask or similar.
+    """
 
     def __init__(self, base_name, keep_file_in_memory=30*60):
         """
@@ -98,6 +102,6 @@ class BigParentSampleBase(ParentSampleBase):
             os.remove(self._cache_file)
 
         if hasattr(self, "clean_thread"):
-            logger.debug(f'')
+            logger.debug(f'stopping clean thread')
             self._stop_thread = True
             self._clean_thread.join()
