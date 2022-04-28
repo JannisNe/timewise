@@ -45,14 +45,19 @@ class BigParentSampleBase(ParentSampleBase):
         self._time_when_df_was_used_last = time.time()
 
         if isinstance(self._df, type(None)):
-            logger.debug(f'loading from {self._cache_file}')
-            self._wait_for_unlock_cache_file()
-            self._lock_cache_file = True
 
-            with open(self._cache_file, "rb") as f:
-                self._df = pickle.load(f)
+            if os.path.isfile(self._cache_file):
+                logger.debug(f'loading from {self._cache_file}')
+                self._wait_for_unlock_cache_file()
+                self._lock_cache_file = True
 
-            self._lock_cache_file = False
+                with open(self._cache_file, "rb") as f:
+                    self._df = pickle.load(f)
+
+                self._lock_cache_file = False
+
+            else:
+                logger.debug(f'No file {self._cache_file}')
 
         return self._df
 
