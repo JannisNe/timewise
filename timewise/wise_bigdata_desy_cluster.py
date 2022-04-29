@@ -216,7 +216,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
             for i in range(len(tables) + 1):
 
-                # -----------  submit jobs via the IRSA TAP ---------- #
+                # -----------   submit jobs for chunk i via the IRSA TAP  ---------- #
                 if i < len(tables):
                     t = tables[i]
                     submit_method = "_submit_job_to_TAP"
@@ -224,7 +224,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                     self._io_queue.put((1, submit_method, submit_args))
                     self._wait_for_io_task(submit_method, submit_args)
 
-                # --------------  get results of TAP job ------------- #
+                # --------------  get results of TAP job for chunk i-1 ------------- #
                 if i > 0:
                     t_before = tables[i - 1]
 
@@ -240,7 +240,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                             f"{self.tap_jobs[t_before][chunk].phase}!"
                         )
 
-                # ---------------  wait for the TAP job -------------- #
+                # ---------------   wait for the TAP job of chunk i  -------------- #
                 if i < len(tables):
                     t = tables[i]
                     logger.info(f'waiting for {wait} hours')
@@ -250,6 +250,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                         self._wait_for_job(t, chunk)
                     except vo.dal.exceptions.DALServiceError:
                         logger.warning(f"could not wait for {chunk}th query of {t}!")
+                        # mark task as done and move on without submission to cluster
                         self._tap_queue.task_done()
                         continue
 
