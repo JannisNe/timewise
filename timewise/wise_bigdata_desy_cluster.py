@@ -214,33 +214,44 @@ class WISEDataDESYCluster(WiseDataByVisit):
             tables, chunk, wait, mag, flux, cluster_time, query_type = self._tap_queue.get(block=True)
             logger.debug(f'querying IRSA for chunk {chunk}')
 
-            for t in tables:
+            for i in range(len(tables) + 1):
+
                 # -----------  submit jobs via the IRSA TAP ---------- #
-                submit_method = "_submit_job_to_TAP"
-                submit_args = [chunk, t, mag, flux, query_type]
-                self._io_queue.put((1, submit_method, submit_args))
-                self._wait_for_io_task(submit_method, submit_args)
-
-                # ---------------  wait for the TAP job -------------- #
-                logger.info(f'waiting for {wait} hours')
-                time.sleep(wait * 3600)
-
-                try:
-                    self._wait_for_job(t, chunk)
-                except vo.dal.exceptions.DALServiceError:
-                    logger.warning(f"could not wait for {chunk}th query of {t}!")
-                    self._tap_queue.task_done()
-                    continue
+                if i < len(tables):
+                    t = tables[i]
+                    submit_method = "_submit_job_to_TAP"
+                    submit_args = [chunk, t, mag, flux, query_type]
+                    self._io_queue.put((1, submit_method, submit_args))
+                    self._wait_for_io_task(submit_method, submit_args)
 
                 # --------------  get results of TAP job ------------- #
-                if self.tap_jobs[t][chunk].phase == "COMPLETED":
-                    result_method = "_get_results_from_job"
-                    result_args = [t, chunk]
-                    self._io_queue.put((2, result_method, result_args))
-                    self._wait_for_io_task(result_method, result_args)
+                if i > 0:
+                    t_before = tables[i - 1]
 
-                else:
-                    logger.warning(f"No completion for {chunk}th query of {t}! {self.tap_jobs[t][chunk].phase}!")
+                    if self.tap_jobs[t_before][chunk].phase == "COMPLETED":
+                        result_method = "_get_results_from_job"
+                        result_args = [t_before, chunk]
+                        self._io_queue.put((2, result_method, result_args))
+                        self._wait_for_io_task(result_method, result_args)
+
+                    else:
+                        logger.warning(
+                            f"No completion for {chunk}th query of {t_before}! "
+                            f"{self.tap_jobs[t_before][chunk].phase}!"
+                        )
+
+                # ---------------  wait for the TAP job -------------- #
+                if i < len(tables):
+                    t = tables[i]
+                    logger.info(f'waiting for {wait} hours')
+                    time.sleep(wait * 3600)
+
+                    try:
+                        self._wait_for_job(t, chunk)
+                    except vo.dal.exceptions.DALServiceError:
+                        logger.warning(f"could not wait for {chunk}th query of {t}!")
+                        self._tap_queue.task_done()
+                        continue
 
             self._tap_queue.task_done()
             self._cluster_queue.put((cluster_time, chunk))
