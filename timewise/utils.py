@@ -1,8 +1,8 @@
-import requests, os, getpass
+import requests, os, getpass, backoff
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from timewise.general import main_logger, cache_dir
+from timewise.general import main_logger, cache_dir, backoff_hndlr
 
 
 logger = main_logger.getChild(__name__)
@@ -58,9 +58,6 @@ def login_to_sciserver():
     try:
         from SciServer import Authentication
     except ModuleNotFoundError:
-        Authentication = None
-
-    if isinstance(Authentication, type(None)):
         raise ModuleNotFoundError("Please install SciServer (https://github.com/sciserver/SciScript-Python) "
                                   "if you want to see SDSS cutouts!")
 
@@ -69,11 +66,20 @@ def login_to_sciserver():
     Authentication.login(uid, pw)
 
 
-def plot_sdss_cutout(ra, dec, arcsec=20, arcsec_per_px=0.1, interactive=False, fn=None, title=None, save=False, ax=False,
-                height=2.5):
-
+@backoff.on_exception(
+        backoff.expo,
+        Exception,
+        max_tries=50,
+        on_backoff=backoff_hndlr
+    )
+def get_cutout(*args, **kwargs):
     login_to_sciserver()
     from SciServer import SkyServer
+    return SkyServer.getJpegImgCutout(*args, **kwargs)
+
+
+def plot_sdss_cutout(ra, dec, arcsec=20, arcsec_per_px=0.1, interactive=False, fn=None, title=None, save=False, ax=False,
+                height=2.5):
 
     ang_px = int(arcsec / arcsec_per_px)
     ang_deg = arcsec / 3600
@@ -84,7 +90,7 @@ def plot_sdss_cutout(ra, dec, arcsec=20, arcsec_per_px=0.1, interactive=False, f
         fig = plt.gcf()
 
     try:
-        im = SkyServer.getJpegImgCutout(ra, dec, scale=arcsec_per_px, height=ang_px, width=ang_px)
+        im = get_cutout(ra, dec, scale=arcsec_per_px, height=ang_px, width=ang_px)
         ax.imshow(im, origin='upper',
                   extent=([ra + ang_deg / 2, ra - ang_deg / 2,
                            dec - ang_deg / 2, dec + ang_deg / 2]),
