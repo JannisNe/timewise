@@ -2,6 +2,7 @@ import getpass, os, time, subprocess, math, pickle, queue, threading, argparse, 
 import numpy as np
 import pandas as pd
 import pyvo as vo
+import traceback as tb
 
 from timewise.general import main_logger, DATA_DIR_KEY, data_dir, bigdata_dir, backoff_hndlr
 from timewise.wise_data_by_visit import WiseDataByVisit
@@ -203,10 +204,25 @@ class WISEDataDESYCluster(WiseDataByVisit):
         while True:
             priority, method_name, args = self._io_queue.get(block=True)
             logger.debug(f"executing {method_name} with arguments {args} (priority {priority})")
-            self.__getattribute__(method_name)(*args)
-            self._io_queue.task_done()
-            self._io_queue_done.put(self._io_queue_hash(method_name, args))
-            gc.collect()
+
+            try:
+                self.__getattribute__(method_name)(*args)
+                self._io_queue_done.put(self._io_queue_hash(method_name, args))
+            except Exception as e:
+                msg = (
+                    f"#################################################################\n"
+                    f"                !!!     ATTENTION     !!!                 \n"
+                    f" ----------------- {method_name}({args}) ---------------- \n"
+                    f"                      AN ERROR OCCURED                    \n"
+                    f"\n{''.join(tb.format_exception(None, e, e.__traceback__))}\n\n"
+                    f"putting {method_name}({args}) back into IO-queue\n"
+                    f"#################################################################\n"
+                )
+                logger.error(msg)
+                self._io_queue.put((priority, method_name, args))
+            finally:
+                self._io_queue.task_done()
+                gc.collect()
 
     def _tap_thread(self):
         logger.debug(f'started tap thread')
@@ -256,6 +272,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
             self._tap_queue.task_done()
             self._cluster_queue.put((cluster_time, chunk))
+            gc.collect()
 
     def _move_file_to_storage(self, filename):
         dst_fn = filename.replace(data_dir, self._storage_dir)
@@ -321,6 +338,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 finally:
                     self._cluster_queue.task_done()
                     self._done_tasks += 1
+                    gc.collect()
 
     def _status_thread(self):
         logger.debug('started status thread')
