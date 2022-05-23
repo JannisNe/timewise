@@ -230,6 +230,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
             tables, chunk, wait, mag, flux, cluster_time, query_type = self._tap_queue.get(block=True)
             logger.debug(f'querying IRSA for chunk {chunk}')
 
+            submit_to_cluster = True
+
             for i in range(len(tables) + 1):
 
                 # -----------   submit jobs for chunk i via the IRSA TAP  ---------- #
@@ -253,8 +255,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
                     else:
                         logger.warning(
                             f"No completion for {chunk}th query of {t_before}! "
-                            f"{self.tap_jobs[t_before][chunk].phase}!"
+                            f"Phase is {self.tap_jobs[t_before][chunk].phase}!"
                         )
+                        submit_to_cluster = False
 
                 # ---------------   wait for the TAP job of chunk i  -------------- #
                 if i < len(tables):
@@ -265,13 +268,15 @@ class WISEDataDESYCluster(WiseDataByVisit):
                     try:
                         self._wait_for_job(t, chunk)
                     except vo.dal.exceptions.DALServiceError:
-                        logger.warning(f"could not wait for {chunk}th query of {t}!")
+                        logger.warning(f"could not wait for {chunk}th query of {t}! Not submitting to cluster.")
                         # mark task as done and move on without submission to cluster
-                        self._tap_queue.task_done()
+                        submit_to_cluster = False
                         continue
 
             self._tap_queue.task_done()
-            self._cluster_queue.put((cluster_time, chunk))
+            if submit_to_cluster:
+                self._cluster_queue.put((cluster_time, chunk))
+
             gc.collect()
 
     def _move_file_to_storage(self, filename):
