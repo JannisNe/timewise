@@ -839,14 +839,23 @@ class WISEDataBase(abc.ABC):
         while True:
             if N_tries == 0:
                 logger.warning("No more tries left!")
+                raise vo.dal.exceptions.DALServiceError(f"Submission failed "
+                                                        f"for {i}th chunk "
+                                                        f"of {t} "
+                                                        f"after {N_tries} attempts")
             try:
                 job = WISEDataBase.service.submit_job(qstring, uploads={'ids': Table(tab_d)})
                 job.run()
+
+                if isinstance(job.phase, type(None)):
+                    raise vo.dal.DALServiceError(f"Job submission failed. No phase!")
+
                 logger.info(f'submitted job for {t} for chunk {i}: ')
                 logger.debug(f'Job: {job.url}; {job.phase}')
                 self.tap_jobs[t][i] = job
                 self.queue.put((t, i))
                 break
+
             except (requests.exceptions.ConnectionError, vo.dal.exceptions.DALServiceError) as e:
                 wait = 60
                 N_tries -= 1
