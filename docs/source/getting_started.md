@@ -1,10 +1,5 @@
 # Getting Started
 
-#### Data directory
-``timewise`` is capable of downloading a lot of data. You can specify the location of all that data:
-```
-export TIMEWISE_DATA=/path/to/data/directory
-```
 
 #### The `ParentSample` class 
 
