@@ -75,8 +75,9 @@ def get_point_source_wise_data(base_name, ra, dec, min_sep_arcsec=10, match=Fals
     wd = WiseDataByVisit(n_chunks=1, base_name=base_name, parent_sample_class=ps, min_sep_arcsec=min_sep_arcsec)
     if match:
         wd.match_all_chunks()
-    wd.get_photometric_data(**kwargs)
-    wd.plot_lc(parent_sample_idx=0, service=kwargs.get('service', 'tap'))
+    service = kwargs.pop('service', 'gator')
+    wd.get_photometric_data(service=service, **kwargs)
+    wd.plot_lc(parent_sample_idx=0, service=service)
     return wd
 
 
