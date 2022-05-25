@@ -1,6 +1,10 @@
 import unittest
 
-from timewise.utils import get_point_source_wise_data
+from timewise.general import main_logger
+from timewise.point_source_utils import get_point_source_wise_data
+
+
+main_logger.setLevel('DEBUG')
 
 
 class TestPSUtils(unittest.TestCase):
