@@ -37,7 +37,8 @@ if __name__ == '__main__':
             "matplotlib==3.5.1",
             "coveralls==3.3.1",
             "scikit-image==0.19.2",
-            "backoff==2.0.1"
+            "backoff==2.0.1",
+            "myst-parser==0.17.2"
         ],
         package_data={'timewise': [
             'wise_flux_conversion_correction.dat'

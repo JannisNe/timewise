@@ -9,3 +9,4 @@ coveralls==3.3.1
 scikit-image==0.19.2
 furo==2022.4.7
 backoff==2.0.1
+myst-parser==0.17.2
