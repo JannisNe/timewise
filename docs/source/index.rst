@@ -9,7 +9,6 @@ Welcome to timewise's documentation!
 .. toctree::
    installation
    getting_started
-   classes
    api
    :maxdepth: 1
    :caption: Contents:

@@ -1,10 +1,12 @@
-### Data directory
+# Getting Started
+
+#### Data directory
 ``timewise`` is capable of downloading a lot of data. You can specify the location of all that data:
 ```
 export TIMEWISE_DATA=/path/to/data/directory
 ```
 
-### The `ParentSample` class 
+#### The `ParentSample` class 
 
 To tell `timewise` which data you want to download, you have to create a subclass of `ParentSampleBase`. 
 The subclass has to define two key attributes:
@@ -35,7 +37,7 @@ class MyParentSample(ParentSampleBase):
 ```
 
 
-### The ``WISEData`` class
+#### The ``WISEData`` class
 
 This is the class that implements all core functionality:
 * match your catalogue to WISE sources
@@ -123,7 +125,7 @@ wd.plot_lc(
 ```
 
 
-### Util function for point sources
+#### Util function for point sources
 
 If you only want data for a point source there is a util function for this, yay!
 
