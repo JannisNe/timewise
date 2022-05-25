@@ -128,7 +128,7 @@ wd.plot_lc(
 If you only want data for a point source there is a util function for this, yay!
 
 ```python
-from timewise.utils import get_point_source_wise_data
+from timewise.point_source_utils import get_point_source_wise_data
 
 wd = get_point_source_wise_data(
     base_name="my_point_source",
