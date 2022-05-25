@@ -57,6 +57,7 @@ def get_point_source_parent_sample(base_name, ra, dec):
 def get_point_source_wise_data(base_name, ra, dec, min_sep_arcsec=10, match=False, **kwargs):
     """
     Get a WISEData instance for a point source
+
     :param base_name: base name for storage in the data directory
     :type base_name: str
     :param ra: right ascencion

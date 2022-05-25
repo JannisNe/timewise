@@ -47,3 +47,11 @@ Use the DESY cluster in Zeuthen to do the binning
 
 .. autoclass:: timewise.wise_bigdata_desy_cluster.WISEDataDESYCluster
     :members:
+
+
+******************
+Point Source Utils
+******************
+
+.. automodule:: timewise.point_source_utils
+    :members:
