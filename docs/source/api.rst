@@ -8,4 +8,5 @@ API
     timewise.wise_data_base.WISEDataBase
     timewise.wise_data_by_visit.WiseDataByVisit
     timewise.wise_bigdata_desy_cluster.WISEDataDESYCluster
+    timewise.utils
 

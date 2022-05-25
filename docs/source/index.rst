@@ -8,9 +8,10 @@ Welcome to timewise's documentation!
 
 .. toctree::
    installation
+   getting_started.md
    classes
    api
-   :maxdepth: 4
+   :maxdepth: 1
    :caption: Contents:
 
 

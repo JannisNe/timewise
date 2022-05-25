@@ -1,5 +1,5 @@
-Usage
-=====
+Get Set-Up
+==========
 
 .. image:: https://github.com/JannisNe/timewise/actions/workflows/continous_integration.yml/badge.svg
     :target: https://github.com/JannisNe/timewise/actions/workflows/continous_integration.yml
