@@ -34,7 +34,7 @@ if __name__ == '__main__':
             "numpy==1.22.3",
             "pyvo==1.3",
             "astropy==5.0.4",
-            "matplotlib==3.5.1",
+            "matplotlib==3.5.2",
             "coveralls==3.3.1",
             "scikit-image==0.19.2",
             "backoff==2.0.1",
