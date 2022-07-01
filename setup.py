@@ -36,7 +36,7 @@ if __name__ == '__main__':
             "astropy==5.1",
             "matplotlib==3.5.2",
             "coveralls==3.3.1",
-            "scikit-image==0.19.2",
+            "scikit-image==0.19.3",
             "backoff==2.0.1",
             "myst-parser==0.17.2"
         ],
