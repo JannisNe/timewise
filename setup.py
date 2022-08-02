@@ -29,7 +29,7 @@ if __name__ == '__main__':
         python_requires='>=3.8',
         install_requires=[
             "tqdm==4.64.0",
-            "requests==2.27.1",
+            "requests==2.28.1",
             "pandas==1.4.3",
             "numpy==1.23.1",
             "pyvo==1.3",
