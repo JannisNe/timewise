@@ -7,6 +7,6 @@ astropy==5.1
 matplotlib==3.5.2
 coveralls==3.3.1
 scikit-image==0.19.3
-furo==2022.4.7
+furo==2022.6.21
 backoff==2.1.2
 myst-parser==0.17.2
