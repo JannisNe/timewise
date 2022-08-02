@@ -37,7 +37,7 @@ if __name__ == '__main__':
             "matplotlib==3.5.2",
             "coveralls==3.3.1",
             "scikit-image==0.19.3",
-            "backoff==2.0.1",
+            "backoff==2.1.2",
             "myst-parser==0.17.2"
         ],
         package_data={'timewise': [
