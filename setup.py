@@ -38,7 +38,7 @@ if __name__ == '__main__':
             "coveralls==3.3.1",
             "scikit-image==0.19.3",
             "backoff==2.1.2",
-            "myst-parser==0.17.2"
+            "myst-parser==0.18.0"
         ],
         package_data={'timewise': [
             'wise_flux_conversion_correction.dat'
