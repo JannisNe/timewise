@@ -64,8 +64,8 @@ jobs:
           SDSS_USERID: ${{ secrets.SDSS_USERID }}
           SDSS_USERPW: ${{ secrets.SDSS_USERPW }}
         run: |
-          coverage run -m unittest discover tests/
-          coverage combine
+          python -m coverage run -m unittest discover tests/
+          python -m coverage combine
 
       - name: Run Coveralls
         env:
