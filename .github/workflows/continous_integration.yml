@@ -58,6 +58,12 @@ jobs:
           python Install.py sciserver-v2.1.0
           cd ..
 
+      # Set up VENV
+      - name: set-up virtual environment
+        run: |
+          python -m venv testenv
+          python -m poetry env use testenv
+
       # Runs a set of commands using the runners shell
       - name: Test the code
         env:
