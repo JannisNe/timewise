@@ -52,7 +52,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install poetry
+          poetry install
           cd SciScript-Python
           python Install.py sciserver-v2.1.0
           cd ..
