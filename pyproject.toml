@@ -3,6 +3,13 @@ name = "timewise"
 version = "0.1.10"
 description = "A small package to download infrared data from the WISE satellite"
 authors = ["Jannis Necker <jannis.necker@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+documentation = "https://timewise.readthedocs.io/en/latest"
+repository = "https://github.com/JannisNe/timewise"
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/JannisNe/timewise/issues"
 
 [tool.poetry.dependencies]
 python = ">=3.8, <3.12"
