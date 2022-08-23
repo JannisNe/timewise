@@ -26,6 +26,7 @@ Welcome to timewise's documentation!
 ************
 Installation
 ************
+:code:`timewise` is currently supported with python 3.10.
 
 --------------------------
 Using poetry (RECOMMENDED)
