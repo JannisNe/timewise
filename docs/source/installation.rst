@@ -5,7 +5,7 @@ Get Set-Up
 Data directory
 **************
 
-`timewise` is capable of downloading and handling a lot of data.
+:code:`timewise` is capable of downloading and handling a lot of data.
 You can specify the location of the working directory:
 
 .. code-block:: console
@@ -14,7 +14,7 @@ You can specify the location of the working directory:
 
 Here you will also find all plots etc.
 
-If you are using the class `WISEDataDESYCluster` you have the possibility to specify another directory where the final
+If you are using the class :code:`WISEDataDESYCluster` you have the possibility to specify another directory where the final
 products will be moved to:
 
 .. code-block:: console

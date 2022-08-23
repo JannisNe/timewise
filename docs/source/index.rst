@@ -27,18 +27,44 @@ Welcome to timewise's documentation!
 Installation
 ************
 
+--------------------------
+Using poetry (RECOMMENDED)
+--------------------------
+We recommend using poetry for python installation to properly resolve all dependencies (see `this <https://python-poetry.org>`_ for more info).
+
+If you are using poetry to manage your python environment you can install timewise like this:
+
+.. code-block:: console
+
+   poetry add timewise
+
+If you want to install :code:`timewise` in editable mode just clone the repository and execute this in the
+:code:`timewise` root directory
+
+.. code-block:: console
+
+   poetry install
+
+---------
+Using pip
+---------
+
 .. code-block:: console
 
     pip install timewise
 
-If you would like to contribute just clone the repository. Easy.
+If you would like to install in editable mode just clone the repository and execute this in the :code:`timewise` root directory:
 
-************
-Dependencies
-************
+.. code-block:: console
 
-All dependencies are listed in `requirements.txt`. If installing with `pip` they will automatically installed.
-Otherwise you can install them with `pip install -r requirements.txt`.
+   pip install -e
+
+Note that the :code:`requirements.txt` was deprecated in :code:`v0.1.9`. The easiest way to install the dependencies is
+to install via :code:`poetry`.
+
+*************************************
+Dependencies for showing SDSS cutouts
+*************************************
 
 There is one package that does not obey! It's `SciServer`!
 It's used to access SDSS data and plot cutouts. If you want to use this functionality
@@ -61,7 +87,7 @@ the unittest
 Cite
 ****
 
-If you use `timewise` please cite `this <https://zenodo.org/badge/latestdoi/449677569>`_
+If you use :code:`timewise` please cite `this <https://zenodo.org/badge/latestdoi/449677569>`_
 
 
 ********
