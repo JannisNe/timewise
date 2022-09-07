@@ -45,7 +45,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def get_sample_photometric_data(self, max_nTAPjobs=8, perc=1, tables=None, chunks=None,
                                     cluster_jobs_per_chunk=100, wait=5, remove_chunks=False,
                                     query_type='positional', overwrite=True,
-                                    storage_directory=bigdata_dir):
+                                    storage_directory=bigdata_dir,
+                                    skip_download=False):
         """
         An alternative to `get_photometric_data()` that uses the DESY cluster and is optimised for large datasets.
 
@@ -107,7 +108,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         logger.debug(f"Getting {perc * 100:.2f}% of lightcurve chunks ({len(chunks)}) via {service} "
                      f"in {'magnitude' if mag else ''} {'flux' if flux else ''} "
-                     f"from {tables}")
+                     f"from {tables}\nskipping download: {skip_download}")
 
         input('Correct? [hit enter] ')
 
@@ -145,8 +146,13 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self.start_time = time.time()
         self._total_tasks = len(chunks)
         self._done_tasks = 0
+
         for c in chunks:
-            self._tap_queue.put((tables, c, wait, mag, flux, cluster_time, query_type))
+            if not skip_download:
+                self._tap_queue.put((tables, c, wait, mag, flux, cluster_time, query_type))
+            else:
+                self._cluster_queue.put((cluster_time, c))
+
         status_thread.start()
 
         # --------------------------- wait for completion --------------------------- #
