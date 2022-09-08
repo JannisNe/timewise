@@ -405,7 +405,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             ids = list()
         else:
             # Extract the list of job IDs
-            ids = np.array([int(s.split(' ')[2]) for s in st.split('\n')[2:-1]])
+            ids = np.array([int(s.split(' ')[1]) for s in st.split('\n')[2:-1]])
         return ids
 
     def _ntasks_from_qstat_command(self, qstat_command, job_id):
