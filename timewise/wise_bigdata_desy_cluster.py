@@ -1,4 +1,16 @@
-import getpass, os, time, subprocess, math, pickle, queue, threading, argparse, time, backoff, shutil, gc
+import getpass
+import os
+import json
+import subprocess
+import math
+import pickle
+import queue
+import threading
+import argparse
+import time
+import backoff
+import shutil
+import gc
 import numpy as np
 import pandas as pd
 import pyvo as vo
@@ -41,6 +53,29 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._cluster_queue = queue.Queue()
         self._io_queue = queue.PriorityQueue()
         self._io_queue_done = queue.Queue()
+
+    def _load_lightcurves(
+            self,
+            service,
+            chunk_number=None,
+            jobID=None,
+            return_filename=False,
+            load_from_bigdata_dir=False
+    ):
+        fn = self._lightcurve_filename(service, chunk_number, jobID)
+
+        if load_from_bigdata_dir:
+            fn = fn.replace(data_dir, bigdata_dir)
+
+        logger.debug(f"loading {fn}")
+        try:
+            with open(fn, "r") as f:
+                lcs = json.load(f)
+            if return_filename:
+                return lcs, fn
+            return lcs
+        except FileNotFoundError:
+            logger.warning(f"No file {fn}")
 
     def get_sample_photometric_data(self, max_nTAPjobs=8, perc=1, tables=None, chunks=None,
                                     cluster_jobs_per_chunk=100, wait=5, remove_chunks=False,
