@@ -88,8 +88,7 @@ class WiseDataByVisit(WISEDataBase):
 
                 # calculate the proportionality constant between flux density and source count
                 mag_zp = self.magnitude_zeropoints['F_nu'][b].to('mJy').value
-                app_co = self.aperture_corrections[b]
-                flux_dens_const = mag_zp * 10 ** (-zp_med / 2.5) * 10 ** (app_co / 2.5)
+                flux_dens_const = mag_zp * 10 ** (-zp_med / 2.5)
 
                 # save values in epoch dictionary
                 epoch[f"{b}{self.flux_density_key_ext}"] = fl * flux_dens_const
