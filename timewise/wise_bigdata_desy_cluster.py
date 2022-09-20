@@ -679,8 +679,20 @@ class WISEDataDESYCluster(WiseDataByVisit):
     # END using cluster for downloading and binning        #
     # ----------------------------------------------------------------------------------- #
 
-    def plot_lc(self, parent_sample_idx, service='tap', plot_unbinned=False, plot_binned=True,
-                interactive=False, fn=None, ax=None, save=True, lum_key='flux_density', **kwargs):
+    def plot_lc(
+            self,
+            parent_sample_idx,
+            service='tap',
+            plot_unbinned=False,
+            plot_binned=True,
+            interactive=False,
+            fn=None,
+            ax=None,
+            save=True,
+            lum_key='flux_density',
+            load_from_bigdata_dir=False,
+            **kwargs
+    ):
         """Make a pretty plot of a lightcurve
 
         :param parent_sample_idx: The index in the parent sample of the lightcurve
@@ -699,6 +711,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
         :param save: save the plot
         :type save: bool
         :param lum_key: the unit of luminosity to use in the plot, either of 'mag', 'flux_density' or 'luminosity'
+        :type lum_key: str
+        :param load_from_bigdata_dir: load from the the big data storage directory
+        :type load_from_bigdata_dir: bool
         :param kwargs: any additional kwargs will be passed on to `matplotlib.pyplot.subplots()`
         :return: the matplotlib.Figure and matplotlib.Axes if `interactive=True`
         """
@@ -714,7 +729,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         logger.debug(f"{wise_id} for {parent_sample_idx}")
 
         _chunk_number = self._get_chunk_number(parent_sample_index=parent_sample_idx)
-        lcs = self._load_lightcurves(service, chunk_number=_chunk_number)
+        lcs = self._load_lightcurves(service, chunk_number=_chunk_number, load_from_bigdata_dir=load_from_bigdata_dir)
         lc = pd.DataFrame.from_dict(lcs[f"{int(parent_sample_idx)}"])
 
         if plot_unbinned:
