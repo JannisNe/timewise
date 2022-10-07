@@ -81,7 +81,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
                                     cluster_jobs_per_chunk=100, wait=5, remove_chunks=False,
                                     query_type='positional', overwrite=True,
                                     storage_directory=bigdata_dir,
-                                    skip_download=False):
+                                    skip_download=False,
+                                    skip_input=False):
         """
         An alternative to `get_photometric_data()` that uses the DESY cluster and is optimised for large datasets.
 
@@ -105,6 +106,10 @@ class WISEDataDESYCluster(WiseDataByVisit):
         :type overwrite: bool
         :param storage_directory: move binned files and raw data here after work is done
         :type storage_directory: str
+        :param skip_download: if True, assume data is already downloaded, only do binning in that case
+        :type skip_download: bool
+        :param skip_input: if True do not ask if data is correct before download
+        :type skip_input: bool
         """
 
         # --------------------- set defaults --------------------------- #
@@ -145,7 +150,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
                      f"in {'magnitude' if mag else ''} {'flux' if flux else ''} "
                      f"from {tables}\nskipping download: {skip_download}")
 
-        input('Correct? [hit enter] ')
+        if not skip_input:
+            input('Correct? [hit enter] ')
 
         # --------------------------- set up cluster info --------------------------- #
 
