@@ -222,11 +222,14 @@ class WISEDataDESYCluster(WiseDataByVisit):
         _job = self.tap_jobs[t][i]
         lightcurve = _job.fetch_result().to_table().to_pandas()
         fn = self._chunk_photometry_cache_filename(t, i)
-        logger.debug(f"{i}th query of {t}: saving under {fn}")
-        cols = dict(self.photometry_table_keymap[t]['mag'])
-        cols.update(self.photometry_table_keymap[t]['flux'])
+        table_nice_name = self.get_db_name(t, nice=True)
+        logger.debug(f"{i}th query of {table_nice_name}: saving under {fn}")
+        cols = dict(self.photometry_table_keymap[table_nice_name]['mag'])
+        cols.update(self.photometry_table_keymap[table_nice_name]['flux'])
+
         if 'allwise' in t:
             cols['cntr_mf'] = 'allwise_cntr'
+
         lightcurve.rename(columns=cols).to_csv(fn)
         return
 
