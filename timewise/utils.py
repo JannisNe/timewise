@@ -192,7 +192,7 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
         on_backoff=backoff_hndlr
     )
     def phase(self):
-        return super(StableAsyncTAPJob, self).phase()
+        return super(StableAsyncTAPJob, self).phase
 
 
 class StableTAPService(vo.dal.TAPService):
