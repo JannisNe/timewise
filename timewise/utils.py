@@ -1,6 +1,8 @@
 import requests, os, getpass, backoff
 import pandas as pd
 import matplotlib.pyplot as plt
+import pyvo as vo
+import backoff
 
 from timewise.general import main_logger, cache_dir, backoff_hndlr
 
@@ -172,3 +174,51 @@ def get_excess_variance(y, y_err, mu):
 ###########################################################################################################
 
 
+###########################################################################################################
+#            START CUSTOM TAP Service                 #
+#######################################################
+
+
+class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
+    """
+    Implements backoff for call of phase which otherwise breaks the code if there are connection issues
+    """
+
+    @property
+    @backoff.on_exception(
+        backoff.expo,
+        (vo.dal.DALServiceError, AttributeError),
+        max_tries=50,
+        on_backoff=backoff_hndlr
+    )
+    def phase(self):
+        return super(StableAsyncTAPJob, self).phase
+
+
+class StableTAPService(vo.dal.TAPService):
+    """
+    Implements the StableAsyncTAPJob for job submission
+    """
+
+    def submit_job(
+            self,
+            query,
+            language="ADQL",
+            maxrec=None,
+            uploads=None,
+            **keywords
+    ):
+        return StableAsyncTAPJob.create(
+            self.baseurl,
+            query,
+            language,
+            maxrec,
+            uploads,
+            self._session,
+            **keywords
+        )
+
+
+#######################################################
+#            END CUSTOM TAP Service                   #
+###########################################################################################################

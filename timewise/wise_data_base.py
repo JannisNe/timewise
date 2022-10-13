@@ -11,6 +11,7 @@ from astropy.cosmology import Planck18
 import matplotlib.pyplot as plt
 
 from timewise.general import main_logger, cache_dir, plots_dir, output_dir, logger_format, backoff_hndlr
+from timewise.utils import StableTAPService
 
 
 logger = main_logger.getChild(__name__)
@@ -31,7 +32,7 @@ class WISEDataBase(abc.ABC):
     """
 
     service_url = 'https://irsa.ipac.caltech.edu/TAP'
-    service = vo.dal.TAPService(service_url)
+    service = StableTAPService(service_url)
     active_tap_phases = {"QUEUED", "EXECUTING", "RUN", "COMPLETED", "ERROR", "UNKNOWN"}
     running_tap_phases = ["QUEUED", "EXECUTING", "RUN"]
     done_tap_phases = {"COMPLETED", "ABORTED", "ERROR"}
