@@ -1,7 +1,6 @@
 import unittest, shutil, os, socket
 import numpy as np
-from astropy.coordinates import SkyCoord
-from astropy import units as u
+import logging
 
 from timewise import WiseDataByVisit, WISEDataDESYCluster, ParentSampleBase
 from timewise.general import main_logger
@@ -9,7 +8,7 @@ from timewise.utils import get_mirong_sample
 
 
 main_logger.setLevel('DEBUG')
-logger = main_logger.getChild(__name__)
+logger = logging.getLogger(__name__)
 
 
 mirong_sample = get_mirong_sample()

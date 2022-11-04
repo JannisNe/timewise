@@ -1,12 +1,13 @@
 import abc, os
 import pandas as pd
 import numpy as np
+import logging
 
 from timewise.general import main_logger, cache_dir, plots_dir
 from timewise.utils import plot_sdss_cutout
 
 
-logger = main_logger.getChild(__name__)
+logger = logging.getLogger(__name__)
 
 
 class ParentSampleBase(abc.ABC):

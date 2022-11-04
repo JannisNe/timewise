@@ -14,7 +14,7 @@ from timewise.general import main_logger, cache_dir, plots_dir, output_dir, logg
 from timewise.utils import StableTAPService
 
 
-logger = main_logger.getChild(__name__)
+logger = logging.getLogger(__name__)
 
 
 class WISEDataBase(abc.ABC):

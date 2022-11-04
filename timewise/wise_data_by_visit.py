@@ -1,12 +1,12 @@
 import tqdm
 import pandas as pd
 import numpy as np
+import logging
 
-from timewise.general import main_logger
 from timewise.wise_data_base import WISEDataBase
 from timewise.utils import get_excess_variance
 
-logger = main_logger.getChild(__name__)
+logger = logging.getLogger(__name__)
 
 
 class WiseDataByVisit(WISEDataBase):
