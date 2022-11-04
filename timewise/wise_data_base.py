@@ -571,10 +571,13 @@ class WISEDataBase(abc.ABC):
         self._combine_data_products(service=service, remove=remove_chunks, overwrite=overwrite)
 
     def _data_product_filename(self, service, chunk_number=None, jobID=None):
+
+        n = "timewise_data_product_"
+
         if (chunk_number is None) and (jobID is None):
-            return os.path.join(self.lightcurve_dir, f"binned_lightcurves_{service}.json")
+            return os.path.join(self.lightcurve_dir, f"{n}{service}.json")
         else:
-            fn = f"binned_lightcurves_{service}{self._split_chunk_key}{chunk_number}"
+            fn = f"{n}{service}{self._split_chunk_key}{chunk_number}"
             if (chunk_number is not None) and (jobID is None):
                 return os.path.join(self._cache_photometry_dir, fn + ".json")
             else:
@@ -609,7 +612,7 @@ class WISEDataBase(abc.ABC):
                 logger.info(f"FileNotFoundError: {e}. Making new binned lightcurves.")
 
         with open(fn, "w") as f:
-            json.dump(data_product, f)
+            json.dump(data_product, f, indent=4)
 
     def load_binned_lcs(self, service):
         """Loads the binned lightcurves. For any int `ID` the lightcurves can convieniently read into a pandas.DataFrame
@@ -1249,10 +1252,10 @@ class WISEDataBase(abc.ABC):
         :param service: The service with which the lightcurves were downloaded
         :type service: str
         """
-        lcs = self.load_binned_lcs(service=service)
-        for i, lc in tqdm.tqdm(lcs.items(), desc='adding flux densities'):
-            lcs[i] = self.add_flux_density(
-                lc,
+        data_product = self.load_binned_lcs(service=service)
+        for i, i_data_product in tqdm.tqdm(data_product.items(), desc='adding flux densities'):
+            data_product["timewise_lightcurve"][i] = self.add_flux_density(
+                i_data_product["timewise_lightcurve"],
                 mag_key=f'{self.mean_key}{self.mag_key_ext}',
                 emag_key=f'{self.mag_key_ext}{self.rms_key}',
                 mag_ul_key=f'{self.mag_key_ext}{self.upper_limit_key}',
@@ -1260,7 +1263,7 @@ class WISEDataBase(abc.ABC):
                 ef_key=f'{self.flux_density_key_ext}{self.rms_key}',
                 f_ul_key=f'{self.flux_density_key_ext}{self.upper_limit_key}'
             ).to_dict()
-        self._save_data_product(lcs, service=service, overwrite=True)
+        self._save_data_product(data_product, service=service, overwrite=True)
 
     # ---------------------------------------------------- #
     # END converting to flux densities                     #
@@ -1314,7 +1317,7 @@ class WISEDataBase(abc.ABC):
         return lightcurve
 
     def add_luminosity_to_saved_lightcurves(self, service, redshift_key=None, distance_key=None):
-        """Add luminosities to all lightcurves, calculated from flux desnities and distance or redshift
+        """Add luminosities to all lightcurves, calculated from flux densities and distance or redshift
 
         :param service: the service with which the lightcurves were downloaded
         :type service: str
@@ -1327,8 +1330,8 @@ class WISEDataBase(abc.ABC):
         if (not redshift_key) and (not distance_key):
             raise ValueError('Either distance key or redshift key has to be given!')
 
-        lcs = self.load_binned_lcs(service=service)
-        for i, lc in tqdm.tqdm(lcs.items(), desc='adding luminosities'):
+        data_product = self.load_binned_lcs(service=service)
+        for i, i_data_product in tqdm.tqdm(data_product.items(), desc='adding luminosities'):
             parent_sample_idx = int(i.split('_')[0])
             info = self.parent_sample.df.loc[parent_sample_idx]
 
