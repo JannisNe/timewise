@@ -607,7 +607,6 @@ class WISEDataBase(abc.ABC):
             try:
                 old_data_product = self._load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
                 logger.debug(f"Found {len(old_data_product)}. Combining")
-                # TODO: figure out data format change here
                 data_product = data_product.update(old_data_product)
             except FileNotFoundError as e:
                 logger.info(f"FileNotFoundError: {e}. Making new binned lightcurves.")
@@ -656,7 +655,6 @@ class WISEDataBase(abc.ABC):
             res = self._load_data_product(**kw)
             if not isinstance(res, type(None)):
                 ilcs, ifn = res
-                # TODO: figure out data format change here
                 fns.append(ifn)
                 if isinstance(lcs, type(None)):
                     lcs = dict(ilcs)
@@ -1100,7 +1098,6 @@ class WISEDataBase(abc.ABC):
                 continue
 
             binned_lc = self.bin_lightcurve(lightcurve)
-            # TODO: figure out data format change here
             data_product[int(parent_sample_entry_id)]["timewise_lightcurve"] = binned_lc.to_dict()
 
         logger.debug(f"chunk {chunk_number}: saving {len(data_product.keys())} binned lcs")
@@ -1545,7 +1542,6 @@ class WISEDataBase(abc.ABC):
         :type overwrite: bool
         """
         data_product = self._load_data_product(service, chunk_number, jobID)
-        # TODO: figure out data format change here
         for ID, i_data_product in data_product.items():
             lc = pd.DataFrame.from_dict(i_data_product["timewise_lightcurve"])
             metadata = self.calculate_metadata_single(lc)

@@ -97,7 +97,6 @@ class WISEDataDESYCluster(WiseDataByVisit):
             try:
                 old_data_product = self._load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
                 logger.debug(f"Found {len(old_data_product)}. Combining")
-                # TODO: figure out data format change here
                 data_product = data_product.update(old_data_product)
             except FileNotFoundError as e:
                 logger.info(f"FileNotFoundError: {e}. Making new binned lightcurves.")
@@ -767,7 +766,6 @@ class WISEDataDESYCluster(WiseDataByVisit):
         logger.debug(f"{wise_id} for {parent_sample_idx}")
 
         _chunk_number = self._get_chunk_number(parent_sample_index=parent_sample_idx)
-        # TODO: figure out data format change here
         data_product = self._load_data_product(service, chunk_number=_chunk_number)
         lc = pd.DataFrame.from_dict(data_product.loc[int(parent_sample_idx)]["timewise_lightcurve"])
 

@@ -140,7 +140,6 @@ class WiseDataByVisit(WISEDataBase):
         :return: the metadata
         :rtype: dict
         """
-        # TODO: figure out data format change here
 
         metadata = dict()
 
