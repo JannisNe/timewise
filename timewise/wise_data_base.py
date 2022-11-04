@@ -1254,7 +1254,7 @@ class WISEDataBase(abc.ABC):
         """
         data_product = self.load_binned_lcs(service=service)
         for i, i_data_product in tqdm.tqdm(data_product.items(), desc='adding flux densities'):
-            data_product["timewise_lightcurve"][i] = self.add_flux_density(
+            data_product[i]["timewise_lightcurve"] = self.add_flux_density(
                 i_data_product["timewise_lightcurve"],
                 mag_key=f'{self.mean_key}{self.mag_key_ext}',
                 emag_key=f'{self.mag_key_ext}{self.rms_key}',
@@ -1342,8 +1342,8 @@ class WISEDataBase(abc.ABC):
                 distance = None
                 redshift = info[redshift_key]
 
-            lcs[i] = self._add_luminosity(
-                pd.DataFrame.from_dict(lc),
+            data_product[i]["timewise_lightcurve"] = self._add_luminosity(
+                pd.DataFrame.from_dict(i_data_product["timewise_lightcurve"]),
                 f_key     = self.mean_key + self.flux_density_key_ext,
                 ef_key    = self.flux_density_key_ext + self.rms_key,
                 f_ul_key  = self.flux_density_key_ext + self.upper_limit_key,
@@ -1353,7 +1353,7 @@ class WISEDataBase(abc.ABC):
                 redshift  = redshift,
                 distance  = distance
             ).to_dict()
-        self._save_data_product(lcs, service=service, overwrite=True)
+        self._save_data_product(data_product, service=service, overwrite=True)
 
     # ---------------------------------------------------- #
     # END converting to luminosity                         #
