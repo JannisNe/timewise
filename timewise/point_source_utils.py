@@ -1,13 +1,13 @@
+import logging
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from timewise.general import main_logger
 from timewise.parent_sample_base import ParentSampleBase
 from timewise.wise_data_by_visit import WiseDataByVisit
 from timewise.utils import plot_sdss_cutout
 
 
-logger = main_logger.getChild(__name__)
+logger = logging.getLogger(__name__)
 
 
 ###########################################################################################################

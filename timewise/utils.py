@@ -1,13 +1,17 @@
-import requests, os, getpass, backoff
+import requests
+import os
+import getpass
+import logging
 import pandas as pd
 import matplotlib.pyplot as plt
 import pyvo as vo
 import backoff
 
-from timewise.general import main_logger, cache_dir, backoff_hndlr
+
+from timewise.general import cache_dir, backoff_hndlr
 
 
-logger = main_logger.getChild(__name__)
+logger = logging.getLogger(__name__)
 mirong_url = 'http://staff.ustc.edu.cn/~jnac/data_public/wisevar.txt'
 local_copy = os.path.join(cache_dir, 'mirong_sample.csv')
 

@@ -7,7 +7,8 @@ logger_format = logging.Formatter('%(levelname)s:%(threadName)s %(name)s - %(asc
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(logger_format)
 main_logger.addHandler(stream_handler)
-logger = main_logger.getChild(__name__)
+
+logger = logging.getLogger(__name__)
 
 # Setting up data directory
 DATA_DIR_KEY = 'TIMEWISE_DATA'
