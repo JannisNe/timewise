@@ -1098,7 +1098,7 @@ class WISEDataBase(abc.ABC):
 
             binned_lc = self.bin_lightcurve(lightcurve)
             # TODO: figure out data format change here
-            i_data_product = {"wise_lightcurve": binned_lc.to_dict()}
+            i_data_product = {"timewise_lightcurve": binned_lc.to_dict()}
             data_product[f"{int(parent_sample_entry_id)}"] = i_data_product
 
         logger.debug(f"chunk {chunk_number}: saving {len(data_product.keys())} binned lcs")
