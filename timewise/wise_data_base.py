@@ -1391,7 +1391,7 @@ class WISEDataBase(abc.ABC):
         """
 
         logger.debug(f"loading binned lightcurves")
-        lcs = self.load_binned_lcs(service)
+        data_product = self.load_binned_lcs(service)
         _get_unbinned_lcs_fct = self._get_unbinned_lightcurves if service == 'tap' else self._get_unbinned_lightcurves_gator
 
         wise_id = self.parent_sample.df.loc[int(parent_sample_idx), self.parent_wise_source_id_key]
@@ -1399,7 +1399,7 @@ class WISEDataBase(abc.ABC):
             wise_id = int(wise_id)
         logger.debug(f"{wise_id} for {parent_sample_idx}")
 
-        lc = pd.DataFrame.from_dict(lcs[f"{int(parent_sample_idx)}"])
+        lc = pd.DataFrame.from_dict(data_product[str(int(parent_sample_idx))]["timewise_lightcurve"])
 
         if plot_unbinned:
             _chunk_number = self._get_chunk_number(parent_sample_index=parent_sample_idx)
@@ -1447,7 +1447,7 @@ class WISEDataBase(abc.ABC):
                                 label=f"{b} unbinned", ls='', marker='o', c=self.band_plot_colors[b], markersize=4,
                                 alpha=0.3)
             except KeyError as e:
-                logger.warning(e)
+                raise KeyError(f"Could not find brightness key {e}!")
 
         if lum_key == 'mag':
             ylim = ax.get_ylim()
