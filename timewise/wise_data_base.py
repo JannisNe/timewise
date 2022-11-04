@@ -1003,8 +1003,7 @@ class WISEDataBase(abc.ABC):
             self.tap_jobs[t] = dict()
             for i in chunks:
                 self._submit_job_to_TAP(i, t, mag, flux, query_type)
-                logger.info("waiting for 2 minutes")
-                time.sleep(2*60)
+                time.sleep(5)
 
         logger.info(f'added {self.queue.qsize()} tasks to queue')
         logger.info(f"wait for {wait} hours to give tap_jobs some time")
