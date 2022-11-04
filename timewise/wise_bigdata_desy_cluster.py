@@ -376,12 +376,10 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
                 try:
                     self._combine_data_products('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
-                    self._combine_metadata('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
 
                     if self._storage_dir:
                         filenames_to_move = [
                             self._data_product_filename(service='tap', chunk_number=chunk),
-                            self._metadata_filename(service='tap', chunk_number=chunk),
                         ]
 
                         for t in self.photometry_table_keymap.keys():
@@ -682,7 +680,6 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self.wait_for_job()
         for c in range(self.n_chunks):
             self._combine_data_products(service, chunk_number=c, remove=True, overwrite=True)
-            self._combine_metadata(service, chunk_number=c, remove=True, overwrite=True)
 
     # ---------------------------------------------------- #
     # END using cluster for downloading and binning        #
@@ -740,7 +737,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         _chunk_number = self._get_chunk_number(parent_sample_index=parent_sample_idx)
         # TODO: figure out data format change here
         data_product = self._load_data_product(service, chunk_number=_chunk_number)
-        lc = pd.DataFrame.from_dict(data_product[f"{int(parent_sample_idx)}"]["timewise_lightcurve"])
+        lc = pd.DataFrame.from_dict(data_product.loc[int(parent_sample_idx)]["timewise_lightcurve"])
 
         if plot_unbinned:
 
