@@ -278,6 +278,7 @@ class WISEDataBase(abc.ABC):
         # invert the keymap to rename the columns
         inverse_keymap = {v: k for k, v in self.parent_sample.default_keymap.items()}
         parent_sample_sel.rename(columns=inverse_keymap, inplace=True)
+        # parent_sample_sel.set_index(parent_sample_sel.index.astype(str), inplace=True)
 
         # save to data_product
         data_product = parent_sample_sel.to_dict(orient="index")
@@ -1100,8 +1101,7 @@ class WISEDataBase(abc.ABC):
 
             binned_lc = self.bin_lightcurve(lightcurve)
             # TODO: figure out data format change here
-            i_data_product = {"timewise_lightcurve": binned_lc.to_dict()}
-            data_product[f"{int(parent_sample_entry_id)}"] = i_data_product
+            data_product[int(parent_sample_entry_id)]["timewise_lightcurve"] = binned_lc.to_dict()
 
         logger.debug(f"chunk {chunk_number}: saving {len(data_product.keys())} binned lcs")
         self._save_data_product(data_product, service=service, chunk_number=chunk_number, jobID=jobID, overwrite=True)
