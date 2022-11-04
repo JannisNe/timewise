@@ -96,8 +96,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
         if not overwrite:
             try:
                 old_data_product = self._load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
-                logger.debug(f"Found {len(old_data_product)}. Combining")
-                data_product = data_product.update(old_data_product)
+
+                if old_data_product is not None:
+                    logger.debug(f"Found {len(old_data_product)}. Combining")
+                    data_product = data_product.update(old_data_product)
+
             except FileNotFoundError as e:
                 logger.info(f"FileNotFoundError: {e}. Making new binned lightcurves.")
 
