@@ -125,7 +125,7 @@ class WiseDataByVisit(WISEDataBase):
 
         return binned_lc
 
-    def calculate_metadata_single(self, lcs):
+    def calculate_metadata_single(self, lc):
         """
         Calculates some metadata, describing the variability of the lightcurves.
 
@@ -135,66 +135,64 @@ class WiseDataByVisit(WISEDataBase):
         - `max_deltat`: the maximum time difference between any two datapoints
         - `mean_weighted_ppb`: the weighted average brightness where the weights are the points per bin
 
-        :param lcs: the lightcurves
-        :type lcs: dict
+        :param lc: the lightcurves
+        :type lc: dict
         :return: the metadata
         :rtype: dict
         """
+        # TODO: figure out data format change here
+
         metadata = dict()
 
-        for ID, lc_dict in tqdm.tqdm(lcs.items(), desc='calculating metadata', total=len(lcs)):
-            imetadata = dict()
-            lc = pd.DataFrame.from_dict(lc_dict)
-            for band in self.bands:
-                for lum_key in [self.mag_key_ext, self.flux_key_ext, self.flux_density_key_ext]:
-                    llumkey = f"{band}{self.mean_key}{lum_key}"
-                    errkey = f"{band}{lum_key}{self.rms_key}"
-                    ul_key = f'{band}{lum_key}{self.upper_limit_key}'
-                    ppb_key = f'{band}{lum_key}{self.Npoints_key}'
+        for band in self.bands:
+            for lum_key in [self.mag_key_ext, self.flux_key_ext, self.flux_density_key_ext]:
+                llumkey = f"{band}{self.mean_key}{lum_key}"
+                errkey = f"{band}{lum_key}{self.rms_key}"
+                ul_key = f'{band}{lum_key}{self.upper_limit_key}'
+                ppb_key = f'{band}{lum_key}{self.Npoints_key}'
 
-                    difk = f"{band}_max_dif{lum_key}"
-                    rmsk = f"{band}_min_rms{lum_key}"
-                    Nk = f"{band}_N_datapoints{lum_key}"
-                    dtk = f"{band}_max_deltat{lum_key}"
-                    medk = f"{band}_median{lum_key}"
-                    chi2tmk = f"{band}_chi2_to_med{lum_key}"
-                    mean_weighted_ppb_key = f"{band}_mean_weighted_ppb{lum_key}"
-                    excess_variance_key = f"{band}_excess_variance_{lum_key}"
-                    excess_variance_err_key = f"{band}_excess_variance_err_{lum_key}"
-                    
-                    try:
-                        ilc = lc[~np.array(lc[ul_key]).astype(bool)]
-                        imetadata[Nk] = len(ilc)
+                difk = f"{band}_max_dif{lum_key}"
+                rmsk = f"{band}_min_rms{lum_key}"
+                Nk = f"{band}_N_datapoints{lum_key}"
+                dtk = f"{band}_max_deltat{lum_key}"
+                medk = f"{band}_median{lum_key}"
+                chi2tmk = f"{band}_chi2_to_med{lum_key}"
+                mean_weighted_ppb_key = f"{band}_mean_weighted_ppb{lum_key}"
+                excess_variance_key = f"{band}_excess_variance_{lum_key}"
+                excess_variance_err_key = f"{band}_excess_variance_err_{lum_key}"
 
-                        if len(ilc) > 0:
-                            imetadata[mean_weighted_ppb_key] = np.average(ilc[llumkey], weights=ilc[ppb_key])
-                            imetadata[excess_variance_key], imetadata[excess_variance_err_key] = get_excess_variance(ilc[llumkey], ilc[errkey], imetadata[mean_weighted_ppb_key])                   
+                try:
+                    ilc = lc[~np.array(lc[ul_key]).astype(bool)]
+                    metadata[Nk] = len(ilc)
 
-                            imin = ilc[llumkey].min()
-                            imax = ilc[llumkey].max()
-                            imin_rms_ind = ilc[errkey].argmin()
-                            imin_rms = ilc[errkey].iloc[imin_rms_ind]
+                    if len(ilc) > 0:
+                        metadata[mean_weighted_ppb_key] = np.average(ilc[llumkey], weights=ilc[ppb_key])
+                        metadata[excess_variance_key], metadata[excess_variance_err_key] = get_excess_variance(ilc[llumkey], ilc[errkey], metadata[mean_weighted_ppb_key])
 
-                            imed = np.median(ilc[llumkey])
-                            ichi2_to_med = sum(((ilc[llumkey] - imed) / ilc[errkey]) ** 2)
+                        imin = ilc[llumkey].min()
+                        imax = ilc[llumkey].max()
+                        imin_rms_ind = ilc[errkey].argmin()
+                        imin_rms = ilc[errkey].iloc[imin_rms_ind]
 
-                            imetadata[difk] = imax - imin
-                            imetadata[rmsk] = imin_rms
-                            imetadata[medk] = imed
-                            imetadata[chi2tmk] = ichi2_to_med
+                        imed = np.median(ilc[llumkey])
+                        ichi2_to_med = sum(((ilc[llumkey] - imed) / ilc[errkey]) ** 2)
 
-                            if len(ilc) == 1:
-                                imetadata[dtk] = 0
-                            else:
-                                mjds = np.array(ilc.mean_mjd).astype(float)
-                                dt = mjds[1:] - mjds[:-1]
-                                imetadata[dtk] = max(dt)
+                        metadata[difk] = imax - imin
+                        metadata[rmsk] = imin_rms
+                        metadata[medk] = imed
+                        metadata[chi2tmk] = ichi2_to_med
 
+                        if len(ilc) == 1:
+                            metadata[dtk] = 0
                         else:
-                            imetadata[difk] = np.nan
-                            imetadata[dtk] = np.nan
-                    except KeyError as e:
-                        raise KeyError(e)
+                            mjds = np.array(ilc.mean_mjd).astype(float)
+                            dt = mjds[1:] - mjds[:-1]
+                            metadata[dtk] = max(dt)
 
-            metadata[ID] = imetadata
+                    else:
+                        metadata[difk] = np.nan
+                        metadata[dtk] = np.nan
+                except KeyError as e:
+                    raise KeyError(e)
+
         return metadata

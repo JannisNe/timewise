@@ -9,6 +9,7 @@ from astropy.table import Table
 from astropy import constants
 from astropy.cosmology import Planck18
 import matplotlib.pyplot as plt
+import warnings
 
 from timewise.general import main_logger, cache_dir, plots_dir, output_dir, logger_format, backoff_hndlr
 from timewise.utils import StableTAPService
@@ -265,6 +266,23 @@ class WISEDataBase(abc.ABC):
         #########################
         # END CHUNK MASK        #
         #######################################################################################
+
+    def _start_data_product(self, parent_sample_indices):
+
+        # get all rows in this chunk and columns, specified in the keymap
+        parent_sample_sel = self.parent_sample.df.loc[
+            parent_sample_indices,
+            list(self.parent_sample.default_keymap.values())
+        ]
+
+        # invert the keymap to rename the columns
+        inverse_keymap = {v: k for k, v in self.parent_sample.default_keymap.items()}
+        parent_sample_sel.rename(columns=inverse_keymap, inplace=True)
+
+        # save to data_product
+        data_product = parent_sample_sel.to_dict(orient="index")
+
+        return data_product
 
     @staticmethod
     def get_db_name(table_name, nice=False):
@@ -550,10 +568,9 @@ class WISEDataBase(abc.ABC):
         for c in chunks:
             self.calculate_metadata(service=service, chunk_number=c, overwrite=True)
 
-        self._combine_lcs(service=service, overwrite=overwrite, remove=remove_chunks)
-        self._combine_metadata(service=service, overwrite=overwrite, remove=remove_chunks)
+        self._combine_data_products(service=service, remove=remove_chunks, overwrite=overwrite)
 
-    def _lightcurve_filename(self, service, chunk_number=None, jobID=None):
+    def _data_product_filename(self, service, chunk_number=None, jobID=None):
         if (chunk_number is None) and (jobID is None):
             return os.path.join(self.lightcurve_dir, f"binned_lightcurves_{service}.json")
         else:
@@ -563,8 +580,8 @@ class WISEDataBase(abc.ABC):
             else:
                 return os.path.join(self._cache_photometry_dir, fn + f"_{jobID}.json")
 
-    def _load_lightcurves(self, service, chunk_number=None, jobID=None, return_filename=False):
-        fn = self._lightcurve_filename(service, chunk_number, jobID)
+    def _load_data_product(self, service, chunk_number=None, jobID=None, return_filename=False):
+        fn = self._data_product_filename(service, chunk_number, jobID)
         logger.debug(f"loading {fn}")
         try:
             with open(fn, "r") as f:
@@ -575,23 +592,24 @@ class WISEDataBase(abc.ABC):
         except FileNotFoundError:
             logger.warning(f"No file {fn}")
 
-    def _save_lightcurves(self, lcs, service, chunk_number=None, jobID=None, overwrite=False):
-        fn = self._lightcurve_filename(service, chunk_number, jobID)
-        logger.debug(f"saving {len(lcs)} new lightcurves to {fn}")
+    def _save_data_product(self, data_product, service, chunk_number=None, jobID=None, overwrite=False):
+        fn = self._data_product_filename(service, chunk_number, jobID)
+        logger.debug(f"saving {len(data_product)} new lightcurves to {fn}")
 
-        if fn == self._lightcurve_filename(service):
-            self._cached_final_products['lightcurves'][service] = lcs
+        if fn == self._data_product_filename(service):
+            self._cached_final_products['lightcurves'][service] = data_product
 
         if not overwrite:
             try:
-                old_lcs = self._load_lightcurves(service=service, chunk_number=chunk_number, jobID=jobID)
-                logger.debug(f"Found {len(old_lcs)}. Combining")
-                lcs = lcs.update(old_lcs)
+                old_data_product = self._load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
+                logger.debug(f"Found {len(old_data_product)}. Combining")
+                # TODO: figure out data format change here
+                data_product = data_product.update(old_data_product)
             except FileNotFoundError as e:
                 logger.info(f"FileNotFoundError: {e}. Making new binned lightcurves.")
 
         with open(fn, "w") as f:
-            json.dump(lcs, f)
+            json.dump(data_product, f)
 
     def load_binned_lcs(self, service):
         """Loads the binned lightcurves. For any int `ID` the lightcurves can convieniently read into a pandas.DataFrame
@@ -605,10 +623,10 @@ class WISEDataBase(abc.ABC):
         :rtype: dict
         """
         if service not in self._cached_final_products['lightcurves']:
-            self._cached_final_products['lightcurves'][service] = self._load_lightcurves(service)
+            self._cached_final_products['lightcurves'][service] = self._load_data_product(service)
         return self._cached_final_products['lightcurves'][service]
 
-    def _combine_lcs(self, service=None, chunk_number=None, remove=False, overwrite=False):
+    def _combine_data_products(self, service=None, chunk_number=None, remove=False, overwrite=False):
         if not service:
             logger.info("Combining all lightcuves collected with all services")
             itr = ['service', ['gator', 'tap']]
@@ -631,16 +649,17 @@ class WISEDataBase(abc.ABC):
             kw = dict(kwargs)
             kw[itr[0]] = i
             kw['return_filename'] = True
-            res = self._load_lightcurves(**kw)
+            res = self._load_data_product(**kw)
             if not isinstance(res, type(None)):
                 ilcs, ifn = res
+                # TODO: figure out data format change here
                 fns.append(ifn)
                 if isinstance(lcs, type(None)):
                     lcs = dict(ilcs)
                 else:
                     lcs.update(ilcs)
 
-        self._save_lightcurves(lcs, service=service, chunk_number=chunk_number, overwrite=overwrite)
+        self._save_data_product(lcs, service=service, chunk_number=chunk_number, overwrite=overwrite)
 
         if remove:
             for fn in tqdm.tqdm(fns, desc="removing files"):
@@ -1068,7 +1087,7 @@ class WISEDataBase(abc.ABC):
 
         logger.debug(f"chunk {chunk_number}: going through {len(indices)} IDs")
 
-        binned_lcs = dict()
+        data_product = self._start_data_product(parent_sample_indices=indices)
         for parent_sample_entry_id in tqdm.tqdm(indices):
             m = lightcurves[self._tap_orig_id_key] == parent_sample_entry_id
             lightcurve = lightcurves[m]
@@ -1078,10 +1097,12 @@ class WISEDataBase(abc.ABC):
                 continue
 
             binned_lc = self.bin_lightcurve(lightcurve)
-            binned_lcs[f"{int(parent_sample_entry_id)}"] = binned_lc.to_dict()
+            # TODO: figure out data format change here
+            i_data_product = {"wise_lightcurve": binned_lc.to_dict()}
+            data_product[f"{int(parent_sample_entry_id)}"] = i_data_product
 
-        logger.debug(f"chunk {chunk_number}: saving {len(binned_lcs.keys())} binned lcs")
-        self._save_lightcurves(binned_lcs, service=service, chunk_number=chunk_number, jobID=jobID, overwrite=True)
+        logger.debug(f"chunk {chunk_number}: saving {len(data_product.keys())} binned lcs")
+        self._save_data_product(data_product, service=service, chunk_number=chunk_number, jobID=jobID, overwrite=True)
 
     # ---------------------------------------- #
     # END using TAP to get photometry          #
@@ -1239,7 +1260,7 @@ class WISEDataBase(abc.ABC):
                 ef_key=f'{self.flux_density_key_ext}{self.rms_key}',
                 f_ul_key=f'{self.flux_density_key_ext}{self.upper_limit_key}'
             ).to_dict()
-        self._save_lightcurves(lcs, service=service, overwrite=True)
+        self._save_data_product(lcs, service=service, overwrite=True)
 
     # ---------------------------------------------------- #
     # END converting to flux densities                     #
@@ -1329,7 +1350,7 @@ class WISEDataBase(abc.ABC):
                 redshift  = redshift,
                 distance  = distance
             ).to_dict()
-        self._save_lightcurves(lcs, service=service, overwrite=True)
+        self._save_data_product(lcs, service=service, overwrite=True)
 
     # ---------------------------------------------------- #
     # END converting to luminosity                         #
@@ -1452,6 +1473,9 @@ class WISEDataBase(abc.ABC):
     #####################################
 
     def _metadata_filename(self, service, chunk_number=None, jobID=None):
+
+        warnings.warn("Separate metadata will be deprecated in timewise 0.3!", DeprecationWarning)
+
         if (chunk_number is None) and (jobID is None):
             return os.path.join(self.lightcurve_dir, f'metadata_{service}.json')
         elif (chunk_number is not None) and (jobID is None):
@@ -1518,47 +1542,14 @@ class WISEDataBase(abc.ABC):
         :param overwrite: overwrite existing metadata file
         :type overwrite: bool
         """
-        lcs = self._load_lightcurves(service, chunk_number, jobID)
-        metadata = self.calculate_metadata_single(lcs)
-        self._save_metadata(metadata, service, chunk_number, jobID, overwrite=overwrite)
+        data_product = self._load_data_product(service, chunk_number, jobID)
+        # TODO: figure out data format change here
+        for ID, i_data_product in data_product.items():
+            lc = pd.DataFrame.from_dict(i_data_product["timewise_lightcurve"])
+            metadata = self.calculate_metadata_single(lc)
+            data_product[ID]["timewise_metadata"] = metadata
 
-    def _combine_metadata(self, service=None, chunk_number=None, remove=False, overwrite=False):
-        if not service:
-            logger.info("Combining all metadata collected with all services")
-            itr = ['service', ['gator', 'tap']]
-            kwargs = {}
-        elif chunk_number is None:
-            logger.info(f"Combining all metadata collected with {service}")
-            itr = ['chunk_number', range(self.n_chunks)]
-            kwargs = {'service': service}
-        elif chunk_number is not None:
-            logger.info(f"Combining all metadata collected with {service} for chunk {chunk_number}")
-            itr = ['jobID',
-                   list(self.clusterJob_chunk_map.index[self.clusterJob_chunk_map.chunk_number == chunk_number])]
-            kwargs = {'service': service, 'chunk_number': chunk_number}
-        else:
-            raise NotImplementedError
-
-        metadata = None
-        fns = list()
-        for i in itr[1]:
-            kw = dict(kwargs)
-            kw[itr[0]] = i
-            kw['return_filename'] = True
-            res = self._load_metadata(**kw)
-            if not isinstance(res, type(None)):
-                imetadata, ifn = res
-                fns.append(ifn)
-                if isinstance(metadata, type(None)):
-                    metadata = dict(imetadata)
-                else:
-                    metadata.update(imetadata)
-
-        self._save_metadata(metadata, service=service, chunk_number=chunk_number, overwrite=overwrite)
-
-        if remove:
-            for fn in tqdm.tqdm(fns, desc='removing files'):
-                os.remove(fn)
+        self._save_data_product(data_product, service, chunk_number, jobID, overwrite=overwrite)
 
     @abc.abstractmethod
     def calculate_metadata_single(self, lcs):

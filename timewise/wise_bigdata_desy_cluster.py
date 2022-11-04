@@ -54,7 +54,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._io_queue = queue.PriorityQueue()
         self._io_queue_done = queue.Queue()
 
-    def _load_lightcurves(
+    def _load_data_product(
             self,
             service,
             chunk_number=None,
@@ -62,7 +62,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             return_filename=False,
             load_from_bigdata_dir=False
     ):
-        fn = self._lightcurve_filename(service, chunk_number, jobID)
+        fn = self._data_product_filename(service, chunk_number, jobID)
 
         if load_from_bigdata_dir:
             fn = fn.replace(data_dir, bigdata_dir)
@@ -375,12 +375,12 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}). Start combining')
 
                 try:
-                    self._combine_lcs('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
+                    self._combine_data_products('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
                     self._combine_metadata('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
 
                     if self._storage_dir:
                         filenames_to_move = [
-                            self._lightcurve_filename(service='tap', chunk_number=chunk),
+                            self._data_product_filename(service='tap', chunk_number=chunk),
                             self._metadata_filename(service='tap', chunk_number=chunk),
                         ]
 
@@ -681,7 +681,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self.submit_to_cluster(cluster_cpu, cluster_h, cluster_ram, tables=None, service=service)
         self.wait_for_job()
         for c in range(self.n_chunks):
-            self._combine_lcs(service, chunk_number=c, remove=True, overwrite=True)
+            self._combine_data_products(service, chunk_number=c, remove=True, overwrite=True)
             self._combine_metadata(service, chunk_number=c, remove=True, overwrite=True)
 
     # ---------------------------------------------------- #
@@ -738,8 +738,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
         logger.debug(f"{wise_id} for {parent_sample_idx}")
 
         _chunk_number = self._get_chunk_number(parent_sample_index=parent_sample_idx)
-        lcs = self._load_lightcurves(service, chunk_number=_chunk_number, load_from_bigdata_dir=load_from_bigdata_dir)
-        lc = pd.DataFrame.from_dict(lcs[f"{int(parent_sample_idx)}"])
+        # TODO: figure out data format change here
+        data_product = self._load_data_product(service, chunk_number=_chunk_number)
+        lc = pd.DataFrame.from_dict(data_product[f"{int(parent_sample_idx)}"]["timewise_lightcurve"])
 
         if plot_unbinned:
 
