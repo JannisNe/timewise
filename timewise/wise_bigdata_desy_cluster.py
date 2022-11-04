@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import pyvo as vo
 import traceback as tb
+import gzip
 
 from timewise.general import main_logger, DATA_DIR_KEY, data_dir, bigdata_dir, backoff_hndlr
 from timewise.wise_data_by_visit import WiseDataByVisit
@@ -54,6 +55,14 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._io_queue = queue.PriorityQueue()
         self._io_queue_done = queue.Queue()
 
+    # ---------------------------------------------------------------------------------- #
+    # START using gzip to compress the data when saving     #
+    # ----------------------------------------------------- #
+
+    def _data_product_filename(self, service, chunk_number=None, jobID=None):
+        fn = super(WISEDataDESYCluster, self)._data_product_filename(service, chunk_number=chunk_number, jobID=jobID)
+        return fn + ".gz"
+
     def _load_data_product(
             self,
             service,
@@ -69,13 +78,36 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         logger.debug(f"loading {fn}")
         try:
-            with open(fn, "r") as f:
-                lcs = json.load(f)
+            with gzip.open(fn, 'r') as fin:
+                data_product = json.loads(fin.read().decode('utf-8'))
             if return_filename:
-                return lcs, fn
-            return lcs
+                return data_product, fn
+            return data_product
         except FileNotFoundError:
             logger.warning(f"No file {fn}")
+
+    def _save_data_product(self, data_product, service, chunk_number=None, jobID=None, overwrite=False):
+        fn = self._data_product_filename(service, chunk_number, jobID)
+        logger.debug(f"saving {len(data_product)} new lightcurves to {fn}")
+
+        if fn == self._data_product_filename(service):
+            self._cached_final_products['lightcurves'][service] = data_product
+
+        if not overwrite:
+            try:
+                old_data_product = self._load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
+                logger.debug(f"Found {len(old_data_product)}. Combining")
+                # TODO: figure out data format change here
+                data_product = data_product.update(old_data_product)
+            except FileNotFoundError as e:
+                logger.info(f"FileNotFoundError: {e}. Making new binned lightcurves.")
+
+        with gzip.open(fn, 'w') as f:
+            f.write(json.dumps(data_product).encode('utf-8'))
+
+    # ----------------------------------------------------- #
+    # END using gzip to compress the data when saving       #
+    # ---------------------------------------------------------------------------------- #
 
     def get_sample_photometric_data(self, max_nTAPjobs=8, perc=1, tables=None, chunks=None,
                                     cluster_jobs_per_chunk=100, wait=5, remove_chunks=False,
