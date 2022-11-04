@@ -665,6 +665,14 @@ class WISEDataDESYCluster(WiseDataByVisit):
             _end_id = int(_start_id + self.n_cluster_jobs_per_chunk) - 1
             ids = f'{_start_id}-{_end_id}'
 
+        # make data_product files, storing essential info from parent_sample
+        for jobID in ids:
+            indices = np.where(self.cluster_jobID_map == jobID)[0]
+            logger.debug(f"starting data_product for {len(indices)} objects.")
+            data_product = self._start_data_product(parent_sample_indices=indices)
+            chunk_number = self._get_chunk_number_for_job(jobID)
+            self._save_data_product(data_product, service="tap", chunk_number=chunk_number, jobID=jobID)
+
         parentsample_class_pickle = os.path.join(self.cluster_dir, 'parentsample_class.pkl')
         logger.debug(f"pickling parent sample class to {parentsample_class_pickle}")
         with open(parentsample_class_pickle, "wb") as f:

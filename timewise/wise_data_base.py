@@ -1088,7 +1088,12 @@ class WISEDataBase(abc.ABC):
 
         logger.debug(f"chunk {chunk_number}: going through {len(indices)} IDs")
 
-        data_product = self._start_data_product(parent_sample_indices=indices)
+        data_product = self._load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
+
+        if data_product is None:
+            logger.info(f"Starting data product for {len(indices)} indices.")
+            data_product = self._start_data_product(parent_sample_indices=indices)
+
         for parent_sample_entry_id in tqdm.tqdm(indices):
             m = lightcurves[self._tap_orig_id_key] == parent_sample_entry_id
             lightcurve = lightcurves[m]
