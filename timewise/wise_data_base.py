@@ -1103,7 +1103,7 @@ class WISEDataBase(abc.ABC):
                 continue
 
             binned_lc = self.bin_lightcurve(lightcurve)
-            data_product[int(parent_sample_entry_id)]["timewise_lightcurve"] = binned_lc.to_dict()
+            data_product[str(int(parent_sample_entry_id))]["timewise_lightcurve"] = binned_lc.to_dict()
 
         logger.debug(f"chunk {chunk_number}: saving {len(data_product.keys())} binned lcs")
         self._save_data_product(data_product, service=service, chunk_number=chunk_number, jobID=jobID, overwrite=True)
