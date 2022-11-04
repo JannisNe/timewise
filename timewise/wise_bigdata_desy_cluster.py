@@ -659,14 +659,16 @@ class WISEDataDESYCluster(WiseDataByVisit):
         """
 
         if isinstance(single_chunk, type(None)):
-            ids = f'1-{self.n_chunks*self.n_cluster_jobs_per_chunk}'
+            _start_id = 1
+            _end_id = int(self.n_chunks*self.n_cluster_jobs_per_chunk)
         else:
             _start_id = int(single_chunk*self.n_cluster_jobs_per_chunk) + 1
             _end_id = int(_start_id + self.n_cluster_jobs_per_chunk) - 1
-            ids = f'{_start_id}-{_end_id}'
+
+        ids = f'{_start_id}-{_end_id}'
 
         # make data_product files, storing essential info from parent_sample
-        for jobID in ids:
+        for jobID in range(_start_id, _end_id):
             indices = np.where(self.cluster_jobID_map == jobID)[0]
             logger.debug(f"starting data_product for {len(indices)} objects.")
             data_product = self._start_data_product(parent_sample_indices=indices)
