@@ -16,12 +16,13 @@ import pandas as pd
 import pyvo as vo
 import traceback as tb
 import gzip
+import logging
 
-from timewise.general import main_logger, DATA_DIR_KEY, data_dir, bigdata_dir, backoff_hndlr
+from timewise.general import DATA_DIR_KEY, data_dir, bigdata_dir, backoff_hndlr
 from timewise.wise_data_by_visit import WiseDataByVisit
 
 
-logger = main_logger.getChild(__name__)
+logger = logging.getLogger(__name__)
 
 
 class WISEDataDESYCluster(WiseDataByVisit):

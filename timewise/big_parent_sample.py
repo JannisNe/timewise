@@ -3,11 +3,11 @@ import os
 import pickle
 import threading
 import time
+import logging
 
-from timewise.general import main_logger
 from timewise.parent_sample_base import ParentSampleBase
 
-logger = main_logger.getChild(__name__)
+logger = logging.getLogger(__name__)
 
 
 class BigParentSampleBase(ParentSampleBase):
