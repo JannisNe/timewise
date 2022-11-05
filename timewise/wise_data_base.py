@@ -278,7 +278,7 @@ class WISEDataBase(abc.ABC):
         # invert the keymap to rename the columns
         inverse_keymap = {v: k for k, v in self.parent_sample.default_keymap.items()}
         parent_sample_sel.rename(columns=inverse_keymap, inplace=True)
-        # parent_sample_sel.set_index(parent_sample_sel.index.astype(str), inplace=True)
+        parent_sample_sel.set_index(parent_sample_sel.index.astype(str), inplace=True)
 
         # save to data_product
         data_product = parent_sample_sel.to_dict(orient="index")
