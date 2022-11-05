@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 import pyvo as vo
 import traceback as tb
+import gzip
 import logging
 
 from timewise.general import DATA_DIR_KEY, data_dir, bigdata_dir, backoff_hndlr
@@ -55,7 +56,15 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._io_queue = queue.PriorityQueue()
         self._io_queue_done = queue.Queue()
 
-    def _load_lightcurves(
+    # ---------------------------------------------------------------------------------- #
+    # START using gzip to compress the data when saving     #
+    # ----------------------------------------------------- #
+
+    def _data_product_filename(self, service, chunk_number=None, jobID=None):
+        fn = super(WISEDataDESYCluster, self)._data_product_filename(service, chunk_number=chunk_number, jobID=jobID)
+        return fn + ".gz"
+
+    def _load_data_product(
             self,
             service,
             chunk_number=None,
@@ -63,20 +72,45 @@ class WISEDataDESYCluster(WiseDataByVisit):
             return_filename=False,
             load_from_bigdata_dir=False
     ):
-        fn = self._lightcurve_filename(service, chunk_number, jobID)
+        fn = self._data_product_filename(service, chunk_number, jobID)
 
         if load_from_bigdata_dir:
             fn = fn.replace(data_dir, bigdata_dir)
 
         logger.debug(f"loading {fn}")
         try:
-            with open(fn, "r") as f:
-                lcs = json.load(f)
+            with gzip.open(fn, 'r') as fin:
+                data_product = json.loads(fin.read().decode('utf-8'))
             if return_filename:
-                return lcs, fn
-            return lcs
+                return data_product, fn
+            return data_product
         except FileNotFoundError:
             logger.warning(f"No file {fn}")
+
+    def _save_data_product(self, data_product, service, chunk_number=None, jobID=None, overwrite=False):
+        fn = self._data_product_filename(service, chunk_number, jobID)
+        logger.debug(f"saving {len(data_product)} new objects to {fn}")
+
+        if fn == self._data_product_filename(service):
+            self._cached_final_products['lightcurves'][service] = data_product
+
+        if not overwrite:
+            try:
+                old_data_product = self._load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
+
+                if old_data_product is not None:
+                    logger.debug(f"Found {len(old_data_product)}. Combining")
+                    data_product = data_product.update(old_data_product)
+
+            except FileNotFoundError as e:
+                logger.info(f"FileNotFoundError: {e}. Making new binned lightcurves.")
+
+        with gzip.open(fn, 'w') as f:
+            f.write(json.dumps(data_product).encode('utf-8'))
+
+    # ----------------------------------------------------- #
+    # END using gzip to compress the data when saving       #
+    # ---------------------------------------------------------------------------------- #
 
     def get_sample_photometric_data(self, max_nTAPjobs=8, perc=1, tables=None, chunks=None,
                                     cluster_jobs_per_chunk=100, wait=5, remove_chunks=False,
@@ -376,13 +410,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}). Start combining')
 
                 try:
-                    self._combine_lcs('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
-                    self._combine_metadata('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
+                    self._combine_data_products('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
 
                     if self._storage_dir:
                         filenames_to_move = [
-                            self._lightcurve_filename(service='tap', chunk_number=chunk),
-                            self._metadata_filename(service='tap', chunk_number=chunk),
+                            self._data_product_filename(service='tap', chunk_number=chunk),
                         ]
 
                         for t in self.photometry_table_keymap.keys():
@@ -631,11 +663,21 @@ class WISEDataDESYCluster(WiseDataByVisit):
         """
 
         if isinstance(single_chunk, type(None)):
-            ids = f'1-{self.n_chunks*self.n_cluster_jobs_per_chunk}'
+            _start_id = 1
+            _end_id = int(self.n_chunks*self.n_cluster_jobs_per_chunk)
         else:
             _start_id = int(single_chunk*self.n_cluster_jobs_per_chunk) + 1
             _end_id = int(_start_id + self.n_cluster_jobs_per_chunk) - 1
-            ids = f'{_start_id}-{_end_id}'
+
+        ids = f'{_start_id}-{_end_id}'
+
+        # make data_product files, storing essential info from parent_sample
+        for jobID in range(_start_id, _end_id + 1):
+            indices = np.where(self.cluster_jobID_map == jobID)[0]
+            logger.debug(f"starting data_product for {len(indices)} objects.")
+            data_product = self._start_data_product(parent_sample_indices=indices)
+            chunk_number = self._get_chunk_number_for_job(jobID)
+            self._save_data_product(data_product, service="tap", chunk_number=chunk_number, jobID=jobID)
 
         parentsample_class_pickle = os.path.join(self.cluster_dir, 'parentsample_class.pkl')
         logger.debug(f"pickling parent sample class to {parentsample_class_pickle}")
@@ -682,8 +724,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self.submit_to_cluster(cluster_cpu, cluster_h, cluster_ram, tables=None, service=service)
         self.wait_for_job()
         for c in range(self.n_chunks):
-            self._combine_lcs(service, chunk_number=c, remove=True, overwrite=True)
-            self._combine_metadata(service, chunk_number=c, remove=True, overwrite=True)
+            self._combine_data_products(service, chunk_number=c, remove=True, overwrite=True)
 
     # ---------------------------------------------------- #
     # END using cluster for downloading and binning        #
@@ -739,8 +780,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
         logger.debug(f"{wise_id} for {parent_sample_idx}")
 
         _chunk_number = self._get_chunk_number(parent_sample_index=parent_sample_idx)
-        lcs = self._load_lightcurves(service, chunk_number=_chunk_number, load_from_bigdata_dir=load_from_bigdata_dir)
-        lc = pd.DataFrame.from_dict(lcs[f"{int(parent_sample_idx)}"])
+        data_product = self._load_data_product(service, chunk_number=_chunk_number)
+        lc = pd.DataFrame.from_dict(data_product.loc[int(parent_sample_idx)]["timewise_lightcurve"])
 
         if plot_unbinned:
 

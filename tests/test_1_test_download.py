@@ -155,3 +155,10 @@ class TestMIRFlareCatalogue(unittest.TestCase):
                 cluster_jobs_per_chunk=2,
                 wait=0,
             )
+
+            N_downloaded = sum([
+                len(wise_desy_bigdata._load_data_product(service="tap", chunk_number=c, load_from_bigdata_dir=True))
+                for c in range(wise_desy_bigdata.n_chunks)
+            ])
+
+            self.assertEqual(N_downloaded, len(wise_desy_bigdata.parent_sample.df))
