@@ -88,7 +88,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
     def _save_data_product(self, data_product, service, chunk_number=None, jobID=None, overwrite=False):
         fn = self._data_product_filename(service, chunk_number, jobID)
-        logger.debug(f"saving {len(data_product)} new lightcurves to {fn}")
+        logger.debug(f"saving {len(data_product)} new objects to {fn}")
 
         if fn == self._data_product_filename(service):
             self._cached_final_products['lightcurves'][service] = data_product
