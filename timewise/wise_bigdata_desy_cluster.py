@@ -671,7 +671,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         ids = f'{_start_id}-{_end_id}'
 
         # make data_product files, storing essential info from parent_sample
-        for jobID in range(_start_id, _end_id):
+        for jobID in range(_start_id, _end_id + 1):
             indices = np.where(self.cluster_jobID_map == jobID)[0]
             logger.debug(f"starting data_product for {len(indices)} objects.")
             data_product = self._start_data_product(parent_sample_indices=indices)
