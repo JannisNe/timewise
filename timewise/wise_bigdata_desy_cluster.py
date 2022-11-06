@@ -108,6 +108,29 @@ class WISEDataDESYCluster(WiseDataByVisit):
         with gzip.open(fn, 'w') as f:
             f.write(json.dumps(data_product).encode('utf-8'))
 
+    def _load_lightcurves(
+            self,
+            service,
+            chunk_number=None,
+            jobID=None,
+            return_filename=False,
+            load_from_bigdata_dir=False
+    ):
+        fn = self._lightcurve_filename(service, chunk_number, jobID)
+
+        if load_from_bigdata_dir:
+            fn = fn.replace(data_dir, bigdata_dir)
+
+        logger.debug(f"loading {fn}")
+        try:
+            with open(fn, "r") as f:
+                lcs = json.load(f)
+            if return_filename:
+                return lcs, fn
+            return lcs
+        except FileNotFoundError:
+            logger.warning(f"No file {fn}")
+
     # ----------------------------------------------------- #
     # END using gzip to compress the data when saving       #
     # ---------------------------------------------------------------------------------- #
