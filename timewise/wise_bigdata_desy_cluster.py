@@ -116,41 +116,20 @@ class WISEDataDESYCluster(WiseDataByVisit):
             return_filename=False,
             load_from_bigdata_dir=False
     ):
-        fn = self._data_product_filename(service, chunk_number, jobID)
+        fn = self._lightcurve_filename(service, chunk_number, jobID)
 
         if load_from_bigdata_dir:
             fn = fn.replace(data_dir, bigdata_dir)
 
         logger.debug(f"loading {fn}")
         try:
-            with gzip.open(fn, 'r') as fin:
-                data_product = json.loads(fin.read().decode('utf-8'))
+            with open(fn, "r") as f:
+                lcs = json.load(f)
             if return_filename:
-                return data_product, fn
-            return data_product
+                return lcs, fn
+            return lcs
         except FileNotFoundError:
             logger.warning(f"No file {fn}")
-
-    def _save_data_product(self, data_product, service, chunk_number=None, jobID=None, overwrite=False):
-        fn = self._data_product_filename(service, chunk_number, jobID)
-        logger.debug(f"saving {len(data_product)} new objects to {fn}")
-
-        if fn == self._data_product_filename(service):
-            self._cached_final_products['lightcurves'][service] = data_product
-
-        if not overwrite:
-            try:
-                old_data_product = self._load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
-
-                if old_data_product is not None:
-                    logger.debug(f"Found {len(old_data_product)}. Combining")
-                    data_product = data_product.update(old_data_product)
-
-            except FileNotFoundError as e:
-                logger.info(f"FileNotFoundError: {e}. Making new binned lightcurves.")
-
-        with gzip.open(fn, 'w') as f:
-            f.write(json.dumps(data_product).encode('utf-8'))
 
     # ----------------------------------------------------- #
     # END using gzip to compress the data when saving       #
