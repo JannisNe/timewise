@@ -571,21 +571,21 @@ class WISEDataBase(abc.ABC):
 
         self._combine_data_products(service=service, remove=remove_chunks, overwrite=overwrite)
 
-    def _lightcurve_filename(self, service, chunk_number=None, jobID=None):
+    def _data_product_filename(self, service, chunk_number=None, jobID=None):
 
-        warnings.warn("Separate lightcurves and metadata will be deprecated in v0.3.0!", DeprecationWarning)
+        n = "timewise_data_product_"
 
         if (chunk_number is None) and (jobID is None):
-            return os.path.join(self.lightcurve_dir, f"binned_lightcurves_{service}.json")
+            return os.path.join(self.lightcurve_dir, f"{n}{service}.json")
         else:
-            fn = f"binned_lightcurves_{service}{self._split_chunk_key}{chunk_number}"
+            fn = f"{n}{service}{self._split_chunk_key}{chunk_number}"
             if (chunk_number is not None) and (jobID is None):
                 return os.path.join(self._cache_photometry_dir, fn + ".json")
             else:
                 return os.path.join(self._cache_photometry_dir, fn + f"_{jobID}.json")
 
-    def _load_lightcurves(self, service, chunk_number=None, jobID=None, return_filename=False):
-        fn = self._lightcurve_filename(service, chunk_number, jobID)
+    def _load_data_product(self, service, chunk_number=None, jobID=None, return_filename=False):
+        fn = self._data_product_filename(service, chunk_number, jobID)
         logger.debug(f"loading {fn}")
         try:
             with open(fn, "r") as f:
@@ -596,23 +596,23 @@ class WISEDataBase(abc.ABC):
         except FileNotFoundError:
             logger.warning(f"No file {fn}")
 
-    def _save_lightcurves(self, lcs, service, chunk_number=None, jobID=None, overwrite=False):
-        fn = self._lightcurve_filename(service, chunk_number, jobID)
-        logger.debug(f"saving {len(lcs)} new lightcurves to {fn}")
+    def _save_data_product(self, data_product, service, chunk_number=None, jobID=None, overwrite=False):
+        fn = self._data_product_filename(service, chunk_number, jobID)
+        logger.debug(f"saving {len(data_product)} new lightcurves to {fn}")
 
-        if fn == self._lightcurve_filename(service):
-            self._cached_final_products['lightcurves'][service] = lcs
+        if fn == self._data_product_filename(service):
+            self._cached_final_products['lightcurves'][service] = data_product
 
         if not overwrite:
             try:
-                old_lcs = self._load_lightcurves(service=service, chunk_number=chunk_number, jobID=jobID)
-                logger.debug(f"Found {len(old_lcs)}. Combining")
-                lcs = lcs.update(old_lcs)
+                old_data_product = self._load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
+                logger.debug(f"Found {len(old_data_product)}. Combining")
+                data_product = data_product.update(old_data_product)
             except FileNotFoundError as e:
                 logger.info(f"FileNotFoundError: {e}. Making new binned lightcurves.")
 
         with open(fn, "w") as f:
-            json.dump(lcs, f)
+            json.dump(data_product, f, indent=4)
 
     def _data_product_filename(self, service, chunk_number=None, jobID=None):
 
