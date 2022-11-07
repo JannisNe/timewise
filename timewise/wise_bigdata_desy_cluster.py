@@ -151,6 +151,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         except FileNotFoundError:
             logger.warning(f"No file {fn}")
 
+
     def _load_metadata(
             self,
             service,
