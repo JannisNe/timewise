@@ -60,8 +60,12 @@ class WISEDataDESYCluster(WiseDataByVisit):
     # START using gzip to compress the data when saving     #
     # ----------------------------------------------------- #
 
-    def _data_product_filename(self, service, chunk_number=None, jobID=None):
+    def _data_product_filename(self, service, chunk_number=None, jobID=None, use_bigdata_dir=False):
         fn = super(WISEDataDESYCluster, self)._data_product_filename(service, chunk_number=chunk_number, jobID=jobID)
+
+        if use_bigdata_dir:
+            fn = fn.replace(data_dir, bigdata_dir)
+
         return fn + ".gz"
 
     def _load_data_product(
@@ -70,12 +74,14 @@ class WISEDataDESYCluster(WiseDataByVisit):
             chunk_number=None,
             jobID=None,
             return_filename=False,
-            load_from_bigdata_dir=False
+            use_bigdata_dir=False
     ):
-        fn = self._data_product_filename(service, chunk_number, jobID)
-
-        if load_from_bigdata_dir:
-            fn = fn.replace(data_dir, bigdata_dir)
+        fn = self._data_product_filename(
+            service,
+            chunk_number,
+            jobID,
+            use_bigdata_dir=use_bigdata_dir
+        )
 
         logger.debug(f"loading {fn}")
         try:
@@ -87,8 +93,21 @@ class WISEDataDESYCluster(WiseDataByVisit):
         except FileNotFoundError:
             logger.warning(f"No file {fn}")
 
-    def _save_data_product(self, data_product, service, chunk_number=None, jobID=None, overwrite=False):
-        fn = self._data_product_filename(service, chunk_number, jobID)
+    def _save_data_product(
+            self,
+            data_product,
+            service,
+            chunk_number=None,
+            jobID=None,
+            overwrite=False,
+            use_bigdata_dir=False
+    ):
+        fn = self._data_product_filename(
+            service,
+            chunk_number,
+            jobID,
+            use_bigdata_dir=use_bigdata_dir
+        )
         logger.debug(f"saving {len(data_product)} new objects to {fn}")
 
         if fn == self._data_product_filename(service):
@@ -96,7 +115,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         if not overwrite:
             try:
-                old_data_product = self._load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
+                old_data_product = self._load_data_product(service=service, chunk_number=chunk_number, jobID=jobID,
+                                                           use_bigdata_dir=use_bigdata_dir)
 
                 if old_data_product is not None:
                     logger.debug(f"Found {len(old_data_product)}. Combining")
