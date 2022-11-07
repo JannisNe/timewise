@@ -131,6 +131,29 @@ class WISEDataDESYCluster(WiseDataByVisit):
         except FileNotFoundError:
             logger.warning(f"No file {fn}")
 
+    def _load_metadata(
+            self,
+            service,
+            chunk_number=None,
+            jobID=None,
+            return_filename=False,
+            load_from_bigdata_dir=False
+    ):
+        fn = self._metadata_filename(service, chunk_number, jobID)
+
+        if load_from_bigdata_dir:
+            fn = fn.replace(data_dir, bigdata_dir)
+
+        try:
+            logger.debug(f"loading {fn}")
+            with open(fn, "r") as f:
+                metadata = json.load(f)
+            if return_filename:
+                return metadata, fn
+            return metadata
+        except FileNotFoundError:
+            logger.warning(f"No file {fn}")
+
     # ----------------------------------------------------- #
     # END using gzip to compress the data when saving       #
     # ---------------------------------------------------------------------------------- #
