@@ -502,7 +502,8 @@ class WISEDataBase(abc.ABC):
     ###################################
 
     def get_photometric_data(self, tables=None, perc=1, wait=0, service=None, nthreads=100,
-                             chunks=None, overwrite=True, remove_chunks=False, query_type='positional'):
+                             chunks=None, overwrite=True, remove_chunks=False, query_type='positional',
+                             skip_download=False):
         """
         Load photometric data from the IRSA server for the matched sample. The result will be saved under
 
@@ -526,6 +527,8 @@ class WISEDataBase(abc.ABC):
         :type chunks: list-like
         :param query_type: 'positional': query photometry based on distance from object, 'by_allwise_id': select all photometry points within a radius of 50 arcsec with the corresponding AllWISE ID
         :type query_type: str
+        :param skip_download: if `True` skip downloading and only do binning
+        :type skip_download: bool
         """
 
         mag = True
@@ -555,15 +558,20 @@ class WISEDataBase(abc.ABC):
         if (query_type == 'by_allwise_id') and (service == 'gator'):
             raise ValueError(f"Query type 'by_allwise_id' only implemented for service 'tap'!")
 
-        logger.debug(f"Getting {perc * 100:.2f}% of lightcurve chunks ({len(chunks)}) via {service} "
-                     f"in {'magnitude' if mag else ''} {'flux' if flux else ''} "
-                     f"from {tables}")
+        if not skip_download:
 
-        if service == 'tap':
-            self._query_for_photometry(tables, chunks, wait, mag, flux, nthreads, query_type)
+            logger.debug(f"Getting {perc * 100:.2f}% of lightcurve chunks ({len(chunks)}) via {service} "
+                         f"in {'magnitude' if mag else ''} {'flux' if flux else ''} "
+                         f"from {tables}")
 
-        elif service == 'gator':
-            self._query_for_photometry_gator(tables, chunks, mag, flux, nthreads)
+            if service == 'tap':
+                self._query_for_photometry(tables, chunks, wait, mag, flux, nthreads, query_type)
+
+            elif service == 'gator':
+                self._query_for_photometry_gator(tables, chunks, mag, flux, nthreads)
+
+        else:
+            logger.info("skipping download, assume data is already downloaded.")
 
         self._select_individual_lightcurves_and_bin(service=service, chunks=chunks)
         for c in chunks:
