@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "timewise"
-version = "0.3.0a4"
+version = "0.3.0a6"
 description = "A small package to download infrared data from the WISE satellite"
 authors = ["Jannis Necker <jannis.necker@gmail.com>"]
 license = "MIT"
