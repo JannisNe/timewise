@@ -740,7 +740,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         # make data_product files, storing essential info from parent_sample
         for jobID in range(_start_id, _end_id + 1):
-            indices = np.where(self.cluster_jobID_map == jobID)[0]
+            indices = self.parent_sample.df.index[self.cluster_jobID_map == jobID]
             logger.debug(f"starting data_product for {len(indices)} objects.")
             data_product = self._start_data_product(parent_sample_indices=indices)
             chunk_number = self._get_chunk_number_for_job(jobID)
