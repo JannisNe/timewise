@@ -11,7 +11,10 @@ import time
 import backoff
 import shutil
 import gc
+import tqdm
 
+from functools import cache
+from scipy.stats import chi2
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -881,101 +884,148 @@ class WISEDataDESYCluster(WiseDataByVisit):
         return self._plot_lc(lightcurve=_lc, unbinned_lc=unbinned_lc, interactive=interactive, fn=fn, ax=ax,
                              save=save, lum_key=lum_key, **kwargs)
 
+    # --------------------------------------------------------------------------------------
+    #             START Chi2 plots
+    # -------------------------------------------
+
+    @cache
+    def get_red_chi2(self, chunk, lum_key, use_bigdata_dir):
+
+        logger.info(f"extracting info for chunk {chunk}")
+        data_product = self._load_data_product(
+            service="tap",
+            chunk_number=chunk,
+            use_bigdata_dir=use_bigdata_dir
+        )
+
+        chi2_val = {b: dict() for b in self.bands}
+
+        for b in self.bands:
+            key1 = f"{b}_chi2_to_med{lum_key}"
+            key2 = f"{b}_N_datapoints{lum_key}"
+            key3 = f"{b}_median{lum_key}"
+            logger.debug(f"{key1}, {key2}")
+
+            for i, idata_product in tqdm.tqdm(
+                    data_product.items(),
+                    total=len(data_product),
+                    desc="collecting chi2 values"
+            ):
+                if "timewise_metadata" in idata_product:
+                    imetadata = idata_product["timewise_metadata"]
+
+                    if (key1 in imetadata) and (key2 in imetadata):
+                        ndof = (imetadata[key2] - 1)
+                        v = {
+                            "chi2": imetadata[key1] / ndof if ndof > 0 else np.nan,
+                            "med_lum": imetadata[key3],
+                            "N_datapoints": imetadata[key2]
+                        }
+                        chi2_val[b][i] = v
+
+        return {b: pd.DataFrame.from_dict(chi2_val[b], orient='index') for b in self.bands}
+
     def make_chi2_plot(
             self,
             index_mask=None,
             chunks=None,
             load_from_bigdata_dir=False,
             lum_key="_flux_density",
-            **kwargs
+            interactive=False,
+            save=False,
+            nbins=100,
+            upper_bound=4
     ):
 
         if chunks is None:
             chunks = list(range(self.n_chunks))
 
-        chi2 = {b: dict() for b in self.bands}
+        chi2_data_list = [self.get_red_chi2(chunk, lum_key, load_from_bigdata_dir) for chunk in chunks]
+        chi2_data = {b: pd.concat([d[b] for d in chi2_data_list]) for b in self.bands}
 
-        for c in chunks:
-            logger.info(f"extracting info for chunk {c}")
-            data_product = self._load_data_product(service="tap", chunk_number=c, use_bigdata_dir=load_from_bigdata_dir)
-            for b in self.bands:
-                key1 = f"{b}_chi2_to_med{lum_key}"
-                key2 = f"{b}_N_datapoints{lum_key}"
-                logger.debug(f"{key1}, {key2}")
-                for i, idata_product in data_product.items():
-                    imetadata = idata_product["timewise_metadata"]
-                    if (key1 in imetadata) and (key2 in imetadata):
-                        chi2[b][i] = imetadata[key1] / imetadata[key2]
+        N_datapoints = set.intersection(*[set(df["N_datapoints"].unique()) for b, df in chi2_data.items()])
 
-        chi2_dfs = {
-            b: pd.DataFrame.from_dict(v, orient="index")
-            for b, v in chi2.items()
-        }
+        res = list()
 
-        return self.histogram_metadata_by_band(
-            chi2_dfs,
-            index_mask=index_mask,
-            **kwargs
-        )
+        for n in N_datapoints:
 
-    def histogram_metadata_by_band(
-            self,
-            metadata,
-            index_mask=None,
-            interactive=False,
-            fn=None,
-            save=False,
-            axs=None,
-            density=False,
-            cumulative=False,
-            bins=None
-    ):
-        logger.info("making hostogram of metadata")
+            if n == 1:
+                continue
 
-        if axs is None:
+            chi2_df_sel = {b: df[df["N_datapoints"] == n]["chi2"] for b, df in chi2_data.items()}
+
+            logger.info(f"making chi2 histogram for lightcurves with {n} datapoints")
+
             fig, axs = plt.subplots(
                 ncols=len(self.bands),
                 figsize=(10, 5),
-                # sharex="all",
-                # sharey="all"
+                sharey="all",
+                sharex="all"
             )
 
-        else:
-            fig = plt.gcf()
+            index_colors = {k: f"C{i}" for i, k in enumerate(index_mask.keys())} if index_mask is not None else None
 
-        index_colors = {k: f"C{i}" for i, k in enumerate(index_mask.keys())} if index_mask is not None else None
+            x = np.linspace(0, upper_bound, nbins)
+            x = np.concatenate([x, [1e6]])
 
-        for ax, band in zip(axs, self.bands):
-            h, b, _ = ax.hist(
-                metadata[band].values.flatten(),
-                label="all",
-                density=density,
-                cumulative=cumulative,
-                color="k",
-                bins=bins,
-                alpha=0.4
-            )
+            for ax, band in zip(axs, self.bands):
+                h, b, _ = ax.hist(
+                    chi2_df_sel[band].values.flatten(),
+                    label="all",
+                    density=True,
+                    cumulative=True,
+                    color="k",
+                    bins=x,
+                    alpha=0.4
+                )
 
-            if index_mask is not None:
-                for label, indices in index_mask.items():
-                    ax.hist(
-                        metadata[band].loc[indices].values.flatten(),
-                        label=label,
-                        histtype="step",
-                        bins=b,
-                        density=density,
-                        cumulative=cumulative,
-                        color=index_colors[label]
-                    )
+                if index_mask is not None:
+                    for label, indices in index_mask.items():
+                        _indices = chi2_df_sel[band].index.intersection(indices)
+                        ax.hist(
+                            chi2_df_sel[band].loc[_indices].values.flatten(),
+                            label=label,
+                            histtype="step",
+                            bins=b,
+                            density=True,
+                            cumulative=True,
+                            color=index_colors[label]
+                        )
 
-        if save:
-            logger.debug(f"saving under {fn}")
-            fig.savefig(fn)
+                sel = chi2_df_sel[band][(~chi2_df_sel[band].isna()) & (chi2_df_sel[band] < upper_bound)]
+                if len(sel) > 0:
+                    pars = chi2.fit(sel, n - 1, loc=0, scale=1 / (n - 1), floc=0)
+                    rfit = chi2.cdf(x, *pars)
+                    ax.plot(x, rfit, color="k", ls=":", label=f"fitted $\chi ^2$\n ndof: {pars[0]:.1f}")
+
+                r = chi2.cdf(x, n - 1, 0, 1 / (n - 1))
+                ax.plot(x, r, color="k", ls="--", label=f"expected $\chi ^2$\n ndof: {n - 1:.1f}")
+
+                ax.legend()
+                ax.set_xlabel("$\chi^2$ " + band)
+                ax.set_xlim(0, upper_bound)
+                fig.suptitle(f"{n} datapoints")
+                fig.tight_layout()
+
+            if save:
+                fn = os.path.join(self.plots_dir, f"chi2_plots", lum_key, f"{n}_datapoints")
+                d = os.path.dirname(fn)
+                if not os.path.isdir(d):
+                    os.makedirs(d)
+                logger.debug(f"saving under {fn}")
+                fig.savefig(fn)
+
+            if interactive:
+                res.append((fig, axs))
+            else:
+                plt.close()
 
         if interactive:
-            return fig, axs
+            return res
 
-        plt.close()
+    # -------------------------------------------
+    #             END Chi2 plots
+    # --------------------------------------------------------------------------------------
 
     #####################################
     # END MAKE PLOTTING FUNCTIONS       #

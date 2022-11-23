@@ -166,7 +166,11 @@ class WiseDataByVisit(WISEDataBase):
 
                     if len(ilc) > 0:
                         metadata[mean_weighted_ppb_key] = np.average(ilc[llumkey], weights=ilc[ppb_key])
-                        metadata[excess_variance_key], metadata[excess_variance_err_key] = get_excess_variance(ilc[llumkey], ilc[errkey], metadata[mean_weighted_ppb_key])
+                        metadata[excess_variance_key], metadata[excess_variance_err_key] = get_excess_variance(
+                            np.array(ilc[llumkey]),
+                            np.array(ilc[errkey]),
+                            np.array(metadata[mean_weighted_ppb_key])
+                        )
 
                         imin = ilc[llumkey].min()
                         imax = ilc[llumkey].max()
