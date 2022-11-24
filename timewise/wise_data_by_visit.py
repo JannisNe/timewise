@@ -112,11 +112,9 @@ class WiseDataByVisit(WISEDataBase):
 
                         if ul:
                             f = f[~nans]
-                            u_mes = 0
                         else:
                             f = f[~ulims & ~nans]
                             e = e[~ulims & ~nans]
-                            u_mes = np.sqrt(sum(e ** 2 / len(e)))
 
                         if len(f) == 0:
                             continue
@@ -148,6 +146,8 @@ class WiseDataByVisit(WISEDataBase):
                         if N_outlier > 0:
                             logger.debug(f"{b}{lum_ext}, MJD {ei}: removed {N_outlier}")
                             r[f"{b}{lum_ext}_outlier_indices"] = [list(outlier_mask.index[outlier_mask])]
+
+                        u_mes = 0 if ul else np.sqrt(sum(e[~outlier_mask] ** 2 / len(e[~outlier_mask])))
 
         # ---------------------   assemble final result   ---------------------- #
 
