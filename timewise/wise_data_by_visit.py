@@ -109,7 +109,8 @@ class WiseDataByVisit(WISEDataBase):
                         else:
                             f = f[~ulims]
                             e = e[~ulims]
-                            w = e / sum(e)
+                            iw = 1 / e**2
+                            w = iw / sum(iw)
                             mean = np.average(f, weights=w)
                             u_mes = np.sqrt(sum(e ** 2 / len(e)))
 
