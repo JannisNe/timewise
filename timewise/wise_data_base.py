@@ -1145,7 +1145,7 @@ class WISEDataBase(abc.ABC):
             logger.info(f"Starting data product for {len(indices)} indices.")
             data_product = self._start_data_product(parent_sample_indices=indices)
 
-        for parent_sample_entry_id in tqdm.tqdm(indices):
+        for parent_sample_entry_id in tqdm.tqdm(indices, desc="binning"):
             m = lightcurves[self._tap_orig_id_key] == parent_sample_entry_id
             lightcurve = lightcurves[m]
 
@@ -1598,10 +1598,11 @@ class WISEDataBase(abc.ABC):
         :type overwrite: bool
         """
         data_product = self._load_data_product(service, chunk_number, jobID)
-        for ID, i_data_product in data_product.items():
-            lc = pd.DataFrame.from_dict(i_data_product["timewise_lightcurve"])
-            metadata = self.calculate_metadata_single(lc)
-            data_product[ID]["timewise_metadata"] = metadata
+        for ID, i_data_product in tqdm.tqdm(data_product.items(), desc="calculating metadata"):
+            if "timewise_lightcurve" in i_data_product:
+                lc = pd.DataFrame.from_dict(i_data_product["timewise_lightcurve"])
+                metadata = self.calculate_metadata_single(lc)
+                data_product[ID]["timewise_metadata"] = metadata
 
         self._save_data_product(data_product, service, chunk_number, jobID, overwrite=overwrite)
 
