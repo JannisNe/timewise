@@ -113,6 +113,7 @@ class WiseDataByVisit(WISEDataBase):
                         if ul:
                             f = f[~nans]
                             e = e[~nans]
+
                         else:
                             f = f[~ulims & ~nans]
                             e = e[~ulims & ~nans]
@@ -156,6 +157,7 @@ class WiseDataByVisit(WISEDataBase):
 
                         r[f'{b}{self.mean_key}{lum_ext}'] = mean
                         r[f'{b}{lum_ext}{self.rms_key}'] = rms  # max(rms, u_mes)
+
                         r[f'{b}{lum_ext}{self.upper_limit_key}'] = bool(ul)
                         r[f'{b}{lum_ext}{self.Npoints_key}'] = len(f)
                     except KeyError:
