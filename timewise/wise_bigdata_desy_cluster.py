@@ -35,12 +35,13 @@ class WISEDataDESYCluster(WiseDataByVisit):
     # finding the file that contains the setup function tde_catalogue
     BASHFILE = os.getenv('TIMEWISE_DESY_CLUSTER_BASHFILE', os.path.expanduser('~/.bashrc'))
 
-    def __init__(self, base_name, parent_sample_class, min_sep_arcsec, n_chunks):
+    def __init__(self, base_name, parent_sample_class, min_sep_arcsec, n_chunks, clean_outliers_when_binning=True):
 
         super().__init__(base_name=base_name,
                          parent_sample_class=parent_sample_class,
                          min_sep_arcsec=min_sep_arcsec,
-                         n_chunks=n_chunks)
+                         n_chunks=n_chunks,
+                         clean_outliers_when_binning=clean_outliers_when_binning)
 
         # set up cluster stuff
         self.job_id = None
@@ -642,12 +643,12 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def _save_cluster_info(self):
         logger.debug(f"writing cluster info to {self.cluster_info_file}")
         with open(self.cluster_info_file, "wb") as f:
-            pickle.dump((self.cluster_jobID_map, self.clusterJob_chunk_map), f)
+            pickle.dump((self.cluster_jobID_map, self.clusterJob_chunk_map, self.clean_outliers_when_binning), f)
 
     def _load_cluster_info(self):
         logger.debug(f"loading cluster info from {self.cluster_info_file}")
         with open(self.cluster_info_file, "rb") as f:
-            self.cluster_jobID_map, self.clusterJob_chunk_map = pickle.load(f)
+            self.cluster_jobID_map, self.clusterJob_chunk_map, self.clean_outliers_when_binning = pickle.load(f)
 
     def clear_cluster_log_dir(self):
         """
@@ -890,6 +891,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
     @cache
     def get_red_chi2(self, chunk, lum_key, use_bigdata_dir):
+        # TODO: add doc
 
         logger.info(f"extracting info for chunk {chunk}")
         data_product = self._load_data_product(
@@ -936,6 +938,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             nbins=100,
             upper_bound=4
     ):
+        # TODO: add doc
 
         if chunks is None:
             chunks = list(range(self.n_chunks))
