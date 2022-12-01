@@ -14,7 +14,7 @@ import gc
 import tqdm
 
 from functools import cache
-from scipy.stats import chi2
+from scipy.stats import chi2, f
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -936,9 +936,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
             interactive=False,
             save=False,
             nbins=100,
+            cumulative=True,
             upper_bound=4
     ):
-        # TODO: add doc
 
         if chunks is None:
             chunks = list(range(self.n_chunks))
@@ -976,7 +976,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                     chi2_df_sel[band].values.flatten(),
                     label="all",
                     density=True,
-                    cumulative=True,
+                    cumulative=cumulative,
                     color="k",
                     bins=x,
                     alpha=0.4
@@ -991,17 +991,24 @@ class WISEDataDESYCluster(WiseDataByVisit):
                             histtype="step",
                             bins=b,
                             density=True,
-                            cumulative=True,
+                            cumulative=cumulative,
                             color=index_colors[label]
                         )
 
                 sel = chi2_df_sel[band][(~chi2_df_sel[band].isna()) & (chi2_df_sel[band] < upper_bound)]
                 if len(sel) > 0:
-                    pars = chi2.fit(sel, n - 1, loc=0, scale=1 / (n - 1), floc=0)
-                    rfit = chi2.cdf(x, *pars)
-                    ax.plot(x, rfit, color="k", ls=":", label=f"fitted $\chi ^2$\n ndof: {pars[0]:.1f}")
+                    fpars = f.fit(sel, n-1, 1e5, f0=n - 1, floc=0)
+                    frozenf = f(*fpars)
+                    ffunc = frozenf.cdf if cumulative else frozenf.pdf
+                    bmids = (b[1:] + b[:-1]) / 2
+                    nonzero_m = h > 0
+                    chi2fit = sum((h[nonzero_m] - ffunc(bmids[nonzero_m]))**2 / h[nonzero_m])
+                    ax.plot(x, ffunc(x), color='k', ls="-.",
+                            label=f"fitted F-distribution (chi2={chi2fit:.2f})\n ndof1={fpars[0]:.2f}, ndof2={fpars[1]:.2f}, scale={fpars[-1]:.2f}")
 
-                r = chi2.cdf(x, n - 1, 0, 1 / (n - 1))
+                pars_expected = (n - 1, 0, 1 / (n - 1))
+                r = chi2.cdf(x, *pars_expected) if cumulative else chi2.pdf(x, *pars_expected)
+
                 ax.plot(x, r, color="k", ls="--", label=f"expected $\chi ^2$\n ndof: {n - 1:.1f}")
 
                 ax.legend()
