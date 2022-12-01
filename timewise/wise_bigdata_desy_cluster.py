@@ -35,13 +35,19 @@ class WISEDataDESYCluster(WiseDataByVisit):
     # finding the file that contains the setup function tde_catalogue
     BASHFILE = os.getenv('TIMEWISE_DESY_CLUSTER_BASHFILE', os.path.expanduser('~/.bashrc'))
 
-    def __init__(self, base_name, parent_sample_class, min_sep_arcsec, n_chunks, clean_outliers_when_binning=True):
+    def __init__(
+            self,
+            base_name,
+            parent_sample_class,
+            min_sep_arcsec,
+            n_chunks,
+            clean_outliers_when_binning=True,
+            multiply_flux_error=True
+    ):
 
-        super().__init__(base_name=base_name,
-                         parent_sample_class=parent_sample_class,
-                         min_sep_arcsec=min_sep_arcsec,
-                         n_chunks=n_chunks,
-                         clean_outliers_when_binning=clean_outliers_when_binning)
+        super().__init__(base_name=base_name, parent_sample_class=parent_sample_class, min_sep_arcsec=min_sep_arcsec,
+                         n_chunks=n_chunks, clean_outliers_when_binning=clean_outliers_when_binning,
+                         multiply_flux_error=multiply_flux_error)
 
         # set up cluster stuff
         self.job_id = None
