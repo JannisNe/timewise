@@ -21,10 +21,24 @@ class WiseDataByVisit(WISEDataBase):
     Npoints_key = '_Npoints'
     zeropoint_key_ext = '_zeropoint'
 
-    def __init__(self, base_name, parent_sample_class, min_sep_arcsec, n_chunks, clean_outliers_when_binning=True):
+    flux_error_factor = {
+        "W1": 1.6,
+        "W2": 1.2
+    }
+
+    def __init__(
+            self,
+            base_name,
+            parent_sample_class,
+            min_sep_arcsec,
+            n_chunks,
+            clean_outliers_when_binning=True,
+            multiply_flux_error=True
+    ):
         # TODO: add doc
         super().__init__(base_name, parent_sample_class, min_sep_arcsec, n_chunks)
         self.clean_outliers_when_binning = clean_outliers_when_binning
+        self.multiply_flux_error = multiply_flux_error
 
     def bin_lightcurve(self, lightcurve):
         """
@@ -33,9 +47,9 @@ class WiseDataByVisit(WISEDataBase):
         six months.
         The mean flux for one visit is calculated by the weighted mean of the data.
         The error on that mean is calculated by the root-mean-squared.
-        # TODO: add doc about clean when binning
+        # TODO: add doc about clean when binning and error factor
 
-        :param lightcurve: the unbnned lightcurve
+        :param lightcurve: the unbinned lightcurve
         :type lightcurve: pandas.DataFrame
         :return: the binned lightcurve
         :rtype: pandas.DataFrame
@@ -103,9 +117,15 @@ class WiseDataByVisit(WISEDataBase):
 
         # ---------------------   loop through different brightness units   ---------------------- #
                 for lum_ext in [self.flux_key_ext, self.mag_key_ext, self.flux_density_key_ext]:
+
+                    if ('flux' in lum_ext) and self.multiply_flux_error:
+                        error_factor = self.flux_error_factor[b]
+                    else:
+                        error_factor = 1
+
                     try:
                         f = epoch[f"{b}{lum_ext}"]
-                        e = epoch[f"{b}{lum_ext}{self.error_key_ext}"]
+                        e = epoch[f"{b}{lum_ext}{self.error_key_ext}"] * error_factor
                         ulims = epoch[f"{b}{lum_ext}{self.upper_limit_key}"]
                         ul = np.all(pd.isna(e))
                         nans = f.isna()
@@ -134,14 +154,16 @@ class WiseDataByVisit(WISEDataBase):
                         N_remaining_outlier = 1
                         N_outlier = 0
 
-                        # recalculate rms and median as long as no outliers left
+                        # recalculate uncertainty and median as long as no outliers left
                         while N_remaining_outlier > 0:
                             f = f[~remaining_outlier_mask]
                             e = e[~remaining_outlier_mask]
                             mean = np.median(f)
                             rms = np.sqrt(sum((f - mean) ** 2)) / len(f)
+                            u_mes = 0 if ul else np.sqrt(sum(e[~outlier_mask] ** 2)) / len(e[~outlier_mask])
+                            u = max(rms, u_mes)
 
-                            remaining_outlier_mask = abs(mean - f) > outlier_thresh * rms
+                            remaining_outlier_mask = abs(mean - f) > outlier_thresh * u
                             outlier_mask = outlier_mask | remaining_outlier_mask
                             N_remaining_outlier = sum(remaining_outlier_mask)
                             N_outlier += N_remaining_outlier
@@ -150,12 +172,10 @@ class WiseDataByVisit(WISEDataBase):
                             logger.debug(f"{b}{lum_ext}, MJD {ei}: removed {N_outlier}")
                             r[f"{b}{lum_ext}_outlier_indices"] = [list(outlier_mask.index[outlier_mask])]
 
-                        u_mes = 0 if ul else np.sqrt(sum(e[~outlier_mask] ** 2)) / len(e[~outlier_mask])
-
         # ---------------------   assemble final result   ---------------------- #
 
                         r[f'{b}{self.mean_key}{lum_ext}'] = mean
-                        r[f'{b}{lum_ext}{self.rms_key}'] = max(rms, u_mes)
+                        r[f'{b}{lum_ext}{self.rms_key}'] = u
                         r[f'{b}{lum_ext}{self.upper_limit_key}'] = bool(ul)
                         r[f'{b}{lum_ext}{self.Npoints_key}'] = len(f)
                     except KeyError:
