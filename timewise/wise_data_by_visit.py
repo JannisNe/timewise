@@ -124,7 +124,7 @@ class WiseDataByVisit(WISEDataBase):
         # ---------------------   remove outliers in the bins   ---------------------- #
 
                         # if we do not want to clean outliers just set the threshold to infinity
-                        outlier_thresh = np.inf if not self.clean_outliers_when_binning else 50
+                        outlier_thresh = np.inf if not self.clean_outliers_when_binning else 100
 
                         # set up empty masks
                         remaining_outlier_mask = np.array([False] * len(f))
@@ -138,8 +138,7 @@ class WiseDataByVisit(WISEDataBase):
                         while N_remaining_outlier > 0:
                             f = f[~remaining_outlier_mask]
                             e = e[~remaining_outlier_mask]
-                            w = 1 / (e ** 2)
-                            mean = np.average(f, weights=w)
+                            mean = np.median(f)
                             rms = np.sqrt(sum((f - mean) ** 2)) / len(f)
 
                             remaining_outlier_mask = abs(mean - f) > outlier_thresh * rms
@@ -151,13 +150,12 @@ class WiseDataByVisit(WISEDataBase):
                             logger.debug(f"{b}{lum_ext}, MJD {ei}: removed {N_outlier}")
                             r[f"{b}{lum_ext}_outlier_indices"] = [list(outlier_mask.index[outlier_mask])]
 
-                        u_mes = 0 if ul else np.sqrt(sum(e[~outlier_mask] ** 2 / len(e[~outlier_mask])))
+                        u_mes = 0 if ul else np.sqrt(sum(e[~outlier_mask] ** 2)) / len(e[~outlier_mask])
 
         # ---------------------   assemble final result   ---------------------- #
 
                         r[f'{b}{self.mean_key}{lum_ext}'] = mean
-                        r[f'{b}{lum_ext}{self.rms_key}'] = rms  # max(rms, u_mes)
-
+                        r[f'{b}{lum_ext}{self.rms_key}'] = max(rms, u_mes)
                         r[f'{b}{lum_ext}{self.upper_limit_key}'] = bool(ul)
                         r[f'{b}{lum_ext}{self.Npoints_key}'] = len(f)
                     except KeyError:
