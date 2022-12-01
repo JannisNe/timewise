@@ -112,6 +112,8 @@ class WiseDataByVisit(WISEDataBase):
 
                         if ul:
                             f = f[~nans]
+                            e = e[~nans]
+
                         else:
                             f = f[~ulims & ~nans]
                             e = e[~ulims & ~nans]
@@ -122,7 +124,7 @@ class WiseDataByVisit(WISEDataBase):
         # ---------------------   remove outliers in the bins   ---------------------- #
 
                         # if we do not want to clean outliers just set the threshold to infinity
-                        outlier_thresh = np.inf if not self.clean_outliers_when_binning else 3
+                        outlier_thresh = np.inf if not self.clean_outliers_when_binning else 100
 
                         # set up empty masks
                         remaining_outlier_mask = np.array([False] * len(f))
@@ -135,8 +137,9 @@ class WiseDataByVisit(WISEDataBase):
                         # recalculate rms and median as long as no outliers left
                         while N_remaining_outlier > 0:
                             f = f[~remaining_outlier_mask]
+                            e = e[~remaining_outlier_mask]
                             mean = np.median(f)
-                            rms = np.sqrt(sum((f - mean) ** 2) / len(f))
+                            rms = np.sqrt(sum((f - mean) ** 2)) / len(f)
 
                             remaining_outlier_mask = abs(mean - f) > outlier_thresh * rms
                             outlier_mask = outlier_mask | remaining_outlier_mask
@@ -147,7 +150,7 @@ class WiseDataByVisit(WISEDataBase):
                             logger.debug(f"{b}{lum_ext}, MJD {ei}: removed {N_outlier}")
                             r[f"{b}{lum_ext}_outlier_indices"] = [list(outlier_mask.index[outlier_mask])]
 
-                        u_mes = 0 if ul else np.sqrt(sum(e[~outlier_mask] ** 2 / len(e[~outlier_mask])))
+                        u_mes = 0 if ul else np.sqrt(sum(e[~outlier_mask] ** 2)) / len(e[~outlier_mask])
 
         # ---------------------   assemble final result   ---------------------- #
 
