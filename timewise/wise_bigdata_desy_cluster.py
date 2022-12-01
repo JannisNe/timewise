@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 class WISEDataDESYCluster(WiseDataByVisit):
     status_cmd = f'qstat -u {getpass.getuser()}'
-    # finding the file that contains the setup function tde_catalogue
+    # finding the file that contains the setup function
     BASHFILE = os.getenv('TIMEWISE_DESY_CLUSTER_BASHFILE', os.path.expanduser('~/.bashrc'))
 
     def __init__(
@@ -987,6 +987,13 @@ class WISEDataDESYCluster(WiseDataByVisit):
                     bins=x,
                     alpha=0.4
                 )
+                bmids = (b[1:] + b[:-1]) / 2
+
+                # if cumulative then also calculate the histogram of the PDF
+                # this will be used later to calculate the goodness of fit to the F- and Chi2-distribution
+                hpdf = h if not cumulative else \
+                    np.histogram(chi2_df_sel[band].values.flatten(), bins=x, density=True)[0]
+                nonzero_m = hpdf > 0
 
                 if index_mask is not None:
                     for label, indices in index_mask.items():
@@ -1001,21 +1008,37 @@ class WISEDataDESYCluster(WiseDataByVisit):
                             color=index_colors[label]
                         )
 
+                # select non-NaN's and values below `upper_bound`
                 sel = chi2_df_sel[band][(~chi2_df_sel[band].isna()) & (chi2_df_sel[band] < upper_bound)]
                 if len(sel) > 0:
+
+                    # fit an F-distribution
                     fpars = f.fit(sel, n-1, 1e5, f0=n - 1, floc=0)
                     frozenf = f(*fpars)
-                    ffunc = frozenf.cdf if cumulative else frozenf.pdf
-                    bmids = (b[1:] + b[:-1]) / 2
-                    nonzero_m = h > 0
-                    chi2fit = sum((h[nonzero_m] - ffunc(bmids[nonzero_m]))**2 / h[nonzero_m])
+                    fpdf = frozenf.pdf
+
+                    # if cumulative then draw the CDF instead of the PDF
+                    ffunc = frozenf.cdf if cumulative else fpdf
+
+                    # To see how well the distribution fits the data we'll caluclate the chi2
+                    # to the PDF (not to the CDF because the bins in CDF are correlated)
+                    F_chi2fit = sum((hpdf[nonzero_m] - fpdf(bmids[nonzero_m])) ** 2 / hpdf[nonzero_m])
+
+                    # plot the fitted distribution
                     ax.plot(x, ffunc(x), color='k', ls="-.",
-                            label=f"fitted F-distribution (chi2={chi2fit:.2f})\n ndof1={fpars[0]:.2f}, ndof2={fpars[1]:.2f}, scale={fpars[-1]:.2f}")
+                            label=(
+                                f"fitted F-distribution ($\chi ^2$={F_chi2fit:.2f})\n "
+                                f"ndof1={fpars[0]:.2f}, ndof2={fpars[1]:.2f}, scale={fpars[-1]:.2f}"
+                            )
+                            )
 
+                # we will also show the expected chi2 distribution
                 pars_expected = (n - 1, 0, 1 / (n - 1))
-                r = chi2.cdf(x, *pars_expected) if cumulative else chi2.pdf(x, *pars_expected)
-
-                ax.plot(x, r, color="k", ls="--", label=f"expected $\chi ^2$\n ndof: {n - 1:.1f}")
+                chi2_expected = chi2(*pars_expected)
+                r = chi2_expected.cdf(x) if cumulative else chi2_expected.pdf(x)
+                chi2_fitchi2 = sum((hpdf[nonzero_m] - chi2_expected.pdf(bmids[nonzero_m])) ** 2 / hpdf[nonzero_m])
+                ax.plot(x, r, color="k", ls="--",
+                        label=f"expected $\chi ^2$\n ndof: {n - 1:.1f} ($\chi ^2$={chi2_fitchi2:.2f})")
 
                 ax.legend()
                 ax.set_xlabel("$\chi^2$ " + band)
@@ -1024,7 +1047,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 fig.tight_layout()
 
             if save:
-                fn = os.path.join(self.plots_dir, f"chi2_plots", lum_key, f"{n}_datapoints")
+                kind = "cdf" if cumulative else "pdf"
+                fn = os.path.join(self.plots_dir, f"chi2_plots", lum_key, f"{n}_datapoints_{kind}.pdf")
                 d = os.path.dirname(fn)
                 if not os.path.isdir(d):
                     os.makedirs(d)
