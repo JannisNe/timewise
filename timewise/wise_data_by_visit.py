@@ -21,6 +21,11 @@ class WiseDataByVisit(WISEDataBase):
     Npoints_key = '_Npoints'
     zeropoint_key_ext = '_zeropoint'
 
+    def __init__(self, base_name, parent_sample_class, min_sep_arcsec, n_chunks, clean_outliers_when_binning=True):
+        # TODO: add doc
+        super().__init__(base_name, parent_sample_class, min_sep_arcsec, n_chunks)
+        self.clean_outliers_when_binning = clean_outliers_when_binning
+
     def bin_lightcurve(self, lightcurve):
         """
         Combine the data by visits of the satellite of one region in the sky.
@@ -28,6 +33,7 @@ class WiseDataByVisit(WISEDataBase):
         six months.
         The mean flux for one visit is calculated by the weighted mean of the data.
         The error on that mean is calculated by the root-mean-squared.
+        # TODO: add doc about clean when binning
 
         :param lightcurve: the unbnned lightcurve
         :type lightcurve: pandas.DataFrame
@@ -102,21 +108,51 @@ class WiseDataByVisit(WISEDataBase):
                         e = epoch[f"{b}{lum_ext}{self.error_key_ext}"]
                         ulims = epoch[f"{b}{lum_ext}{self.upper_limit_key}"]
                         ul = np.all(pd.isna(e))
+                        nans = f.isna()
 
                         if ul:
-                            mean = np.mean(f)
-                            u_mes = 0
+                            f = f[~nans]
                         else:
-                            f = f[~ulims]
-                            e = e[~ulims]
-                            iw = 1 / e**2
-                            w = iw / sum(iw)
-                            mean = np.average(f, weights=w)
-                            u_mes = np.sqrt(sum(e ** 2 / len(e)))
+                            f = f[~ulims & ~nans]
+                            e = e[~ulims & ~nans]
 
-                        u_rms = np.sqrt(sum((f - mean) ** 2) / len(f))
+                        if len(f) == 0:
+                            continue
+
+        # ---------------------   remove outliers in the bins   ---------------------- #
+
+                        # if we do not want to clean outliers just set the threshold to infinity
+                        outlier_thresh = np.inf if not self.clean_outliers_when_binning else 3
+
+                        # set up empty masks
+                        remaining_outlier_mask = np.array([False] * len(f))
+                        outlier_mask = np.copy(remaining_outlier_mask)
+
+                        # set up dummy values for number of remaining and total outliers
+                        N_remaining_outlier = 1
+                        N_outlier = 0
+
+                        # recalculate rms and median as long as no outliers left
+                        while N_remaining_outlier > 0:
+                            f = f[~remaining_outlier_mask]
+                            mean = np.median(f)
+                            rms = np.sqrt(sum((f - mean) ** 2) / len(f))
+
+                            remaining_outlier_mask = abs(mean - f) > outlier_thresh * rms
+                            outlier_mask = outlier_mask | remaining_outlier_mask
+                            N_remaining_outlier = sum(remaining_outlier_mask)
+                            N_outlier += N_remaining_outlier
+
+                        if N_outlier > 0:
+                            logger.debug(f"{b}{lum_ext}, MJD {ei}: removed {N_outlier}")
+                            r[f"{b}{lum_ext}_outlier_indices"] = [list(outlier_mask.index[outlier_mask])]
+
+                        u_mes = 0 if ul else np.sqrt(sum(e[~outlier_mask] ** 2 / len(e[~outlier_mask])))
+
+        # ---------------------   assemble final result   ---------------------- #
+
                         r[f'{b}{self.mean_key}{lum_ext}'] = mean
-                        r[f'{b}{lum_ext}{self.rms_key}'] = max(u_rms, u_mes)
+                        r[f'{b}{lum_ext}{self.rms_key}'] = max(rms, u_mes)
                         r[f'{b}{lum_ext}{self.upper_limit_key}'] = bool(ul)
                         r[f'{b}{lum_ext}{self.Npoints_key}'] = len(f)
                     except KeyError:
