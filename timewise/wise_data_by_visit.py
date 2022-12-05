@@ -220,42 +220,39 @@ class WiseDataByVisit(WISEDataBase):
                 excess_variance_key = f"{band}_excess_variance_{lum_key}"
                 excess_variance_err_key = f"{band}_excess_variance_err_{lum_key}"
 
-                try:
-                    ilc = lc[~np.array(lc[ul_key]).astype(bool)]
-                    metadata[Nk] = len(ilc)
+                ilc = lc[~np.array(lc[ul_key]).astype(bool)] if ul_key in lc else dict()
+                metadata[Nk] = len(ilc)
 
-                    if len(ilc) > 0:
-                        metadata[mean_weighted_ppb_key] = np.average(ilc[llumkey], weights=ilc[ppb_key])
-                        metadata[excess_variance_key], metadata[excess_variance_err_key] = get_excess_variance(
-                            np.array(ilc[llumkey]),
-                            np.array(ilc[errkey]),
-                            np.array(metadata[mean_weighted_ppb_key])
-                        )
+                if len(ilc) > 0:
+                    metadata[mean_weighted_ppb_key] = np.average(ilc[llumkey], weights=ilc[ppb_key])
+                    metadata[excess_variance_key], metadata[excess_variance_err_key] = get_excess_variance(
+                        np.array(ilc[llumkey]),
+                        np.array(ilc[errkey]),
+                        np.array(metadata[mean_weighted_ppb_key])
+                    )
 
-                        imin = ilc[llumkey].min()
-                        imax = ilc[llumkey].max()
-                        imin_rms_ind = ilc[errkey].argmin()
-                        imin_rms = ilc[errkey].iloc[imin_rms_ind]
+                    imin = ilc[llumkey].min()
+                    imax = ilc[llumkey].max()
+                    imin_rms_ind = ilc[errkey].argmin()
+                    imin_rms = ilc[errkey].iloc[imin_rms_ind]
 
-                        imed = np.median(ilc[llumkey])
-                        ichi2_to_med = sum(((ilc[llumkey] - imed) / ilc[errkey]) ** 2)
+                    imed = np.median(ilc[llumkey])
+                    ichi2_to_med = sum(((ilc[llumkey] - imed) / ilc[errkey]) ** 2)
 
-                        metadata[difk] = imax - imin
-                        metadata[rmsk] = imin_rms
-                        metadata[medk] = imed
-                        metadata[chi2tmk] = ichi2_to_med
+                    metadata[difk] = imax - imin
+                    metadata[rmsk] = imin_rms
+                    metadata[medk] = imed
+                    metadata[chi2tmk] = ichi2_to_med
 
-                        if len(ilc) == 1:
-                            metadata[dtk] = 0
-                        else:
-                            mjds = np.array(ilc.mean_mjd).astype(float)
-                            dt = mjds[1:] - mjds[:-1]
-                            metadata[dtk] = max(dt)
-
+                    if len(ilc) == 1:
+                        metadata[dtk] = 0
                     else:
-                        metadata[difk] = np.nan
-                        metadata[dtk] = np.nan
-                except KeyError as e:
-                    raise KeyError(e)
+                        mjds = np.array(ilc.mean_mjd).astype(float)
+                        dt = mjds[1:] - mjds[:-1]
+                        metadata[dtk] = max(dt)
+
+                else:
+                    metadata[difk] = np.nan
+                    metadata[dtk] = np.nan
 
         return metadata
