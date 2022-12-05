@@ -8,10 +8,13 @@ import queue
 import threading
 import argparse
 import time
+import warnings
+
 import backoff
 import shutil
 import gc
 import tqdm
+import sys
 
 from functools import cache
 from scipy.stats import chi2, f
@@ -22,6 +25,8 @@ import pyvo as vo
 import traceback as tb
 import gzip
 import logging
+
+from typing import List
 
 from timewise.general import DATA_DIR_KEY, data_dir, bigdata_dir, backoff_hndlr
 from timewise.wise_data_by_visit import WiseDataByVisit
@@ -50,6 +55,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
                          multiply_flux_error=multiply_flux_error)
 
         # set up cluster stuff
+        self._status_output = None
+        self.executable_filename = os.path.join(self.cluster_dir, "run_timewise.sh")
+        self.submit_file_filename = os.path.join(self.cluster_dir, "submit_file.submit")
         self.job_id = None
         self._n_cluster_jobs_per_chunk = None
         self.cluster_jobID_map = None
@@ -471,11 +479,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
             cluster_time, chunk = self._cluster_queue.get(block=True)
 
             logger.info(f'got all TAP results for chunk {chunk}. submitting to cluster')
-            job_id = self.submit_to_cluster(cluster_cpu=1,
-                                            cluster_h=cluster_time,
-                                            cluster_ram='40G',
+            job_id = self.submit_to_cluster(node_memory='40G',
                                             tables=None,
-                                            service='tap',
                                             single_chunk=chunk)
 
             if not job_id:
@@ -547,37 +552,37 @@ class WISEDataDESYCluster(WiseDataByVisit):
         return msg
 
     @staticmethod
-    def _qstat_output(qstat_command):
-        """return the output of the qstat_command"""
-        # start a subprocess to query the cluster
-        return str(WISEDataDESYCluster._execute_bash_command(qstat_command))
+    def get_condor_status():
+        """
+        Queries condor to get cluster status.
+        :return: str, output of query command
+        """
+        cmd = "condor_q"
+        return WISEDataDESYCluster._execute_bash_command(cmd)
 
-    @staticmethod
-    def _get_ids(qstat_command):
-        """Takes a command that queries the DESY cluster and returns a list of job IDs"""
-        st = WISEDataDESYCluster._qstat_output(qstat_command)
-        # If the output is an empty string there are no tasks left
-        if st == '':
-            ids = list()
-        else:
-            # Extract the list of job IDs
-            ids = np.array([int(s.split(' ')[1]) for s in st.split('\n')[2:-1]])
-        return ids
+    def collect_condor_status(self):
+        """Gets the condor status and saves it to private attribute"""
+        self._status_output = self.get_condor_status()
 
-    def _ntasks_from_qstat_command(self, qstat_command, job_id):
-        """Returns the number of tasks from the output of qstat_command"""
-        # get the output of qstat_command
-        ids = self._get_ids(qstat_command)
-        ntasks = 0 if len(ids) == 0 else len(ids[ids == job_id])
-        return ntasks
+    @property
+    def condor_status(self):
+        """
+        Get the status of jobs running on condor.
+        :return: number of jobs that are done, running, waiting, total, held
+        """
+        status_list = [
+            [y for y in ii.split(" ") if y]
+            for ii in self._status_output.split("\n")[4:-6]
+        ]
+        done = running = waiting = total = held = None
 
-    def _ntasks_total(self, job_id):
-        """Returns the total number of tasks"""
-        return self._ntasks_from_qstat_command(self.status_cmd, job_id)
+        for li in status_list:
+            if li[2] == self.job_id:
+                done, running, waiting = li[5:8]
+                held = 0 if len(li) == 10 else li[8]
+                total = li[-2]
 
-    def _ntasks_running(self, job_id):
-        """Returns the number of running tasks"""
-        return self._ntasks_from_qstat_command(self.status_cmd + " -s r", job_id)
+        return done, running, waiting, total, held
 
     def wait_for_job(self, job_id=None):
         """
@@ -586,34 +591,32 @@ class WISEDataDESYCluster(WiseDataByVisit):
         :param job_id: the ID of the cluster job, if `None` use `self.job_ID`
         :type job_id: int
         """
+
         _job_id = job_id if job_id else self.job_id
 
         if _job_id:
-            logger.info(f'waiting on job {_job_id}')
-            time.sleep(10)
-            i = 31
-            j = 6
-            while self._ntasks_total(_job_id) != 0:
-                if i > 30:
-                    logger.info(f'{time.asctime(time.localtime())} - Job{_job_id}:'
-                                f' {self._ntasks_total(_job_id)} entries in queue. '
-                                f'Of these, {self._ntasks_running(_job_id)} are running tasks, and '
-                                f'{self._ntasks_total(_job_id) - self._ntasks_running(_job_id)} '
-                                f'are tasks still waiting to be executed.')
-                    i = 0
-                    j += 1
+            logger.info("waiting for job with ID " + str(_job_id))
+            time.sleep(5)
 
+            self.collect_condor_status()
+            j = 0
+            while not np.all(np.array(self.condor_status) == None):
+                d, r, w, t, h = self.condor_status
+                logger.info(
+                    f"{time.asctime(time.localtime())} - Job{_job_id}: "
+                    f"{d} done, {r} running, {w} waiting, {h} held of total {t}"
+                )
+                j += 1
                 if j > 7:
-                    logger.info(self._qstat_output(self.status_cmd))
+                    logger.info(self._status_output)
                     j = 0
+                time.sleep(90)
+                self.collect_condor_status()
 
-                time.sleep(30)
-                i += 1
-
-            logger.info('cluster is done')
+            logger.info("Done waiting for job with ID " + str(_job_id))
 
         else:
-            logger.info(f'No Job ID!')
+            logger.info(f"No Job ID!")
 
     @property
     def n_cluster_jobs_per_chunk(self):
@@ -664,7 +667,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
         for fn in fns:
             os.remove(os.path.join(self.cluster_log_dir, fn))
 
-    def _make_cluster_script(self, cluster_h, cluster_ram, tables, service):
+    def make_executable_file(self, tables):
+        """
+        Produces the executable that will be submitted to the NPX cluster.
+        """
+        logging_level = logger.getEffectiveLevel()
         script_fn = os.path.realpath(__file__)
 
         if tables:
@@ -674,67 +681,58 @@ class WISEDataDESYCluster(WiseDataByVisit):
         else:
             tables_str = '\n'
 
-        text = "#!/bin/zsh \n" \
-               "## \n" \
-               "##(otherwise the default shell would be used) \n" \
-               "#$ -S /bin/zsh \n" \
-               "## \n" \
-               "##(the running time for this job) \n" \
-              f"#$ -l h_cpu={cluster_h} \n" \
-               "#$ -l h_rss=" + str(cluster_ram) + "\n" \
-               "## \n" \
-               "## \n" \
-               "##(send mail on job's abort) \n" \
-               "#$ -m a \n" \
-               "## \n" \
-               "##(stderr and stdout are merged together to stdout) \n" \
-               "#$ -j y \n" \
-               "## \n" \
-               "## name of the job \n" \
-               "## -N TDE Catalogue download \n" \
-               "## \n" \
-               "##(redirect output to:) \n" \
-               f"#$ -o /dev/null \n" \
-               "## \n" \
-               "sleep $(( ( RANDOM % 60 )  + 1 )) \n" \
-               'exec > "$TMPDIR"/${JOB_ID}_${SGE_TASK_ID}_stdout.txt ' \
-               '2>"$TMPDIR"/${JOB_ID}_${SGE_TASK_ID}_stderr.txt \n' \
-              f'source {WISEDataDESYCluster.BASHFILE} \n' \
-              f'export {DATA_DIR_KEY}={data_dir} \n' \
-               'export O=1 \n' \
-              f'python {script_fn} ' \
-               f'--logging_level DEBUG ' \
-               f'--base_name {self.base_name} ' \
-               f'--min_sep_arcsec {self.min_sep.to("arcsec").value} ' \
-               f'--n_chunks {self._n_chunks} ' \
-               f'--job_id $SGE_TASK_ID ' \
-               f'{tables_str}' \
-               'cp $TMPDIR/${JOB_ID}_${SGE_TASK_ID}_stdout.txt ' + self.cluster_log_dir + '\n' \
-               'cp $TMPDIR/${JOB_ID}_${SGE_TASK_ID}_stderr.txt ' + self.cluster_log_dir + '\n '
+        txt = (
+            f'{sys.executable} {script_fn} '
+            f'--logging_level {logging_level} '
+            f'--base_name {self.base_name} '
+            f'--min_sep_arcsec {self.min_sep.to("arcsec").value} '
+            f'--n_chunks {self._n_chunks} '
+            f'--job_id $SGE_TASK_ID '
+            f'{tables_str}'
+        )
 
-        logger.debug(f"Submit file: \n {text}")
-        logger.debug(f"Creating file at {self.submit_file}")
+        logger.debug("writing executable to " + self.executable_filename)
+        with open(self.executable_filename, "w") as f:
+            f.write(txt)
 
-        with open(self.submit_file, "w") as f:
+    def make_submit_file(
+            self,
+            job_ids: (int, List[int]),
+            node_memory: str = '8G',
+    ):
+        """
+        Produces the submit file that will be submitted to the NPX cluster.
+        :param chunks:
+        """
+
+        q = "1 job_id in " + ", ".join(np.atleast_1d(job_ids).astype(str))
+
+        text = (
+            f"executable = {self.executable_filename} \n"
+            f"environment = \"TIMEWISE_DATA={data_dir} TIMEWISE_BIGDATA={bigdata_dir}\" \n"
+            f"log = $(cluster)_$(process)job.log \n"
+            f"output = $(cluster)_$(process)job.out \n"
+            f"error = $(cluster)_$(process)job.err \n"
+            f"should_transfer_files   = YES \n"
+            f"when_to_transfer_output = ON_EXIT \n"
+            f"arguments = $(job_id) \n"
+            f"RequestMemory = {node_memory} \n"
+            f"\n"
+            f"queue {q}"
+        )
+
+        logger.debug("writing submitfile at " + self.submit_file_filename)
+        with open(self.submit_file_filename, "w") as f:
             f.write(text)
 
-        cmd = "chmod +x " + self.submit_file
-        os.system(cmd)
-
-    def submit_to_cluster(self, cluster_cpu, cluster_h, cluster_ram, tables, service, single_chunk=None):
+    def submit_to_cluster(self, node_memory, tables, single_chunk=None):
         """
         Submit jobs to cluster
 
-        :param cluster_cpu: Number of cluster CPUs
-        :type cluster_cpu: int
-        :param cluster_h: Time for cluster jobs
-        :type cluster_h: str
-        :param cluster_ram: RAM for cluster jobs
-        :type cluster_ram: str
+        :param node_memory: memory per node
+        :type node_memory: str
         :param tables: Table to query
         :type tables: str or list-like
-        :param service: service to use for querying the data
-        :type service: str
         :param single_chunk: number of single chunk to run on the cluster
         :type single_chunk: int
         :return: ID of the cluster job
@@ -748,10 +746,10 @@ class WISEDataDESYCluster(WiseDataByVisit):
             _start_id = int(single_chunk*self.n_cluster_jobs_per_chunk) + 1
             _end_id = int(_start_id + self.n_cluster_jobs_per_chunk) - 1
 
-        ids = f'{_start_id}-{_end_id}'
+        ids = list(range(_start_id, _end_id + 1))
 
         # make data_product files, storing essential info from parent_sample
-        for jobID in range(_start_id, _end_id + 1):
+        for jobID in ids:
             indices = self.parent_sample.df.index[self.cluster_jobID_map == jobID]
             logger.debug(f"starting data_product for {len(indices)} objects.")
             data_product = self._start_data_product(parent_sample_indices=indices)
@@ -763,15 +761,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
         with open(parentsample_class_pickle, "wb") as f:
             pickle.dump(self.parent_sample_class, f)
 
-        submit_cmd = 'qsub '
-        if cluster_cpu > 1:
-            submit_cmd += "-pe multicore {0} -R y ".format(cluster_cpu)
-        submit_cmd += f'-N wise_lightcurves '
-        submit_cmd += f"-t {ids}:1 {self.submit_file}"
-        logger.debug(f"Ram per core: {cluster_ram}")
+        submit_cmd = 'condor submit ' + self.submit_file_filename
         logger.info(f"{time.asctime(time.localtime())}: {submit_cmd}")
 
-        self._make_cluster_script(cluster_h, cluster_ram, tables, service)
+        self.make_executable_file(tables)
+        self.make_submit_file(job_ids=ids, node_memory=node_memory)
 
         try:
             msg = self._execute_bash_command(submit_cmd)
@@ -784,23 +778,19 @@ class WISEDataDESYCluster(WiseDataByVisit):
         except OSError:
             return
 
-    def run_cluster(self, cluster_cpu, cluster_h, cluster_ram, service):
+    def run_cluster(self, node_memory, service):
         """
         Run the DESY cluster
 
-        :param cluster_cpu: Number of cluster CPUs
-        :type cluster_cpu: int
-        :param cluster_h: Time for cluster jobs
-        :type cluster_h: str
-        :param cluster_ram: RAM for cluster jobs
-        :type cluster_ram: str
+        :param node_memory: memory per node
+        :type node_memory: str
         :param service: service to use for querying the data
         :type service: str
         """
 
         self.clear_cluster_log_dir()
         self._save_cluster_info()
-        self.submit_to_cluster(cluster_cpu, cluster_h, cluster_ram, tables=None, service=service)
+        self.submit_to_cluster(node_memory, tables=None)
         self.wait_for_job()
         for c in range(self.n_chunks):
             self._combine_data_products(service, chunk_number=c, remove=True, overwrite=True)
