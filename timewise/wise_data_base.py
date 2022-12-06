@@ -1109,6 +1109,10 @@ class WISEDataBase(abc.ABC):
                 f"{self._split_chunk_key}{chunk_number}.csv"
             ))]
         logger.debug(f"chunk {chunk_number}: loading {len(fns)} files for chunk {chunk_number}")
+
+        if len(fns) == 0:
+            raise ValueError(f"No unbinned lightcurves found for chunk {chunk_number}!")
+
         lightcurves = pd.concat([pd.read_csv(fn) for fn in fns])
 
         if clear:
