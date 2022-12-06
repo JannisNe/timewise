@@ -1090,9 +1090,6 @@ if __name__ == '__main__':
     parser.add_argument('--base_name', type=str)
     parser.add_argument('--min_sep_arcsec', type=float)
     parser.add_argument('--n_chunks', type=int)
-    parser.add_argument('--tables', type=str, nargs='+', default='')
-    parser.add_argument('--mag', type=bool, default=True)
-    parser.add_argument('--flux', type=bool, default=False)
     parser.add_argument('--clear_unbinned', type=bool, default=False)
     parser.add_argument('--logging_level', type=str, default='INFO')
     cfg = parser.parse_args()
@@ -1103,6 +1100,8 @@ if __name__ == '__main__':
         logging_level = cfg.logging_level.upper()
 
     logging.getLogger("timewise").setLevel(logging_level)
+    logger = logging.getLogger("timewise.main")
+    logger.info(json.dumps(vars(cfg), indent=4))
 
     wd = WISEDataDESYCluster(base_name=cfg.base_name,
                              min_sep_arcsec=cfg.min_sep_arcsec,
