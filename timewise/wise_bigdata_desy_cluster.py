@@ -490,7 +490,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
             else:
                 logger.debug(f'waiting for chunk {chunk} (Cluster job {job_id})')
-                self.wait_for_job(job_id)
+                self.wait_for_job()
                 logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}). Start combining')
 
                 try:
@@ -584,18 +584,13 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         return done, running, waiting, total, held
 
-    def wait_for_job(self, job_id=None):
+    def wait_for_job(self):
         """
         Wait until the cluster job is done
-
-        :param job_id: the ID of the cluster job, if `None` use `self.job_ID`
-        :type job_id: int
         """
 
-        _job_id = job_id if job_id else self.job_id
-
-        if _job_id:
-            logger.info("waiting for job with ID " + str(_job_id))
+        if self.job_id:
+            logger.info("waiting for job with ID " + str(self.job_id))
             time.sleep(5)
 
             self.collect_condor_status()
@@ -603,7 +598,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             while not np.all(np.array(self.condor_status) == None):
                 d, r, w, t, h = self.condor_status
                 logger.info(
-                    f"{time.asctime(time.localtime())} - Job{_job_id}: "
+                    f"{time.asctime(time.localtime())} - Job{self.job_id}: "
                     f"{d} done, {r} running, {w} waiting, {h} held of total {t}"
                 )
                 j += 1
@@ -613,7 +608,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 time.sleep(90)
                 self.collect_condor_status()
 
-            logger.info("Done waiting for job with ID " + str(_job_id))
+            logger.info("Done waiting for job with ID " + str(self.job_id))
 
         else:
             logger.info(f"No Job ID!")
@@ -687,7 +682,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             f'--base_name {self.base_name} '
             f'--min_sep_arcsec {self.min_sep.to("arcsec").value} '
             f'--n_chunks {self._n_chunks} '
-            f'--job_id $SGE_TASK_ID '
+            f'--job_id $1 '
             f'{tables_str}'
         )
 
@@ -702,7 +697,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
     ):
         """
         Produces the submit file that will be submitted to the NPX cluster.
-        :param chunks:
+
+        :param job_ids: The job ID or list of job IDs to submit
+        :type job_ids: int or list of ints
+        :param node_memory: The amount of memory to request for each node
+        :type node_memory: str
         """
 
         q = "1 job_id in " + ", ".join(np.atleast_1d(job_ids).astype(str))
@@ -761,7 +760,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         with open(parentsample_class_pickle, "wb") as f:
             pickle.dump(self.parent_sample_class, f)
 
-        submit_cmd = 'condor submit ' + self.submit_file_filename
+        submit_cmd = 'condor_submit ' + self.submit_file_filename
         logger.info(f"{time.asctime(time.localtime())}: {submit_cmd}")
 
         self.make_executable_file(tables)
@@ -770,7 +769,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         try:
             msg = self._execute_bash_command(submit_cmd)
             logger.info(str(msg))
-            job_id = int(str(msg).split('job-array')[1].split('.')[0])
+            job_id = str(msg).split("cluster ")[-1].split(".")[0]
             logger.info(f"Running on cluster with ID {job_id}")
             self.job_id = job_id
             return job_id
