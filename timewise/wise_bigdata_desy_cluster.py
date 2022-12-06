@@ -1,4 +1,5 @@
 import getpass
+import glob
 import os
 import json
 import subprocess
@@ -491,7 +492,15 @@ class WISEDataDESYCluster(WiseDataByVisit):
             else:
                 logger.debug(f'waiting for chunk {chunk} (Cluster job {job_id})')
                 self.wait_for_job()
-                logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}). Start combining')
+                logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}).')
+
+                log_files = glob.glob(f"./{self.job_id}_*")
+                log_files_abs = [os.path.abspath(p) for p in log_files]
+                logger.debug(f"moving {len(log_files_abs)} log files to {self.cluster_dir}")
+                for f in log_files_abs:
+                    shutil.move(f, self.cluster_dir)
+
+                logger.debug(f'Start combining')
 
                 try:
                     self._combine_data_products('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
