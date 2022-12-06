@@ -671,19 +671,12 @@ class WISEDataDESYCluster(WiseDataByVisit):
         for fn in fns:
             os.remove(os.path.join(self.cluster_log_dir, fn))
 
-    def make_executable_file(self, tables):
+    def make_executable_file(self):
         """
         Produces the executable that will be submitted to the NPX cluster.
         """
         logging_level = logger.getEffectiveLevel()
         script_fn = os.path.realpath(__file__)
-
-        if tables:
-            tables = np.atleast_1d(tables)
-            tables = [self.get_db_name(t, nice=False) for t in tables]
-            tables_str = f"--tables {' '.join(tables)} \n"
-        else:
-            tables_str = '\n'
 
         txt = (
             f'{sys.executable} {script_fn} '
@@ -692,7 +685,6 @@ class WISEDataDESYCluster(WiseDataByVisit):
             f'--min_sep_arcsec {self.min_sep.to("arcsec").value} '
             f'--n_chunks {self._n_chunks} '
             f'--job_id $1 '
-            f'{tables_str}'
         )
 
         logger.debug("writing executable to " + self.executable_filename)
@@ -747,14 +739,12 @@ class WISEDataDESYCluster(WiseDataByVisit):
         with open(fn, "w") as f:
             f.write(text)
 
-    def submit_to_cluster(self, node_memory, tables, single_chunk=None):
+    def submit_to_cluster(self, node_memory, single_chunk=None):
         """
         Submit jobs to cluster
 
         :param node_memory: memory per node
         :type node_memory: str
-        :param tables: Table to query
-        :type tables: str or list-like
         :param single_chunk: number of single chunk to run on the cluster
         :type single_chunk: int
         :return: ID of the cluster job
@@ -762,7 +752,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         """
 
         if isinstance(single_chunk, type(None)):
-            _start_id = 1
+            _start_id = d1
             _end_id = int(self.n_chunks*self.n_cluster_jobs_per_chunk)
         else:
             _start_id = int(single_chunk*self.n_cluster_jobs_per_chunk) + 1
@@ -783,7 +773,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         with open(parentsample_class_pickle, "wb") as f:
             pickle.dump(self.parent_sample_class, f)
 
-        self.make_executable_file(tables)
+        self.make_executable_file()
         self.make_submit_file(job_ids=ids, node_memory=node_memory)
 
         submit_cmd = 'condor_submit ' + self.get_submit_file_filename(ids)
@@ -812,7 +802,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         self.clear_cluster_log_dir()
         self._save_cluster_info()
-        self.submit_to_cluster(node_memory, tables=None)
+        self.submit_to_cluster(node_memory)
         self.wait_for_job()
         for c in range(self.n_chunks):
             self._combine_data_products(service, chunk_number=c, remove=True, overwrite=True)
