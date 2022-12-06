@@ -481,7 +481,6 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
             logger.info(f'got all TAP results for chunk {chunk}. submitting to cluster')
             job_id = self.submit_to_cluster(node_memory='40G',
-                                            tables=None,
                                             single_chunk=chunk)
 
             if not job_id:
