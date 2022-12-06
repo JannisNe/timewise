@@ -496,9 +496,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
                 log_files = glob.glob(f"./{self.job_id}_*")
                 log_files_abs = [os.path.abspath(p) for p in log_files]
-                logger.debug(f"moving {len(log_files_abs)} log files to {self.cluster_dir}")
+                logger.debug(f"moving {len(log_files_abs)} log files to {self.cluster_log_dir}")
                 for f in log_files_abs:
-                    shutil.move(f, self.cluster_dir)
+                    shutil.move(f, self.cluster_log_dir)
 
                 logger.debug(f'Start combining')
 
@@ -699,6 +699,19 @@ class WISEDataDESYCluster(WiseDataByVisit):
         with open(self.executable_filename, "w") as f:
             f.write(txt)
 
+    def get_submit_file_filename(self, ids):
+        """
+        Get the filename of the submit file for given job ids
+
+        :param ids: list of job ids
+        :type ids: list
+        :return: filename
+        :rtype: str
+        """
+        ids = np.atleast_1d(ids)
+        ids_string = f"{min(ids)}-{max(ids)}"
+        return os.path.join(self.cluster_dir, f"ids{ids_string}.submit")
+
     def make_submit_file(
             self,
             job_ids: (int, List[int]),
@@ -729,8 +742,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
             f"queue {q}"
         )
 
-        logger.debug("writing submitfile at " + self.submit_file_filename)
-        with open(self.submit_file_filename, "w") as f:
+        fn = self.get_submit_file_filename(job_ids)
+        logger.debug("writing submitfile at " + fn)
+        with open(fn, "w") as f:
             f.write(text)
 
     def submit_to_cluster(self, node_memory, tables, single_chunk=None):
@@ -769,11 +783,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
         with open(parentsample_class_pickle, "wb") as f:
             pickle.dump(self.parent_sample_class, f)
 
-        submit_cmd = 'condor_submit ' + self.submit_file_filename
-        logger.info(f"{time.asctime(time.localtime())}: {submit_cmd}")
-
         self.make_executable_file(tables)
         self.make_submit_file(job_ids=ids, node_memory=node_memory)
+
+        submit_cmd = 'condor_submit ' + self.get_submit_file_filename(ids)
+        logger.info(f"{time.asctime(time.localtime())}: {submit_cmd}")
 
         try:
             msg = self._execute_bash_command(submit_cmd)
