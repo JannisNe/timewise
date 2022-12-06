@@ -252,7 +252,16 @@ class WiseDataByVisit(WISEDataBase):
                         metadata[dtk] = max(dt)
 
                 else:
-                    metadata[difk] = np.nan
-                    metadata[dtk] = np.nan
+                    for k in [
+                        difk,
+                        dtk,
+                        mean_weighted_ppb_key,
+                        excess_variance_key,
+                        rmsk,
+                        medk,
+                        chi2tmk
+
+                    ]:
+                        metadata[k] = np.nan
 
         return metadata
