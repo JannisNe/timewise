@@ -1074,8 +1074,12 @@ if __name__ == '__main__':
     parser.add_argument('--logging_level', type=str, default='INFO')
     cfg = parser.parse_args()
 
-    logging.getLogger("air_flares").setLevel(cfg.logging_level)
-    logging.getLogger("timewise").setLevel(cfg.logging_level)
+    try:
+        logging_level = int(cfg.logging_level)
+    except ValueError:
+        logging_level = cfg.logging_level.upper()
+
+    logging.getLogger("timewise").setLevel(logging_level)
 
     wd = WISEDataDESYCluster(base_name=cfg.base_name,
                              min_sep_arcsec=cfg.min_sep_arcsec,
