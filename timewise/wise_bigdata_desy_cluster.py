@@ -752,7 +752,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         """
 
         if isinstance(single_chunk, type(None)):
-            _start_id = d1
+            _start_id = 1
             _end_id = int(self.n_chunks*self.n_cluster_jobs_per_chunk)
         else:
             _start_id = int(single_chunk*self.n_cluster_jobs_per_chunk) + 1
