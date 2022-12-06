@@ -123,63 +123,69 @@ class WiseDataByVisit(WISEDataBase):
                     else:
                         error_factor = 1
 
-                    try:
-                        f = epoch[f"{b}{lum_ext}"]
-                        e = epoch[f"{b}{lum_ext}{self.error_key_ext}"] * error_factor
-                        ulims = epoch[f"{b}{lum_ext}{self.upper_limit_key}"]
-                        ul = np.all(pd.isna(e))
-                        nans = f.isna()
+                    f = epoch[f"{b}{lum_ext}"]
+                    e = epoch[f"{b}{lum_ext}{self.error_key_ext}"] * error_factor
+                    ulims = epoch[f"{b}{lum_ext}{self.upper_limit_key}"]
+                    ul = np.all(pd.isna(e))
+                    nans = f.isna()
 
-                        if ul:
-                            f = f[~nans]
-                            e = e[~nans]
+                    if ul:
+                        f = f[~nans]
+                        e = e[~nans]
 
-                        else:
-                            f = f[~ulims & ~nans]
-                            e = e[~ulims & ~nans]
+                    else:
+                        f = f[~ulims & ~nans]
+                        e = e[~ulims & ~nans]
 
-                        if len(f) == 0:
-                            continue
+        # ---------------------   if no data is there then enter nans   ---------------------- #
+
+                    if len(f) == 0:
+                        r[f"{b}{lum_ext}_outlier_indices"] = np.nan
+                        r[f'{b}{self.mean_key}{lum_ext}'] = np.nan
+                        r[f'{b}{lum_ext}{self.rms_key}'] = np.nan
+                        r[f'{b}{lum_ext}{self.upper_limit_key}'] = np.nan
+                        r[f'{b}{lum_ext}{self.Npoints_key}'] = np.nan
+                        continue
 
         # ---------------------   remove outliers in the bins   ---------------------- #
 
-                        # if we do not want to clean outliers just set the threshold to infinity
-                        outlier_thresh = np.inf if not self.clean_outliers_when_binning else 100
+                    # if we do not want to clean outliers just set the threshold to infinity
+                    outlier_thresh = np.inf if not self.clean_outliers_when_binning else 100
 
-                        # set up empty masks
-                        remaining_outlier_mask = np.array([False] * len(f))
-                        outlier_mask = np.copy(remaining_outlier_mask)
+                    # set up empty masks
+                    remaining_outlier_mask = np.array([False] * len(f))
+                    outlier_mask = np.copy(remaining_outlier_mask)
 
-                        # set up dummy values for number of remaining and total outliers
-                        N_remaining_outlier = 1
-                        N_outlier = 0
+                    # set up dummy values for number of remaining and total outliers
+                    N_remaining_outlier = 1
+                    N_outlier = 0
 
-                        # recalculate uncertainty and median as long as no outliers left
-                        while N_remaining_outlier > 0:
-                            f = f[~remaining_outlier_mask]
-                            e = e[~remaining_outlier_mask]
-                            mean = np.median(f)
-                            rms = np.sqrt(sum((f - mean) ** 2)) / len(f)
-                            u_mes = 0 if ul else np.sqrt(sum(e[~outlier_mask] ** 2)) / len(e[~outlier_mask])
-                            u = max(rms, u_mes)
+                    # recalculate uncertainty and median as long as no outliers left
+                    while N_remaining_outlier > 0:
+                        f = f[~remaining_outlier_mask]
+                        e = e[~remaining_outlier_mask]
+                        mean = np.median(f)
+                        rms = np.sqrt(sum((f - mean) ** 2)) / len(f)
+                        u_mes = 0 if ul else np.sqrt(sum(e[~outlier_mask] ** 2)) / len(e[~outlier_mask])
+                        u = max(rms, u_mes)
 
-                            remaining_outlier_mask = abs(mean - f) > outlier_thresh * u
-                            outlier_mask = outlier_mask | remaining_outlier_mask
-                            N_remaining_outlier = sum(remaining_outlier_mask)
-                            N_outlier += N_remaining_outlier
+                        remaining_outlier_mask = abs(mean - f) > outlier_thresh * u
+                        outlier_mask = outlier_mask | remaining_outlier_mask
+                        N_remaining_outlier = sum(remaining_outlier_mask)
+                        N_outlier += N_remaining_outlier
 
-                        if N_outlier > 0:
-                            logger.debug(f"{b}{lum_ext}, MJD {ei}: removed {N_outlier}")
-                            r[f"{b}{lum_ext}_outlier_indices"] = [list(outlier_mask.index[outlier_mask])]
+                    if N_outlier > 0:
+                        logger.debug(f"{b}{lum_ext}, MJD {ei}: removed {N_outlier}")
+                        r[f"{b}{lum_ext}_outlier_indices"] = [list(outlier_mask.index[outlier_mask])]
+                    else:
+                        r[f"{b}{lum_ext}_outlier_indices"] = np.nan
 
         # ---------------------   assemble final result   ---------------------- #
 
-                        r[f'{b}{self.mean_key}{lum_ext}'] = mean
-                        r[f'{b}{lum_ext}{self.rms_key}'] = u
-                        r[f'{b}{lum_ext}{self.upper_limit_key}'] = bool(ul)
-                        r[f'{b}{lum_ext}{self.Npoints_key}'] = len(f)
-                    except KeyError:
-                        pass
+                    r[f'{b}{self.mean_key}{lum_ext}'] = mean
+                    r[f'{b}{lum_ext}{self.rms_key}'] = u
+                    r[f'{b}{lum_ext}{self.upper_limit_key}'] = bool(ul)
+                    r[f'{b}{lum_ext}{self.Npoints_key}'] = len(f)
 
             binned_lc = pd.concat([binned_lc, pd.DataFrame(r, index=[0])], ignore_index=True)
 
