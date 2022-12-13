@@ -2,6 +2,7 @@ import tqdm
 import pandas as pd
 import numpy as np
 import logging
+from scipy import stats
 
 from timewise.wise_data_base import WISEDataBase
 from timewise.utils import get_excess_variance
@@ -165,7 +166,8 @@ class WiseDataByVisit(WISEDataBase):
                         f = f[~remaining_outlier_mask]
                         e = e[~remaining_outlier_mask]
                         mean = np.median(f)
-                        rms = np.sqrt(sum((f - mean) ** 2)) / len(f)
+                        t_value = stats.t.interval(0.68, df=len(f) - 1)[1]
+                        rms = np.sqrt(sum((f - mean) ** 2)) / (len(f) - 1) * t_value
                         u_mes = 0 if ul else np.sqrt(sum(e[~outlier_mask] ** 2)) / len(e[~outlier_mask])
                         u = max(rms, u_mes)
 
