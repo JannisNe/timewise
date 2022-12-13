@@ -165,11 +165,16 @@ class WiseDataByVisit(WISEDataBase):
                     while N_remaining_outlier > 0:
                         f = f[~remaining_outlier_mask]
                         e = e[~remaining_outlier_mask]
+
+                        # calculate the median and uncertainty
                         mean = np.median(f)
+                        # we use the 1-sigma std as errors and correct for small amount of data
+                        # using the correction factor of the t distribution for 0.68
                         t_value = stats.t.interval(0.68, df=len(f) - 1)[1]
-                        rms = np.sqrt(sum((f - mean) ** 2)) / (len(f) - 1) * t_value
+                        rms = np.sqrt(sum((f - mean) ** 2))
+                        std = rms / (len(f) - 1) * t_value
                         u_mes = 0 if ul else np.sqrt(sum(e[~outlier_mask] ** 2)) / len(e[~outlier_mask])
-                        u = max(rms, u_mes)
+                        u = max(std, u_mes)
 
                         remaining_outlier_mask = abs(mean - f) > outlier_thresh * u
                         outlier_mask = outlier_mask | remaining_outlier_mask
