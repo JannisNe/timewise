@@ -225,6 +225,7 @@ class WiseDataByVisit(WISEDataBase):
                 mean_weighted_ppb_key = f"{band}_mean_weighted_ppb{lum_key}"
                 excess_variance_key = f"{band}_excess_variance_{lum_key}"
                 excess_variance_err_key = f"{band}_excess_variance_err_{lum_key}"
+                mck = f"{band}_coverage_of_median{lum_key}"
 
                 ilc = lc[~np.array(lc[ul_key]).astype(bool)] if ul_key in lc else dict()
                 metadata[Nk] = len(ilc)
@@ -244,11 +245,13 @@ class WiseDataByVisit(WISEDataBase):
 
                     imed = np.median(ilc[llumkey])
                     ichi2_to_med = sum(((ilc[llumkey] - imed) / ilc[errkey]) ** 2)
+                    imc = np.sum(abs(ilc[llumkey] - imed) < ilc[errkey]) / len(ilc[llumkey])
 
                     metadata[difk] = imax - imin
                     metadata[rmsk] = imin_rms
                     metadata[medk] = imed
                     metadata[chi2tmk] = ichi2_to_med
+                    metadata[mck] = imc
 
                     if len(ilc) == 1:
                         metadata[dtk] = 0
