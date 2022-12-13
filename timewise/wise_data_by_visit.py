@@ -1,7 +1,7 @@
-import tqdm
 import pandas as pd
 import numpy as np
 import logging
+from scipy import stats
 
 from timewise.wise_data_base import WISEDataBase
 from timewise.utils import get_excess_variance
@@ -40,6 +40,61 @@ class WiseDataByVisit(WISEDataBase):
         self.clean_outliers_when_binning = clean_outliers_when_binning
         self.multiply_flux_error = multiply_flux_error
 
+    def calculate_epoch(self, f, e, visit_mask, counts, remove_outliers):
+        # TODO: add doc
+        u_lims = pd.isna(e)
+
+        # ---------------------   remove outliers in the bins   ---------------------- #
+
+        # if we do not want to clean outliers just set the threshold to infinity
+        outlier_thresh = np.inf if not self.clean_outliers_when_binning else 100
+
+        # set up empty masks
+        outlier_mask = np.array([False] * len(f))
+        mean = np.nan
+        u = np.nan
+        use_mask = None
+
+        # set up dummy values for number of remaining outliers
+        n_remaining_outlier = np.inf
+
+        # ---------------------   flag upper limits   ---------------------- #
+        bin_n_ulims = np.bincount(visit_mask, weights=u_lims, minlength=len(counts))
+        bin_ulim_bool = (counts - bin_n_ulims) == 0
+        use_mask_ul = ~u_lims | (u_lims & bin_ulim_bool[visit_mask])
+
+        # recalculate uncertainty and median as long as no outliers left
+        while (n_remaining_outlier > 0) and remove_outliers:
+
+            # make a mask of values to use
+            use_mask = ~outlier_mask & use_mask_ul
+
+            # -------------------------   calculate mean   ------------------------- #
+            sums = np.bincount(visit_mask[use_mask], weights=f[use_mask], minlength=len(counts))
+            mean = sums / counts
+            mean_deviation = np.bincount(
+                visit_mask[use_mask],
+                weights=(f[use_mask] - mean[visit_mask[use_mask]]) ** 2,
+                minlength=len(counts)
+            )
+
+            # ---------------------   calculate uncertainty   ---------------------- #
+            std = np.sqrt(mean_deviation) / (counts - 1)
+            ecomb = np.sqrt(np.bincount(
+                visit_mask[use_mask],
+                weights=e[use_mask] ** 2,
+                minlength=len(counts)
+            )) / counts
+            t_value = stats.t.interval(0.68, df=counts - 1)
+            u = np.maximum(std, ecomb) * t_value
+
+            # ---------------------   remove outliers in the bins   ---------------------- #
+            remaining_outliers = abs(mean[visit_mask] - f) > outlier_thresh * u[visit_mask]
+            outlier_mask |= remaining_outliers
+            n_remaining_outlier = sum(remaining_outliers)
+
+        return mean, u, bin_ulim_bool, outlier_mask, use_mask
+
     def bin_lightcurve(self, lightcurve):
         """
         Combine the data by visits of the satellite of one region in the sky.
@@ -58,138 +113,92 @@ class WiseDataByVisit(WISEDataBase):
         # -------------------------   find epoch intervals   -------------------------- #
         sorted_mjds = np.sort(lightcurve.mjd)
         epoch_bounds_mask = (sorted_mjds[1:] - sorted_mjds[:-1]) > 100
-        epoch_bounds = np.array(
-            [lightcurve.mjd.min()] +
-            list(sorted_mjds[1:][epoch_bounds_mask]) +
-            [lightcurve.mjd.max() * 1.01]  # this just makes sure that the last datapoint gets selected as well
+        epoch_bins = np.array(
+            [lightcurve.mjd.min() * 0.99] +  # this makes sure that the first datapoint gets selected
+            list(((sorted_mjds[1:] + sorted_mjds[:-1]) / 2)[epoch_bounds_mask]) +  # finding the middle between
+                                                                                   # two visits
+            [lightcurve.mjd.max() * 1.01]    # this just makes sure that the last datapoint gets selected as well
         )
-        epoch_intervals = np.array([epoch_bounds[:-1], epoch_bounds[1:]]).T
 
-        # -------------------------   loop through epoch intervals   -------------------------- #
-        binned_lc = pd.DataFrame()
-        for ei in epoch_intervals:
-            r = dict()
-            epoch_mask = (lightcurve.mjd >= ei[0]) & (lightcurve.mjd < ei[1])
-            r['mean_mjd'] = np.median(lightcurve.mjd[epoch_mask])
+        # -------------------------   create visit mask   -------------------------- #
+        visit_mask = np.digitize(lightcurve.mjd, epoch_bins) - 1
+        counts = np.bincount(visit_mask)
 
-            epoch = dict()
+        binned_data = dict()
+
+        # -------------------------   calculate mean mjd   -------------------------- #
+        binned_data["mean_mjd"] = np.bincount(visit_mask, weights=lightcurve.mjd) / counts
+
         # -------------------------   loop through bands   -------------------------- #
-            for b in self.bands:
-                # loop through magnitude and flux and save the respective datapoints
-                for lum_ext in [self.flux_key_ext, self.mag_key_ext]:
-                    f = lightcurve[f"{b}{lum_ext}"][epoch_mask]
-                    e = lightcurve[f"{b}{lum_ext}{self.error_key_ext}"][epoch_mask]
-                    ulims = pd.isna(e)
+        for b in self.bands:
+            # loop through magnitude and flux and save the respective datapoints
 
-                    epoch[f"{b}{lum_ext}"] = f
-                    epoch[f"{b}{lum_ext}{self.error_key_ext}"] = e
-                    epoch[f"{b}{lum_ext}{self.upper_limit_key}"] = ulims
+            outlier_masks = dict()
+            use_masks = dict()
 
-                # -------  calculate the zeropoints per exposure ------- #
-                mags = epoch[f'{b}{self.mag_key_ext}']
-                inst_fluxes = epoch[f'{b}{self.flux_key_ext}']
-                pos_m = inst_fluxes > 0  # select only positive fluxes, i.e. detections
+            for lum_ext in [self.flux_key_ext, self.mag_key_ext]:
+                f = lightcurve[f"{b}{lum_ext}"]
+                e = lightcurve[f"{b}{lum_ext}{self.error_key_ext}"]
 
-                if sum(pos_m) == 0:
-                    # if there are only non-detections then fall back to default zeropoint
-                    zp_med = self.magnitude_zeropoints['Mag'][b]
-                else:
-                    # calculate zeropoints and save median
-                    zps = mags[pos_m] + 2.5 * np.log10(inst_fluxes[pos_m])
-                    zp_med = np.median(zps)
+                mean, u, bin_ulim_bool, outlier_mask, use_mask = self.calculate_epoch(
+                    f, e, visit_mask, counts, remove_outliers=True
+                )
+                n_outliers = np.bincount(visit_mask, weights=outlier_mask)
+                n_points = np.bincount(visit_mask, weights=use_mask)
 
-                r[f'{b}{self.median_key}{self.zeropoint_key_ext}'] = zp_med
+                if n_outliers > 0:
+                    logger.info(f"{lum_ext}: removed {n_outliers} outliers")
 
-        # ---------------------   calculate flux density from instrument flux   ----------------------- #
-                # get the instrument flux [digital numbers], i.e. source count
-                fl = epoch[f'{b}{self.flux_key_ext}']
-                fl_err = epoch[f'{b}{self.flux_key_ext}{self.error_key_ext}']
-                fl_ul = epoch[f"{b}{self.flux_key_ext}{self.upper_limit_key}"]
+                binned_data[f'{b}{self.mean_key}{lum_ext}'] = mean
+                binned_data[f'{b}{lum_ext}{self.rms_key}'] = u
+                binned_data[f'{b}{lum_ext}{self.upper_limit_key}'] = bin_ulim_bool
+                binned_data[f'{b}{lum_ext}{self.Npoints_key}'] = n_points
 
-                # calculate the proportionality constant between flux density and source count
-                mag_zp = self.magnitude_zeropoints['F_nu'][b].to('mJy').value
-                flux_dens_const = mag_zp * 10 ** (-zp_med / 2.5)
+                outlier_masks[lum_ext] = outlier_mask
+                use_masks[lum_ext] = use_mask
 
-                # save values in epoch dictionary
-                epoch[f"{b}{self.flux_density_key_ext}"] = fl * flux_dens_const
-                epoch[f"{b}{self.flux_density_key_ext}{self.error_key_ext}"] = fl_err * flux_dens_const
-                epoch[f"{b}{self.flux_density_key_ext}{self.upper_limit_key}"] = fl_ul
+            # -------  calculate the zeropoints per exposure ------- #
+            # this might look wrong since we use the flux mask on the magnitudes but it s right
+            # for each flux measurement we need the corresponding magnitude to get the zeropoint
+            mags = lightcurve[f'{b}{self.mag_key_ext}']
+            inst_fluxes = lightcurve[f'{b}{self.flux_key_ext}']
+            pos_m = inst_fluxes > 0  # select only positive fluxes, i.e. detections
+            zp_mask = pos_m & use_masks[self.flux_key_ext]
 
-        # ---------------------   loop through different brightness units   ---------------------- #
-                for lum_ext in [self.flux_key_ext, self.mag_key_ext, self.flux_density_key_ext]:
+            # calculate zero points
+            zps = np.zeros_like(inst_fluxes)
+            zps[zp_mask] = mags[zp_mask] + 2.5 * np.log10(inst_fluxes[zp_mask])
+            zps_sum = np.bincount(visit_mask, weights=zps)
 
-                    if ('flux' in lum_ext) and self.multiply_flux_error:
-                        error_factor = self.flux_error_factor[b]
-                    else:
-                        error_factor = 1
+            zps_mean = zps_sum / counts
+            # if there are only non-detections then fall back to default zeropoint
+            zps_mean[zps_mean == 0] = self.magnitude_zeropoints['Mag'][b]
 
-                    f = epoch[f"{b}{lum_ext}"]
-                    e = epoch[f"{b}{lum_ext}{self.error_key_ext}"] * error_factor
-                    ulims = epoch[f"{b}{lum_ext}{self.upper_limit_key}"]
-                    ul = np.all(pd.isna(e))
-                    nans = f.isna()
+            # ---------------   calculate flux density from instrument flux   ---------------- #
+            # get the instrument flux [digital numbers], i.e. source count
+            inst_fluxes_e = lightcurve[f'{b}{self.flux_key_ext}{self.error_key_ext}']
 
-                    if ul:
-                        f = f[~nans]
-                        e = e[~nans]
+            # calculate the proportionality constant between flux density and source count
+            mag_zp = self.magnitude_zeropoints['F_nu'][b].to('mJy').value
+            flux_dens_const = mag_zp * 10 ** (-zps_mean / 2.5)
 
-                    else:
-                        f = f[~ulims & ~nans]
-                        e = e[~ulims & ~nans]
+            # calculate flux densities from instrument counts
+            flux_densities = inst_fluxes * flux_dens_const
+            flux_densities_e = inst_fluxes_e * flux_dens_const
 
-        # ---------------------   if no data is there then enter nans   ---------------------- #
+            # bin flux densities
+            mean_fd, u_fd, ul_fd, outlier_mask_fd, use_mask_fd = self.calculate_epoch(
+                flux_densities, flux_densities_e, visit_mask, counts,
+                remove_outliers=False  # we do not remove outliers here because they have already been removed in
+                                       # the inst flux calculation
+            )
+            n_points_fd = np.bincount(visit_mask, weights=use_mask)
+            binned_data[f'{b}{self.mean_key}{self.flux_density_key_ext}'] = mean_fd
+            binned_data[f'{b}{self.flux_density_key_ext}{self.rms_key}'] = u_fd
+            binned_data[f'{b}{self.flux_density_key_ext}{self.upper_limit_key}'] = ul_fd
+            binned_data[f'{b}{self.flux_density_key_ext}{self.Npoints_key}'] = n_points_fd
 
-                    if len(f) == 0:
-                        r[f"{b}{lum_ext}_outlier_indices"] = np.nan
-                        r[f'{b}{self.mean_key}{lum_ext}'] = np.nan
-                        r[f'{b}{lum_ext}{self.rms_key}'] = np.nan
-                        r[f'{b}{lum_ext}{self.upper_limit_key}'] = np.nan
-                        r[f'{b}{lum_ext}{self.Npoints_key}'] = np.nan
-                        continue
-
-        # ---------------------   remove outliers in the bins   ---------------------- #
-
-                    # if we do not want to clean outliers just set the threshold to infinity
-                    outlier_thresh = np.inf if not self.clean_outliers_when_binning else 100
-
-                    # set up empty masks
-                    remaining_outlier_mask = np.array([False] * len(f))
-                    outlier_mask = np.copy(remaining_outlier_mask)
-
-                    # set up dummy values for number of remaining and total outliers
-                    N_remaining_outlier = 1
-                    N_outlier = 0
-
-                    # recalculate uncertainty and median as long as no outliers left
-                    while N_remaining_outlier > 0:
-                        f = f[~remaining_outlier_mask]
-                        e = e[~remaining_outlier_mask]
-                        mean = np.median(f)
-                        rms = np.sqrt(sum((f - mean) ** 2)) / len(f)
-                        u_mes = 0 if ul else np.sqrt(sum(e[~outlier_mask] ** 2)) / len(e[~outlier_mask])
-                        u = max(rms, u_mes)
-
-                        remaining_outlier_mask = abs(mean - f) > outlier_thresh * u
-                        outlier_mask = outlier_mask | remaining_outlier_mask
-                        N_remaining_outlier = sum(remaining_outlier_mask)
-                        N_outlier += N_remaining_outlier
-
-                    if N_outlier > 0:
-                        logger.debug(f"{b}{lum_ext}, MJD {ei}: removed {N_outlier}")
-                        r[f"{b}{lum_ext}_outlier_indices"] = [list(outlier_mask.index[outlier_mask])]
-                    else:
-                        r[f"{b}{lum_ext}_outlier_indices"] = np.nan
-
-        # ---------------------   assemble final result   ---------------------- #
-
-                    r[f'{b}{self.mean_key}{lum_ext}'] = mean
-                    r[f'{b}{lum_ext}{self.rms_key}'] = u
-                    r[f'{b}{lum_ext}{self.upper_limit_key}'] = bool(ul)
-                    r[f'{b}{lum_ext}{self.Npoints_key}'] = len(f)
-
-            binned_lc = pd.concat([binned_lc, pd.DataFrame(r, index=[0])], ignore_index=True)
-
-        return binned_lc
+        return pd.DataFrame(binned_data)
 
     def calculate_metadata_single(self, lc):
         """
