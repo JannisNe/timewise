@@ -103,22 +103,34 @@ class WiseDataByVisit(WISEDataBase):
             one_points_mask = n_points <= 1
             # calculate standard deviation
             std = np.zeros_like(counts, dtype=float)
-            std[~one_points_mask] = np.sqrt(mean_deviation[~one_points_mask]) / (n_points[~one_points_mask] - 1)
+            std[~one_points_mask] = (
+                    np.sqrt(mean_deviation[~one_points_mask])
+                    / (n_points[~one_points_mask] - 1)
+                    * stats.t.interval(0.68, df=n_points[~one_points_mask] - 1)[1]
+                    # for visits with small number of detections we have to correct according to the t distribution
+            )
             std[one_points_mask] = -np.inf
+
             # calculate the propagated errors of the single exposure measurements
             single_exp_measurement_errors = np.sqrt(np.bincount(
                 visit_mask[use_mask],
                 weights=e[use_mask] ** 2,
                 minlength=len(counts)
             ))
-
             e_meas = np.zeros_like(std, dtype=float)
             e_meas[~zero_points_mask] = single_exp_measurement_errors[n_points > 0] / n_points[n_points > 0]
             e_meas[zero_points_mask] = np.nan
-            # for visits with small number of detections we have to correct according to the t distribution
-            t_value = stats.t.interval(0.68, df=n_points - 1)[1]
             # take the maximum value of the measured single exposure errors and the standard deviation
-            u = np.maximum(std, e_meas) * t_value
+            u = np.maximum(std, e_meas)
+
+            # if np.any(np.isnan(u)):
+            #     ids = np.where(np.isnan(u))[0]
+            #     msg = ""
+            #     for inan_index in ids:
+            #         nanf = f[visit_mask == inan_index]
+            #         nane = e[visit_mask == inan_index]
+            #         msg += f"u is nan for {inan_index}th bin\n{nanf}\n{nane}\n\n"
+            #     # raise ValueError(msg)
 
             # ---------------------   remove outliers in the bins   ---------------------- #
             remaining_outliers = (abs(median[visit_mask] - f) > outlier_thresh * u[visit_mask]) & ~outlier_mask
