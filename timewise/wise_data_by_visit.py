@@ -51,9 +51,10 @@ class WiseDataByVisit(WISEDataBase):
 
         # set up empty masks
         outlier_mask = np.array([False] * len(f)) if outlier_mask is None else outlier_mask
-        mean = np.nan
+        median = np.nan
         u = np.nan
         use_mask = None
+        n_points = counts
 
         # set up dummy values for number of remaining outliers
         n_remaining_outlier = np.inf
@@ -68,33 +69,43 @@ class WiseDataByVisit(WISEDataBase):
 
             # make a mask of values to use
             use_mask = ~outlier_mask & use_mask_ul
+            n_points = np.bincount(visit_mask, weights=use_mask)
 
-            # -------------------------   calculate mean   ------------------------- #
-            sums = np.bincount(visit_mask[use_mask], weights=f[use_mask], minlength=len(counts))
-            mean = sums / counts
+            # -------------------------   calculate median   ------------------------- #
+            median = np.array([np.median(f[(visit_mask == i) & use_mask]) for i in np.unique(visit_mask)])
+            if np.any(np.isnan(median)):
+                nan_indices = np.where(np.isnan(median))[0][0]
+                msg = ""
+                for inan_index in nan_indices:
+                    nanf = f[visit_mask == inan_index]
+                    msg += f"median is nan for {inan_index}th bin\n{nanf}\n\n"
+
+                raise ValueError(msg)
+
             mean_deviation = np.bincount(
                 visit_mask[use_mask],
-                weights=(f[use_mask] - mean[visit_mask[use_mask]]) ** 2,
+                weights=(f[use_mask] - median[visit_mask[use_mask]]) ** 2,
                 minlength=len(counts)
             )
 
             # ---------------------   calculate uncertainty   ---------------------- #
-            std = np.sqrt(mean_deviation) / (counts - 1)
+            std = np.sqrt(mean_deviation) / (n_points - 1)
             ecomb = np.sqrt(np.bincount(
                 visit_mask[use_mask],
                 weights=e[use_mask] ** 2,
                 minlength=len(counts)
-            )) / counts
-            t_value = stats.t.interval(0.68, df=counts - 1)[1]
+            )) / n_points
+
+            t_value = stats.t.interval(0.68, df=n_points - 1)[1]
             u = np.maximum(std, ecomb) * t_value
 
             # ---------------------   remove outliers in the bins   ---------------------- #
-            remaining_outliers = abs(mean[visit_mask] - f) > outlier_thresh * u[visit_mask]
+            remaining_outliers = abs(median[visit_mask] - f) > outlier_thresh * u[visit_mask]
             outlier_mask |= remaining_outliers
             n_remaining_outlier = sum(remaining_outliers) if remove_outliers else 0
             # setting remaining_outliers to 0 will exit the while loop
 
-        return mean, u, bin_ulim_bool, outlier_mask, use_mask
+        return median, u, bin_ulim_bool, outlier_mask, use_mask, n_points
 
     def bin_lightcurve(self, lightcurve):
         """
@@ -141,11 +152,10 @@ class WiseDataByVisit(WISEDataBase):
                 f = lightcurve[f"{b}{lum_ext}"]
                 e = lightcurve[f"{b}{lum_ext}{self.error_key_ext}"]
 
-                mean, u, bin_ulim_bool, outlier_mask, use_mask = self.calculate_epoch(
+                mean, u, bin_ulim_bool, outlier_mask, use_mask, n_points = self.calculate_epoch(
                     f, e, visit_mask, counts, remove_outliers=True
                 )
                 n_outliers = np.sum(outlier_mask)
-                n_points = np.bincount(visit_mask, weights=use_mask)
 
                 if n_outliers > 0:
                     logger.info(f"{lum_ext}: removed {n_outliers} outliers")
@@ -169,11 +179,9 @@ class WiseDataByVisit(WISEDataBase):
             # calculate zero points
             zps = np.zeros_like(inst_fluxes)
             zps[zp_mask] = mags[zp_mask] + 2.5 * np.log10(inst_fluxes[zp_mask])
-            zps_sum = np.bincount(visit_mask, weights=zps)
-
-            zps_mean = zps_sum / counts
+            zps_median = np.array([np.median(zps[visit_mask == i]) for i in np.unique(visit_mask)])
             # if there are only non-detections then fall back to default zeropoint
-            zps_mean[zps_mean == 0] = self.magnitude_zeropoints['Mag'][b]
+            zps_median[zps_median == 0] = self.magnitude_zeropoints['Mag'][b]
 
             # ---------------   calculate flux density from instrument flux   ---------------- #
             # get the instrument flux [digital numbers], i.e. source count
@@ -181,19 +189,18 @@ class WiseDataByVisit(WISEDataBase):
 
             # calculate the proportionality constant between flux density and source count
             mag_zp = self.magnitude_zeropoints['F_nu'][b].to('mJy').value
-            flux_dens_const = mag_zp * 10 ** (-zps_mean / 2.5)
+            flux_dens_const = mag_zp * 10 ** (-zps_median / 2.5)
 
             # calculate flux densities from instrument counts
             flux_densities = inst_fluxes * flux_dens_const[visit_mask]
             flux_densities_e = inst_fluxes_e * flux_dens_const[visit_mask]
 
             # bin flux densities
-            mean_fd, u_fd, ul_fd, outlier_mask_fd, use_mask_fd = self.calculate_epoch(
+            mean_fd, u_fd, ul_fd, outlier_mask_fd, use_mask_fd, n_points_fd = self.calculate_epoch(
                 flux_densities, flux_densities_e, visit_mask, counts,
                 remove_outliers=False, outlier_mask=outlier_masks[self.flux_key_ext]
                 # we do not remove outliers here because they have already been removed in the inst flux calculation
             )
-            n_points_fd = np.bincount(visit_mask, weights=use_mask)
             binned_data[f'{b}{self.mean_key}{self.flux_density_key_ext}'] = mean_fd
             binned_data[f'{b}{self.flux_density_key_ext}{self.rms_key}'] = u_fd
             binned_data[f'{b}{self.flux_density_key_ext}{self.upper_limit_key}'] = ul_fd
