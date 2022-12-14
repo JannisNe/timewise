@@ -43,6 +43,7 @@ class WiseDataByVisit(WISEDataBase):
     def calculate_epoch(self, f, e, visit_mask, counts, remove_outliers, outlier_mask=None):
         # TODO: add doc
         u_lims = pd.isna(e)
+        nan_mask = pd.isna(f)
 
         # ---------------------   remove outliers in the bins   ---------------------- #
 
@@ -64,46 +65,71 @@ class WiseDataByVisit(WISEDataBase):
         bin_ulim_bool = (counts - bin_n_ulims) == 0
         use_mask_ul = ~u_lims | (u_lims & bin_ulim_bool[visit_mask])
 
+        n_loops = 0
+
         # recalculate uncertainty and median as long as no outliers left
         while n_remaining_outlier > 0:
 
             # make a mask of values to use
-            use_mask = ~outlier_mask & use_mask_ul
+            use_mask = ~outlier_mask & use_mask_ul & ~nan_mask
             n_points = np.bincount(visit_mask, weights=use_mask)
+            zero_points_mask = n_points == 0
 
             # -------------------------   calculate median   ------------------------- #
-            median = np.array([np.median(f[(visit_mask == i) & use_mask]) for i in np.unique(visit_mask)])
-            if np.any(np.isnan(median)):
-                nan_indices = np.where(np.isnan(median))[0][0]
+            median = np.zeros_like(counts, dtype=float)
+            visits_at_least_one_point = np.unique(visit_mask[~zero_points_mask[visit_mask]])
+            visits_zero_points = np.unique(visit_mask[zero_points_mask[visit_mask]])
+            median[visits_at_least_one_point] = np.array([
+                np.median(f[(visit_mask == i) & use_mask]) for i in visits_at_least_one_point
+            ])
+            median[visits_zero_points] = np.nan
+
+            # median is NaN for visits with 0 detections, (i.e. detections in one band and not the other)
+            # if median is NaN for other visits raise Error
+            if np.any(np.isnan(median[n_points > 0])):
+                nan_indices = np.where(np.isnan(median))[0]
                 msg = ""
                 for inan_index in nan_indices:
                     nanf = f[visit_mask == inan_index]
                     msg += f"median is nan for {inan_index}th bin\n{nanf}\n\n"
-
                 raise ValueError(msg)
 
+            # ---------------------   calculate uncertainty   ---------------------- #
             mean_deviation = np.bincount(
                 visit_mask[use_mask],
                 weights=(f[use_mask] - median[visit_mask[use_mask]]) ** 2,
                 minlength=len(counts)
             )
-
-            # ---------------------   calculate uncertainty   ---------------------- #
-            std = np.sqrt(mean_deviation) / (n_points - 1)
-            ecomb = np.sqrt(np.bincount(
+            one_points_mask = n_points <= 1
+            # calculate standard deviation
+            std = np.zeros_like(counts, dtype=float)
+            std[~one_points_mask] = np.sqrt(mean_deviation[~one_points_mask]) / (n_points[~one_points_mask] - 1)
+            std[one_points_mask] = -np.inf
+            # calculate the propagated errors of the single exposure measurements
+            single_exp_measurement_errors = np.sqrt(np.bincount(
                 visit_mask[use_mask],
                 weights=e[use_mask] ** 2,
                 minlength=len(counts)
-            )) / n_points
+            ))
 
+            e_meas = np.zeros_like(std, dtype=float)
+            e_meas[~zero_points_mask] = single_exp_measurement_errors[n_points > 0] / n_points[n_points > 0]
+            e_meas[zero_points_mask] = np.nan
+            # for visits with small number of detections we have to correct according to the t distribution
             t_value = stats.t.interval(0.68, df=n_points - 1)[1]
-            u = np.maximum(std, ecomb) * t_value
+            # take the maximum value of the measured single exposure errors and the standard deviation
+            u = np.maximum(std, e_meas) * t_value
 
             # ---------------------   remove outliers in the bins   ---------------------- #
-            remaining_outliers = abs(median[visit_mask] - f) > outlier_thresh * u[visit_mask]
+            remaining_outliers = (abs(median[visit_mask] - f) > outlier_thresh * u[visit_mask]) & ~outlier_mask
             outlier_mask |= remaining_outliers
             n_remaining_outlier = sum(remaining_outliers) if remove_outliers else 0
             # setting remaining_outliers to 0 will exit the while loop
+
+            n_loops += 1
+
+            if n_loops > 20:
+                raise Exception(f"{n_loops}!")
 
         return median, u, bin_ulim_bool, outlier_mask, use_mask, n_points
 
