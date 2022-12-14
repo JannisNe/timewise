@@ -41,6 +41,24 @@ class WiseDataByVisit(WISEDataBase):
         self.multiply_flux_error = multiply_flux_error
 
     def calculate_epoch(self, f, e, visit_mask, counts, remove_outliers, outlier_mask=None):
+        """
+        Calculates the epoch of a lightcurve.
+
+        :param f: the fluxes
+        :type f: np.array
+        :param e: the flux errors
+        :type e: np.array
+        :param visit_mask: the visit mask
+        :type visit_mask: np.array
+        :param counts: the counts
+        :type counts: np.array
+        :param remove_outliers: whether to remove outliers
+        :type remove_outliers: bool
+        :param outlier_mask: the outlier mask
+        :type outlier_mask: np.array
+        :return: the epoch
+        :rtype: float
+        """
         # TODO: add doc
         u_lims = pd.isna(e)
         nan_mask = pd.isna(f)
