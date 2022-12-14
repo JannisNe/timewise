@@ -40,7 +40,7 @@ class WiseDataByVisit(WISEDataBase):
         self.clean_outliers_when_binning = clean_outliers_when_binning
         self.multiply_flux_error = multiply_flux_error
 
-    def calculate_epoch(self, f, e, visit_mask, counts, remove_outliers):
+    def calculate_epoch(self, f, e, visit_mask, counts, remove_outliers, outlier_mask=None):
         # TODO: add doc
         u_lims = pd.isna(e)
 
@@ -50,7 +50,7 @@ class WiseDataByVisit(WISEDataBase):
         outlier_thresh = np.inf if not self.clean_outliers_when_binning else 100
 
         # set up empty masks
-        outlier_mask = np.array([False] * len(f))
+        outlier_mask = np.array([False] * len(f)) if outlier_mask is None else outlier_mask
         mean = np.nan
         u = np.nan
         use_mask = None
@@ -190,8 +190,8 @@ class WiseDataByVisit(WISEDataBase):
             # bin flux densities
             mean_fd, u_fd, ul_fd, outlier_mask_fd, use_mask_fd = self.calculate_epoch(
                 flux_densities, flux_densities_e, visit_mask, counts,
-                remove_outliers=False  # we do not remove outliers here because they have already been removed in
-                                       # the inst flux calculation
+                remove_outliers=False, outlier_mask=outlier_masks[self.flux_key_ext]
+                # we do not remove outliers here because they have already been removed in the inst flux calculation
             )
             n_points_fd = np.bincount(visit_mask, weights=use_mask)
             binned_data[f'{b}{self.mean_key}{self.flux_density_key_ext}'] = mean_fd
