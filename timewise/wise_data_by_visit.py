@@ -64,7 +64,7 @@ class WiseDataByVisit(WISEDataBase):
         use_mask_ul = ~u_lims | (u_lims & bin_ulim_bool[visit_mask])
 
         # recalculate uncertainty and median as long as no outliers left
-        while (n_remaining_outlier > 0) and remove_outliers:
+        while n_remaining_outlier > 0:
 
             # make a mask of values to use
             use_mask = ~outlier_mask & use_mask_ul
@@ -85,13 +85,14 @@ class WiseDataByVisit(WISEDataBase):
                 weights=e[use_mask] ** 2,
                 minlength=len(counts)
             )) / counts
-            t_value = stats.t.interval(0.68, df=counts - 1)
+            t_value = stats.t.interval(0.68, df=counts - 1)[1]
             u = np.maximum(std, ecomb) * t_value
 
             # ---------------------   remove outliers in the bins   ---------------------- #
             remaining_outliers = abs(mean[visit_mask] - f) > outlier_thresh * u[visit_mask]
             outlier_mask |= remaining_outliers
-            n_remaining_outlier = sum(remaining_outliers)
+            n_remaining_outlier = sum(remaining_outliers) if remove_outliers else 0
+            # setting remaining_outliers to 0 will exit the while loop
 
         return mean, u, bin_ulim_bool, outlier_mask, use_mask
 
@@ -143,7 +144,7 @@ class WiseDataByVisit(WISEDataBase):
                 mean, u, bin_ulim_bool, outlier_mask, use_mask = self.calculate_epoch(
                     f, e, visit_mask, counts, remove_outliers=True
                 )
-                n_outliers = np.bincount(visit_mask, weights=outlier_mask)
+                n_outliers = np.sum(outlier_mask)
                 n_points = np.bincount(visit_mask, weights=use_mask)
 
                 if n_outliers > 0:
@@ -183,8 +184,8 @@ class WiseDataByVisit(WISEDataBase):
             flux_dens_const = mag_zp * 10 ** (-zps_mean / 2.5)
 
             # calculate flux densities from instrument counts
-            flux_densities = inst_fluxes * flux_dens_const
-            flux_densities_e = inst_fluxes_e * flux_dens_const
+            flux_densities = inst_fluxes * flux_dens_const[visit_mask]
+            flux_densities_e = inst_fluxes_e * flux_dens_const[visit_mask]
 
             # bin flux densities
             mean_fd, u_fd, ul_fd, outlier_mask_fd, use_mask_fd = self.calculate_epoch(
