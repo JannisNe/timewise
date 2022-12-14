@@ -2,6 +2,7 @@ import tqdm
 import pandas as pd
 import numpy as np
 import logging
+from scipy import stats
 
 from timewise.wise_data_base import WISEDataBase
 from timewise.utils import get_excess_variance
@@ -46,8 +47,9 @@ class WiseDataByVisit(WISEDataBase):
         The visits typically consist of some tens of observations. The individual visits are separated by about
         six months.
         The mean flux for one visit is calculated by the weighted mean of the data.
-        The error on that mean is calculated by the root-mean-squared.
-        # TODO: add doc about clean when binning and error factor
+        The error on that mean is calculated by the root-mean-squared and corrected by the t-value.
+        Outliers per visit are identified if they are more than 100 times the rms away from the mean. These outliers
+        are removed from the calculation of the mean and the error if self.clean_outliers_when_binning is True.
 
         :param lightcurve: the unbinned lightcurve
         :type lightcurve: pandas.DataFrame
@@ -164,10 +166,16 @@ class WiseDataByVisit(WISEDataBase):
                     while N_remaining_outlier > 0:
                         f = f[~remaining_outlier_mask]
                         e = e[~remaining_outlier_mask]
+
+                        # calculate the median and uncertainty
                         mean = np.median(f)
-                        rms = np.sqrt(sum((f - mean) ** 2)) / len(f)
+                        # we use the 1-sigma std as errors and correct for small amount of data
+                        # using the correction factor of the t distribution for 0.68
+                        t_value = stats.t.interval(0.68, df=len(f) - 1)[1]
+                        rms = np.sqrt(sum((f - mean) ** 2))
+                        std = rms / (len(f) - 1) * t_value
                         u_mes = 0 if ul else np.sqrt(sum(e[~outlier_mask] ** 2)) / len(e[~outlier_mask])
-                        u = max(rms, u_mes)
+                        u = max(std, u_mes)
 
                         remaining_outlier_mask = abs(mean - f) > outlier_thresh * u
                         outlier_mask = outlier_mask | remaining_outlier_mask
