@@ -204,6 +204,7 @@ class WiseDataByVisit(WISEDataBase):
 
             outlier_masks = dict()
             use_masks = dict()
+            bin_ulim_bools = dict()
 
             for lum_ext in [self.flux_key_ext, self.mag_key_ext]:
                 f = lightcurve[f"{b}{lum_ext}"]
@@ -224,6 +225,7 @@ class WiseDataByVisit(WISEDataBase):
 
                 outlier_masks[lum_ext] = outlier_mask
                 use_masks[lum_ext] = use_mask
+                bin_ulim_bools[lum_ext] = bin_ulim_bool
 
             # -------  calculate the zeropoints per exposure ------- #
             # this might look wrong since we use the flux mask on the magnitudes but it s right
@@ -236,9 +238,19 @@ class WiseDataByVisit(WISEDataBase):
             # calculate zero points
             zps = np.zeros_like(inst_fluxes)
             zps[zp_mask] = mags[zp_mask] + 2.5 * np.log10(inst_fluxes[zp_mask])
-            zps_median = np.array([np.median(zps[visit_mask == i]) for i in np.unique(visit_mask)])
+            # find visits with no zeropoints
+            n_valid_zps = np.bincount(visit_mask, weights=zp_mask)
+            at_least_one_valid_zp = n_valid_zps > 0
+            # calculate the median zeropoint for each visit
+            zps_median = np.zeros_like(n_valid_zps, dtype=float)
+            zps_median[n_valid_zps > 0] = np.array([
+                np.median(zps[(visit_mask == i) & zp_mask])
+                for i in np.unique(visit_mask[at_least_one_valid_zp[visit_mask]])
+            ])
             # if there are only non-detections then fall back to default zeropoint
-            zps_median[zps_median == 0] = self.magnitude_zeropoints['Mag'][b]
+            zps_median[n_valid_zps == 0] = self.magnitude_zeropoints['Mag'][b]
+            # if the visit only has upper limits then use the fall-back zeropoint
+            zps_median[bin_ulim_bools[self.flux_key_ext]] = self.magnitude_zeropoints['Mag'][b]
 
             # ---------------   calculate flux density from instrument flux   ---------------- #
             # get the instrument flux [digital numbers], i.e. source count
