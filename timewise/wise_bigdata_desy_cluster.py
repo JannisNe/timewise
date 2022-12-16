@@ -1105,6 +1105,16 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         return {b: pd.DataFrame.from_dict(coverage_val[b], orient='index') for b in self.bands}
 
+    @staticmethod
+    def get_quantiles_label(df, cl=0.68):
+        """
+
+        """
+        med = np.nanmedian(df)
+        ic = np.nanpercentile(df, [50 - cl / 2 * 100, 50 + cl / 2 * 100]) - med
+        label = rf"$ {med:.2f} ^{{ +{ic[1]:.2f} }} _{{ {ic[0]:.2f} }}$"
+        return label
+
     def make_coverage_plots(
             self,
             index_mask=None,
@@ -1132,16 +1142,19 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         for ax, band in zip(axs, self.bands):
             _coverages = coverages_df[band].values.flatten()
-            _coverages_median = np.nanmedian(_coverages)
-            _coverages_ic68 = np.nanpercentile(_coverages, [16, 84]) - _coverages_median
+            label = "all\n" + self.get_quantiles_label(_coverages)
 
-            h, b, _ = ax.hist(
+            sns.histplot(
                 _coverages,
-                label=rf"all $ {_coverages_median:.2f} ^{{ +{_coverages_ic68[1]:.2f} }} _{{ {_coverages_ic68[0]:.2f} }}$",
-                density=True,
-                color="k",
+                label=label,
+                stat="density",
                 bins=nbins,
-                alpha=0.4
+                ax=ax,
+                element="step",
+                fill=False,
+                lw=3,
+                color="k",
+                zorder=20,
             )
 
             ax.set_xlabel("coverage " + band)
@@ -1150,18 +1163,28 @@ class WISEDataDESYCluster(WiseDataByVisit):
             fig.tight_layout()
 
             if index_mask is not None:
-                for label, indices in index_mask.items():
+                for i, (label, indices) in enumerate(index_mask.items()):
                     _indices = coverages_df[band].index.intersection(indices)
-                    h, _, _ = ax.hist(
-                        coverages_df[band].loc[_indices].values.flatten(),
-                        label=label,
-                        density=True,
-                        bins=b,
-                        histtype="step"
+                    _coverages = coverages_df[band].loc[_indices].values.flatten()
+                    _label = label + "\n" + self.get_quantiles_label(_coverages)
+                    sns.histplot(
+                        _coverages,
+                        label=_label,
+                        stat="density",
+                        bins=nbins,
+                        ax=ax,
+                        color=f"C{(i+1)*2}",
+                        element="bars",
+                        alpha=0.7,
+                        fill=True,
+                        zorder=10
                     )
 
-            ax.grid(ls=":", zorder=100)
             ax.legend()
+            for loc in ["top", "right"]:
+                ax.spines[loc].set_visible(False)
+
+            ax.grid("on", axis="y", ls=":", lw=0.5, color="k", alpha=0.5, zorder=0)
 
         axs[0].set_ylabel("density")
 
