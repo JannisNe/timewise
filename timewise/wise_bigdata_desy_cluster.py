@@ -9,8 +9,7 @@ import queue
 import threading
 import argparse
 import time
-import warnings
-
+import seaborn as sns
 import backoff
 import shutil
 import gc
@@ -900,7 +899,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def get_red_chi2(self, chunk, lum_key, use_bigdata_dir):
         # TODO: add doc
 
-        logger.info(f"extracting info for chunk {chunk}")
+        logger.info(f"getting reduced chi2 for chunk {chunk}")
         data_product = self._load_data_product(
             service="tap",
             chunk_number=chunk,
@@ -946,6 +945,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             cumulative=True,
             upper_bound=4
     ):
+        # TODO: add doc
 
         if chunks is None:
             chunks = list(range(self.n_chunks))
@@ -1049,7 +1049,10 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
             if save:
                 kind = "cdf" if cumulative else "pdf"
-                fn = os.path.join(self.plots_dir, f"chi2_plots", lum_key, f"{n}_datapoints_{kind}.pdf")
+                chunk_str = "chunks_" + "_".join([str(c) for c in chunks]) \
+                    if len(chunks) != self.n_chunks \
+                    else "all_chunks"
+                fn = os.path.join(self.plots_dir, f"chi2_plots", lum_key, f"{n}_datapoints_{kind}_{chunk_str}.pdf")
                 d = os.path.dirname(fn)
                 if not os.path.isdir(d):
                     os.makedirs(d)
@@ -1066,6 +1069,143 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
     # -------------------------------------------
     #             END Chi2 plots
+    # --------------------------------------------------------------------------------------
+
+    # --------------------------------------------------------------------------------------
+    #             START coverage plots
+    # -------------------------------------------
+
+    @cache
+    def get_coverage(self, chunk, lum_key, load_from_bigdata_dir=False):
+        # TODO: this is a bit of a hack, but it works, also add docstring
+        logger.info(f"getting coverage for chunk {chunk}")
+        data_product = self._load_data_product(
+            service="tap",
+            chunk_number=chunk,
+            use_bigdata_dir=load_from_bigdata_dir
+        )
+
+        coverage_val = {b: dict() for b in self.bands}
+
+        for b in self.bands:
+            key1 = f"{b}_coverage_of_median{lum_key}"
+            for i, idata_product in tqdm.tqdm(
+                    data_product.items(),
+                    total=len(data_product),
+                    desc="collecting coverage values"
+            ):
+                if "timewise_metadata" in idata_product:
+                    imetadata = idata_product["timewise_metadata"]
+
+                    if key1 in imetadata:
+                        v = {
+                            "coverage": imetadata[key1]
+                        }
+                        coverage_val[b][i] = v
+
+        return {b: pd.DataFrame.from_dict(coverage_val[b], orient='index') for b in self.bands}
+
+    @staticmethod
+    def get_quantiles_label(df, cl=0.68):
+        """
+
+        """
+        med = np.nanmedian(df)
+        ic = np.nanpercentile(df, [50 - cl / 2 * 100, 50 + cl / 2 * 100]) - med
+        label = rf"$ {med:.2f} ^{{ +{ic[1]:.2f} }} _{{ {ic[0]:.2f} }}$"
+        return label
+
+    def make_coverage_plots(
+            self,
+            index_mask=None,
+            chunks=None,
+            load_from_bigdata_dir=False,
+            lum_key="_flux_density",
+            interactive=False,
+            save=False,
+            nbins=100,
+    ):
+        # TODO: add docstring
+
+        if chunks is None:
+            chunks = list(range(self.n_chunks))
+
+        coverages = [self.get_coverage(chunk, lum_key, load_from_bigdata_dir=load_from_bigdata_dir) for chunk in chunks]
+        coverages_df = {b: pd.concat([c[b] for c in coverages]) for b in self.bands}
+
+        fig, axs = plt.subplots(
+            1, len(self.bands),
+            figsize=(len(self.bands) * 4, 4),
+            sharey="all",
+            sharex="all"
+        )
+
+        for ax, band in zip(axs, self.bands):
+            _coverages = coverages_df[band].values.flatten()
+            label = "all\n" + self.get_quantiles_label(_coverages)
+
+            sns.histplot(
+                _coverages,
+                label=label,
+                stat="density",
+                bins=nbins,
+                ax=ax,
+                element="step",
+                fill=False,
+                lw=3,
+                color="k",
+                zorder=20,
+            )
+
+            ax.set_xlabel("coverage " + band)
+            ax.set_xlim(0, 1)
+            fig.suptitle(f"coverage of median")
+            fig.tight_layout()
+
+            if index_mask is not None:
+                for i, (label, indices) in enumerate(index_mask.items()):
+                    _indices = coverages_df[band].index.intersection(indices)
+                    _coverages = coverages_df[band].loc[_indices].values.flatten()
+                    _label = label + "\n" + self.get_quantiles_label(_coverages)
+                    sns.histplot(
+                        _coverages,
+                        label=_label,
+                        stat="density",
+                        bins=nbins,
+                        ax=ax,
+                        color=f"C{(i+1)*2}",
+                        element="bars",
+                        alpha=0.7,
+                        fill=True,
+                        zorder=10
+                    )
+
+            ax.legend()
+            for loc in ["top", "right"]:
+                ax.spines[loc].set_visible(False)
+
+            ax.grid("on", axis="y", ls=":", lw=0.5, color="k", alpha=0.5, zorder=0)
+
+        axs[0].set_ylabel("density")
+
+        if save:
+            chunk_str = "chunks_" + "_".join([str(c) for c in chunks]) \
+                if len(chunks) != self.n_chunks \
+                else "all_chunks"
+            fn = os.path.join(self.plots_dir, f"coverage_plots", lum_key, f"{chunk_str}.pdf")
+            d = os.path.dirname(fn)
+            if not os.path.isdir(d):
+                os.makedirs(d)
+            logger.debug(f"saving under {fn}")
+            fig.savefig(fn)
+
+        if interactive:
+            return fig, axs
+        else:
+            plt.close()
+
+    # -------------------------------------------
+    #             END coverage plots
     # --------------------------------------------------------------------------------------
 
     #####################################
