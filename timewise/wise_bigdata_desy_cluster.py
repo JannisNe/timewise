@@ -1002,6 +1002,18 @@ class WISEDataDESYCluster(WiseDataByVisit):
                     np.histogram(chi2_df_sel[band].values.flatten(), bins=x, density=True)[0]
                 nonzero_m = hpdf > 0
 
+                # we need the absolute histogram numbers to calculate the uncsertainties of the density bins
+                # The uncertainty of the density bin d_i is
+                #
+                #       u_di = u_ci * sum_{j not i}(c_j) / [(sum_{j}c_j)^2 * (b_{i+1} - b_{i})]
+                #
+                # where u_ci = sqrt(c_i) is the uncertainty of the counts bin c_i
+                #
+                h_abs = np.histogram(chi2_df_sel[band].values.flatten(), bins=x, density=False)[0][nonzero_m]
+                h_abs_sum = np.sum(h_abs)
+                h_sum_not_i = h_abs_sum - h_abs
+                u_density = np.sqrt(h_abs) * h_sum_not_i / (h_abs_sum ** 2 * (np.diff(x))[nonzero_m])
+
                 if index_mask is not None:
                     for i, (label, indices) in enumerate(index_mask.items()):
                         _indices = chi2_df_sel[band].index.intersection(indices)
@@ -1026,7 +1038,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 if len(sel) > 0:
 
                     # fit an F-distribution
-                    fpars = f.fit(sel, n-1, 1e5, f0=n - 1, floc=0)
+                    fpars = f.fit(sel, n-1, 1e5, f0=1, floc=0)
                     frozenf = f(*fpars)
                     fpdf = frozenf.pdf
 
@@ -1035,7 +1047,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
                     # To see how well the distribution fits the data we'll calculate the chi2
                     # to the PDF (not to the CDF because the bins in CDF are correlated)
-                    F_chi2fit = sum((hpdf[nonzero_m] - fpdf(bmids[nonzero_m])) ** 2 / hpdf[nonzero_m])
+                    ndof_fit = len(bmids[nonzero_m]) - 2
+                    F_chi2fit = sum((hpdf[nonzero_m] - fpdf(bmids[nonzero_m])) ** 2 / u_density**2) / ndof_fit
 
                     # plot the fitted distribution
                     ax.plot(x_dense, ffunc(x_dense), color='deepskyblue', ls="--", lw=3,
@@ -1044,6 +1057,28 @@ class WISEDataDESYCluster(WiseDataByVisit):
                                 rf"$\nu_1$={fpars[0]:.2f}, $\nu_2$={fpars[1]:.2f}, scale={fpars[-1]:.2f}"
                             ),
                             zorder=30
+                            )
+
+                    # fit an chi2 distribution
+                    chi2fit_pars = chi2.fit(sel, n - 1, f0=n - 1, floc=0)
+                    frozen_chi2fit = chi2(*chi2fit_pars)
+                    frozen_chi2fit_pdf = frozen_chi2fit.pdf
+
+                    # if cumulative then draw the CDF instead of the PDF
+                    chi2fit_func = frozen_chi2fit.cdf if cumulative else frozen_chi2fit_pdf
+
+                    # To see how well the distribution fits the data we'll caluclate the chi2
+                    # to the PDF (not to the CDF because the bins in CDF are correlated)
+                    ndof_fit = len(bmids[nonzero_m]) - 1
+                    chi2fit_chi2fit = sum((hpdf[nonzero_m] - frozen_chi2fit_pdf(bmids[nonzero_m])) ** 2 /
+                                          u_density**2) / ndof_fit
+
+                    # plot the fitted distribution
+                    ax.plot(x, chi2fit_func(x), color='k', ls=":",
+                            label=(
+                                f"fitted $\chi^2$-distribution ($\chi ^2$={chi2fit_chi2fit:.2f})\n "
+                                f"fixed ndof={chi2fit_pars[0]:.2f}, scale={chi2fit_pars[-1]:.2f}"
+                            )
                             )
 
                 # we will also show the expected chi2 distribution
