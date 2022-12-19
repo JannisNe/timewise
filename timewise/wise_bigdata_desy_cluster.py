@@ -1045,7 +1045,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 if len(sel) > 0:
 
                     # fit an F-distribution
-                    fpars = f.fit(sel, n-1, 1e5, f0=1, floc=0)
+                    fpars = f.fit(sel, n-1, 1e5, f0=n-1, floc=0)
                     frozenf = f(*fpars)
                     fpdf = frozenf.pdf
 
@@ -1064,28 +1064,6 @@ class WISEDataDESYCluster(WiseDataByVisit):
                                 rf"$\nu_1$={fpars[0]:.0f}, $\nu_2$={fpars[1]:.2f}, scale={fpars[-1]:.2f}"
                             ),
                             zorder=30
-                            )
-
-                    # fit an chi2 distribution
-                    chi2fit_pars = chi2.fit(sel, n - 1, f0=n - 1, floc=0)
-                    frozen_chi2fit = chi2(*chi2fit_pars)
-                    frozen_chi2fit_pdf = frozen_chi2fit.pdf
-
-                    # if cumulative then draw the CDF instead of the PDF
-                    chi2fit_func = frozen_chi2fit.cdf if cumulative else frozen_chi2fit_pdf
-
-                    # To see how well the distribution fits the data we'll caluclate the chi2
-                    # to the PDF (not to the CDF because the bins in CDF are correlated)
-                    ndof_fit = len(bmids[nonzero_m]) - 1
-                    chi2fit_chi2fit = sum((hpdf[nonzero_m] - frozen_chi2fit_pdf(bmids[nonzero_m])) ** 2 /
-                                          u_density**2) / ndof_fit
-
-                    # plot the fitted distribution
-                    ax.plot(x, chi2fit_func(x), color='k', ls=":",
-                            label=(
-                                f"fitted $\chi^2$-distribution ($\chi ^2$={chi2fit_chi2fit:.2f})\n "
-                                f"fixed ndof={chi2fit_pars[0]:.2f}, scale={chi2fit_pars[-1]:.2f}"
-                            )
                             )
 
                 # we will also show the expected chi2 distribution
