@@ -973,7 +973,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 sharex="all"
             )
 
-            index_colors = {k: f"C{i}" for i, k in enumerate(index_mask.keys())} if index_mask is not None else None
+            index_colors = (
+                {k: f"C{(i+1)*2}"
+                 for i, k in enumerate(index_mask.keys())}
+                if index_mask is not None else None
+            )
 
             x = np.linspace(0, upper_bound, nbins)
             x = np.concatenate([x, [1e6]])
@@ -986,7 +990,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
                     cumulative=cumulative,
                     color="k",
                     bins=x,
-                    alpha=0.4
+                    lw=3,
+                    histtype="step",
+                    zorder=20,
                 )
                 bmids = (b[1:] + b[:-1]) / 2
 
@@ -997,19 +1003,25 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 nonzero_m = hpdf > 0
 
                 if index_mask is not None:
-                    for label, indices in index_mask.items():
+                    for i, (label, indices) in enumerate(index_mask.items()):
                         _indices = chi2_df_sel[band].index.intersection(indices)
-                        ax.hist(
+                        sns.histplot(
                             chi2_df_sel[band].loc[_indices].values.flatten(),
                             label=label,
-                            histtype="step",
+                            stat="density",
                             bins=b,
-                            density=True,
-                            cumulative=cumulative,
-                            color=index_colors[label]
+                            ax=ax,
+                            color=index_colors[label],
+                            element="bars",
+                            alpha=0.7,
+                            fill=True,
+                            zorder=10,
+                            edgecolor="k",
+                            lw=1,
                         )
 
                 # select non-NaN's and values below `upper_bound`
+                x_dense = np.linspace(min(x), upper_bound, 1000)
                 sel = chi2_df_sel[band][(~chi2_df_sel[band].isna()) & (chi2_df_sel[band] < upper_bound)]
                 if len(sel) > 0:
 
@@ -1021,31 +1033,37 @@ class WISEDataDESYCluster(WiseDataByVisit):
                     # if cumulative then draw the CDF instead of the PDF
                     ffunc = frozenf.cdf if cumulative else fpdf
 
-                    # To see how well the distribution fits the data we'll caluclate the chi2
+                    # To see how well the distribution fits the data we'll calculate the chi2
                     # to the PDF (not to the CDF because the bins in CDF are correlated)
                     F_chi2fit = sum((hpdf[nonzero_m] - fpdf(bmids[nonzero_m])) ** 2 / hpdf[nonzero_m])
 
                     # plot the fitted distribution
-                    ax.plot(x, ffunc(x), color='k', ls="-.",
+                    ax.plot(x_dense, ffunc(x_dense), color='deepskyblue', ls="--", lw=3,
                             label=(
-                                f"fitted F-distribution ($\chi ^2$={F_chi2fit:.2f})\n "
-                                f"ndof1={fpars[0]:.2f}, ndof2={fpars[1]:.2f}, scale={fpars[-1]:.2f}"
-                            )
+                                rf"F-distribution ($\chi_{{fit}} ^2$={F_chi2fit:.2f}) " + "\n" +
+                                rf"$\nu_1$={fpars[0]:.2f}, $\nu_2$={fpars[1]:.2f}, scale={fpars[-1]:.2f}"
+                            ),
+                            zorder=30
                             )
 
                 # we will also show the expected chi2 distribution
                 pars_expected = (n - 1, 0, 1 / (n - 1))
                 chi2_expected = chi2(*pars_expected)
-                r = chi2_expected.cdf(x) if cumulative else chi2_expected.pdf(x)
+                r = chi2_expected.cdf(x_dense) if cumulative else chi2_expected.pdf(x_dense)
                 chi2_fitchi2 = sum((hpdf[nonzero_m] - chi2_expected.pdf(bmids[nonzero_m])) ** 2 / hpdf[nonzero_m])
-                ax.plot(x, r, color="k", ls="--",
-                        label=f"expected $\chi ^2$\n ndof: {n - 1:.1f} ($\chi ^2$={chi2_fitchi2:.2f})")
+                ax.plot(x_dense, r, color="deepskyblue", ls=":", lw=3,
+                        label=rf"expected $\chi^2$-distribution" + "\n" + rf"$\nu$: {n - 1:.1f}",
+                        zorder=30)
 
                 ax.legend()
-                ax.set_xlabel("$\chi^2$ " + band)
+                ax.set_xlabel(r"$\chi^2_{" + band + "} / N_{visits," + band + "}$")
                 ax.set_xlim(0, upper_bound)
-                fig.suptitle(f"{n} datapoints")
-                fig.tight_layout()
+
+                for loc in ["top", "right"]:
+                    ax.spines[loc].set_visible(False)
+
+            fig.suptitle(f"{n} datapoints")
+            fig.tight_layout()
 
             if save:
                 kind = "cdf" if cumulative else "pdf"
