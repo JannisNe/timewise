@@ -1017,6 +1017,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 if index_mask is not None:
                     for i, (label, indices) in enumerate(index_mask.items()):
                         _indices = chi2_df_sel[band].index.intersection(indices)
+                        kwargs = (
+                            dict()
+                            if cumulative else
+                            {"edgecolor": "k"}
+                        )
                         sns.histplot(
                             chi2_df_sel[band].loc[_indices].values.flatten(),
                             label=label,
@@ -1024,12 +1029,13 @@ class WISEDataDESYCluster(WiseDataByVisit):
                             bins=b,
                             ax=ax,
                             color=index_colors[label],
-                            element="bars",
+                            element="step" if cumulative else "bars",
                             alpha=0.7,
-                            fill=True,
+                            fill=not cumulative,
                             zorder=10,
-                            edgecolor="k",
-                            lw=1,
+                            lw=3 if cumulative else 1,
+                            cumulative=cumulative,
+                            **kwargs
                         )
 
                 # select non-NaN's and values below `upper_bound`
