@@ -1022,6 +1022,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                             if cumulative else
                             {"edgecolor": "k"}
                         )
+
                         sns.histplot(
                             chi2_df_sel[band].loc[_indices].values.flatten(),
                             label=label,
