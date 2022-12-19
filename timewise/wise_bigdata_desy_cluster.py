@@ -1053,8 +1053,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
                     # plot the fitted distribution
                     ax.plot(x_dense, ffunc(x_dense), color='deepskyblue', ls="--", lw=3,
                             label=(
-                                rf"F-distribution ($\chi_{{fit}} ^2$={F_chi2fit:.2f}) " + "\n" +
-                                rf"$\nu_1$={fpars[0]:.2f}, $\nu_2$={fpars[1]:.2f}, scale={fpars[-1]:.2f}"
+                                rf"F-distribution" + "\n" +
+                                rf"$\nu_1$={fpars[0]:.0f}, $\nu_2$={fpars[1]:.2f}, scale={fpars[-1]:.2f}"
                             ),
                             zorder=30
                             )
@@ -1087,7 +1087,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 r = chi2_expected.cdf(x_dense) if cumulative else chi2_expected.pdf(x_dense)
                 chi2_fitchi2 = sum((hpdf[nonzero_m] - chi2_expected.pdf(bmids[nonzero_m])) ** 2 / hpdf[nonzero_m])
                 ax.plot(x_dense, r, color="deepskyblue", ls=":", lw=3,
-                        label=rf"expected $\chi^2$-distribution" + "\n" + rf"$\nu$: {n - 1:.1f}",
+                        label=rf"$\chi^2$-distribution" + "\n" + rf"$\nu$: {n - 1:.0f}",
                         zorder=30)
 
                 ax.legend()
