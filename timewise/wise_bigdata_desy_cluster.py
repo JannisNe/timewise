@@ -721,9 +721,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
         text = (
             f"executable = {self.executable_filename} \n"
             f"environment = \"TIMEWISE_DATA={data_dir} TIMEWISE_BIGDATA={bigdata_dir}\" \n"
-            f"log = $(cluster)_$(process)job.log \n"
-            f"output = $(cluster)_$(process)job.out \n"
-            f"error = $(cluster)_$(process)job.err \n"
+            f"log = {self.cluster_log_dir}/$(cluster)_$(process)job.log \n"
+            f"output = {self.cluster_log_dir}/$(cluster)_$(process)job.out \n"
+            f"error = {self.cluster_log_dir}/$(cluster)_$(process)job.err \n"
             f"should_transfer_files   = YES \n"
             f"when_to_transfer_output = ON_EXIT \n"
             f"arguments = $(job_id) \n"
