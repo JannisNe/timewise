@@ -59,11 +59,14 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self.executable_filename = os.path.join(self.cluster_dir, "run_timewise.sh")
         self.submit_file_filename = os.path.join(self.cluster_dir, "submit_file.submit")
         self.job_id = None
-        self._n_cluster_jobs_per_chunk = None
+
         self.cluster_jobID_map = None
         self.clusterJob_chunk_map = None
         self.cluster_info_file = os.path.join(self.cluster_dir, 'cluster_info.pkl')
         self._overwrite = True
+
+        # these attributes will be set later and are used to pass them to the threads
+        self._n_cluster_jobs_per_chunk = None
         self._storage_dir = None
 
         # status attributes
@@ -203,6 +206,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                                     cluster_jobs_per_chunk=100, wait=5, remove_chunks=False,
                                     query_type='positional', overwrite=True,
                                     storage_directory=bigdata_dir,
+                                    node_memory='8G',
                                     skip_download=False,
                                     skip_input=False):
         """
@@ -228,6 +232,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
         :type overwrite: bool
         :param storage_directory: move binned files and raw data here after work is done
         :type storage_directory: str
+        :param node_memory: memory per node on the cluster, default is 8G
+        :type node_memory: str
         :param skip_download: if True, assume data is already downloaded, only do binning in that case
         :type skip_download: bool
         :param skip_input: if True do not ask if data is correct before download
@@ -278,12 +284,6 @@ class WISEDataDESYCluster(WiseDataByVisit):
         # --------------------------- set up cluster info --------------------------- #
 
         self.n_cluster_jobs_per_chunk = cluster_jobs_per_chunk
-        cluster_time_s = max(len(self.parent_sample.df) / self._n_chunks / self.n_cluster_jobs_per_chunk, 59 * 60)
-        if cluster_time_s > 24 * 3600:
-            raise ValueError(f"cluster time per job would be longer than 24h! "
-                             f"Choose more than {self.n_cluster_jobs_per_chunk} jobs per chunk!")
-
-        cluster_time = time.strftime('%H:%M:%S', time.gmtime(cluster_time_s))
         self.clear_cluster_log_dir()
         self._save_cluster_info()
         self._overwrite = overwrite
@@ -312,9 +312,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         for c in chunks:
             if not skip_download:
-                self._tap_queue.put((tables, c, wait, mag, flux, cluster_time, query_type))
+                self._tap_queue.put((tables, c, wait, mag, flux, node_memory, query_type))
             else:
-                self._cluster_queue.put((cluster_time, c))
+                self._cluster_queue.put((node_memory, c))
 
         status_thread.start()
 
@@ -399,7 +399,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def _tap_thread(self):
         logger.debug(f'started tap thread')
         while True:
-            tables, chunk, wait, mag, flux, cluster_time, query_type = self._tap_queue.get(block=True)
+            tables, chunk, wait, mag, flux, node_memory, query_type = self._tap_queue.get(block=True)
             logger.debug(f'querying IRSA for chunk {chunk}')
 
             submit_to_cluster = True
@@ -447,7 +447,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
             self._tap_queue.task_done()
             if submit_to_cluster:
-                self._cluster_queue.put((cluster_time, chunk))
+                self._cluster_queue.put((node_memory, chunk))
 
             gc.collect()
 
@@ -476,15 +476,14 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def _cluster_thread(self):
         logger.debug(f'started cluster thread')
         while True:
-            cluster_time, chunk = self._cluster_queue.get(block=True)
+            node_memory, chunk = self._cluster_queue.get(block=True)
 
             logger.info(f'got all TAP results for chunk {chunk}. submitting to cluster')
-            job_id = self.submit_to_cluster(node_memory='40G',
-                                            single_chunk=chunk)
+            job_id = self.submit_to_cluster(node_memory=node_memory, single_chunk=chunk)
 
             if not job_id:
                 logger.warning(f"could not submit {chunk} to cluster! Try later")
-                self._cluster_queue.put((cluster_time, chunk))
+                self._cluster_queue.put((node_memory, chunk))
                 self._cluster_queue.task_done()
 
             else:
