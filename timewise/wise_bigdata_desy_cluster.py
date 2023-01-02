@@ -570,8 +570,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         """Gets the condor status and saves it to private attribute"""
         self._status_output = self.get_condor_status()
 
-    @property
-    def condor_status(self):
+    def condor_status(self, job_id):
         """
         Get the status of jobs running on condor.
         :return: number of jobs that are done, running, waiting, total, held
@@ -583,28 +582,30 @@ class WISEDataDESYCluster(WiseDataByVisit):
         done = running = waiting = total = held = None
 
         for li in status_list:
-            if li[2] == self.job_id:
+            if li[2] == job_id:
                 done, running, waiting = li[5:8]
                 held = 0 if len(li) == 10 else li[8]
                 total = li[-2]
 
         return done, running, waiting, total, held
 
-    def wait_for_job(self):
+    def wait_for_job(self, job_id=None):
         """
         Wait until the cluster job is done
         """
 
-        if self.job_id:
-            logger.info("waiting for job with ID " + str(self.job_id))
+        _job_id = job_id or self.job_id
+
+        if _job_id:
+            logger.info("waiting for job with ID " + str(_job_id))
             time.sleep(5)
 
             self.collect_condor_status()
             j = 0
-            while not np.all(np.array(self.condor_status) == None):
-                d, r, w, t, h = self.condor_status
+            while not np.all(np.array(self.condor_status(_job_id)) == None):
+                d, r, w, t, h = self.condor_status(_job_id)
                 logger.info(
-                    f"{time.asctime(time.localtime())} - Job{self.job_id}: "
+                    f"{time.asctime(time.localtime())} - Job{_job_id}: "
                     f"{d} done, {r} running, {w} waiting, {h} held of total {t}"
                 )
                 j += 1
@@ -614,7 +615,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 time.sleep(90)
                 self.collect_condor_status()
 
-            logger.info("Done waiting for job with ID " + str(self.job_id))
+            logger.info("Done waiting for job with ID " + str(_job_id))
 
         else:
             logger.info(f"No Job ID!")
