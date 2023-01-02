@@ -603,7 +603,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             self.collect_condor_status()
             j = 0
             while not np.all(np.array(self.condor_status(_job_id)) == None):
-                d, r, w, t, h = self.condor_status
+                d, r, w, t, h = self.condor_status(_job_id)
                 logger.info(
                     f"{time.asctime(time.localtime())} - Job{_job_id}: "
                     f"{d} done, {r} running, {w} waiting, {h} held of total {t}"
