@@ -188,8 +188,8 @@ class TestMIRFlareCatalogue(unittest.TestCase):
             wait=0
         )
 
-        wise_data.make_chi2_plot()
-        wise_data.make_coverage_plots()
+        wise_data.make_chi2_plot(load_from_bigdata_dir=True)
+        wise_data.make_coverage_plots(load_from_bigdata_dir=True)
 
     def test_d_wise_bigdata_desy_cluster(self):
         host = socket.gethostname()
