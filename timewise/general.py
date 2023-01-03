@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 # Setting up data directory
 DATA_DIR_KEY = 'TIMEWISE_DATA'
 if DATA_DIR_KEY in os.environ:
-    data_dir = os.environ[DATA_DIR_KEY]
+    data_dir = os.path.expanduser(os.environ[DATA_DIR_KEY])
 else:
     logger.warning(f'{DATA_DIR_KEY} not set! Using home directory.')
     data_dir = os.path.expanduser('~/')
@@ -32,7 +32,7 @@ cache_dir = os.path.join(data_dir, 'cache')
 
 for d in [data_dir, output_dir, plots_dir, cache_dir]:
     if not os.path.isdir(d):
-        os.mkdir(d)
+        os.mkdir(os.path.abspath(d))
 
 
 def backoff_hndlr(details):

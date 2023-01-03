@@ -2,7 +2,6 @@
 [run]
 source = timewise
 omit =
-    timewise/wise_bigdata_desy_cluster.py
     timewise/big_parent_sample.py
 parallel = True
 concurrency = thread, multiprocessing

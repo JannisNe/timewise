@@ -1,19 +1,30 @@
-import os, subprocess, copy, json, tqdm, time, threading, queue, requests, abc, logging, backoff
+import abc
+import backoff
+import copy
+import json
+import logging
 import multiprocessing as mp
-import pandas as pd
-import numpy as np
-import pyvo as vo
-from astropy.io import ascii
-import astropy.units as u
-from astropy.table import Table
-from astropy import constants
-from astropy.cosmology import Planck18
-import matplotlib.pyplot as plt
+import os
+import queue
+import requests
+import subprocess
+import threading
+import time
+import tqdm
 import warnings
 
-from timewise.general import main_logger, cache_dir, plots_dir, output_dir, logger_format, backoff_hndlr
-from timewise.utils import StableTAPService
+import astropy.units as u
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import pyvo as vo
+from astropy import constants
+from astropy.cosmology import Planck18
+from astropy.io import ascii
+from astropy.table import Table
 
+from timewise.general import cache_dir, plots_dir, output_dir, logger_format, backoff_hndlr
+from timewise.utils import StableTAPService
 
 logger = logging.getLogger(__name__)
 
@@ -917,7 +928,7 @@ class WISEDataBase(abc.ABC):
                                                         f"of {t} "
                                                         f"after {N_tries} attempts")
             try:
-                job = WISEDataBase.service.submit_job(qstring, uploads={'ids': Table(tab_d)})
+                job = self.service.submit_job(qstring, uploads={'ids': Table(tab_d)})
                 job.run()
 
                 if isinstance(job.phase, type(None)):

@@ -63,6 +63,8 @@ jobs:
         env:
           SDSS_USERID: ${{ secrets.SDSS_USERID }}
           SDSS_USERPW: ${{ secrets.SDSS_USERPW }}
+          TIMEWISE_DATA: ~/timewise_data
+          TIMEWISE_BIGDATA: ~/timewise_bigdata
         run: |
           poetry run coverage run -m unittest discover tests/
           poetry run coverage combine
