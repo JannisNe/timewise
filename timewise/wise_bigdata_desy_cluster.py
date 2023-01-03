@@ -69,6 +69,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._n_cluster_jobs_per_chunk = None
         self._storage_dir = None
 
+        # use a lock to prevent multiple threads to load and write to disc simultaneously
+        self.disc_lock = threading.Lock()
+
         # status attributes
         self.start_time = None
         self._total_tasks = None
@@ -491,7 +494,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 self.wait_for_job()
                 logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}).')
 
-                log_files = glob.glob(f"./{self.job_id}_*")
+                log_files = glob.glob(f"./{job_id}_*")
                 log_files_abs = [os.path.abspath(p) for p in log_files]
                 logger.debug(f"moving {len(log_files_abs)} log files to {self.cluster_log_dir}")
                 for f in log_files_abs:
@@ -500,18 +503,19 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 logger.debug(f'Start combining')
 
                 try:
-                    self._combine_data_products('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
+                    with self.disc_lock:
+                        self._combine_data_products('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
 
-                    if self._storage_dir:
-                        filenames_to_move = [
-                            self._data_product_filename(service='tap', chunk_number=chunk),
-                        ]
+                        if self._storage_dir:
+                            filenames_to_move = [
+                                self._data_product_filename(service='tap', chunk_number=chunk),
+                            ]
 
-                        for t in self.photometry_table_keymap.keys():
-                            filenames_to_move.append(self._chunk_photometry_cache_filename(t, chunk))
+                            for t in self.photometry_table_keymap.keys():
+                                filenames_to_move.append(self._chunk_photometry_cache_filename(t, chunk))
 
-                        for fn in filenames_to_move:
-                            self._move_file_to_storage(fn)
+                            for fn in filenames_to_move:
+                                self._move_file_to_storage(fn)
 
                 finally:
                     self._cluster_queue.task_done()
