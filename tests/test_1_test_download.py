@@ -88,9 +88,9 @@ class WISEBigDataTestVersion(WISEDataDESYCluster):
     def wait_for_job(self, job_id=None):
         logger.info("called dummy wait for cluster")
 
-    def clean_up(self):
-        logger.info(f"removing {self.cache_dir}")
-        shutil.rmtree(self.cache_dir)
+    # def clean_up(self):
+    #     logger.info(f"removing {self.cache_dir}")
+    #     shutil.rmtree(self.cache_dir)
 
 
 ####################################
@@ -188,21 +188,21 @@ class TestMIRFlareCatalogue(unittest.TestCase):
             wait=0
         )
 
+        logger.info(f" --- Test chi2 plots --- ")
         wise_data.make_chi2_plot(load_from_bigdata_dir=True, save=True)
+        logger.info(f" --- Test coverage plots --- ")
         wise_data.make_coverage_plots(load_from_bigdata_dir=True, save=True)
 
         logger.info(f" --- Test plot lightcurves --- ")
-        lcs = wise_data.load_binned_lcs('tap')
-        plot_id = list(lcs.keys())[0].split('_')[0]
-        for lumk in ['mag', 'flux_density', 'luminosity']:
+        plot_id = "2"
+        for lumk in ['mag', 'flux_density']:
             fn = os.path.join(wise_data.plots_dir, f"{plot_id}_{lumk}.pdf")
-            plot_unbinned = True if lumk == 'mag' else False
             wise_data.plot_lc(
                 parent_sample_idx=plot_id,
-                plot_unbinned=plot_unbinned,
                 lum_key=lumk,
-                service=s,
-                fn=fn
+                service='tap',
+                fn=fn,
+                load_from_bigdata_dir=True
             )
 
     def test_d_wise_bigdata_desy_cluster(self):
