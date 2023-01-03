@@ -188,8 +188,22 @@ class TestMIRFlareCatalogue(unittest.TestCase):
             wait=0
         )
 
-        wise_data.make_chi2_plot(load_from_bigdata_dir=True)
-        wise_data.make_coverage_plots(load_from_bigdata_dir=True)
+        wise_data.make_chi2_plot(load_from_bigdata_dir=True, save=True)
+        wise_data.make_coverage_plots(load_from_bigdata_dir=True, save=True)
+
+        logger.info(f" --- Test plot lightcurves --- ")
+        lcs = wise_data.load_binned_lcs('tap')
+        plot_id = list(lcs.keys())[0].split('_')[0]
+        for lumk in ['mag', 'flux_density', 'luminosity']:
+            fn = os.path.join(wise_data.plots_dir, f"{plot_id}_{lumk}.pdf")
+            plot_unbinned = True if lumk == 'mag' else False
+            wise_data.plot_lc(
+                parent_sample_idx=plot_id,
+                plot_unbinned=plot_unbinned,
+                lum_key=lumk,
+                service=s,
+                fn=fn
+            )
 
     def test_d_wise_bigdata_desy_cluster(self):
         host = socket.gethostname()
