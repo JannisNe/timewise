@@ -32,6 +32,8 @@ cache_dir = os.path.join(data_dir, 'cache')
 
 for d in [data_dir, output_dir, plots_dir, cache_dir]:
     if not os.path.isdir(d):
+        if "~" in d:
+            d = os.path.expanduser(d)
         os.mkdir(os.path.abspath(d))
 
 
