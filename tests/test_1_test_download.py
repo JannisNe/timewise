@@ -51,6 +51,48 @@ class WISEDataTestVersion(WiseDataByVisit):
         shutil.rmtree(self.cache_dir)
 
 
+class WISEBigDataTestVersion(WISEDataDESYCluster):
+    base_name = "test/test_mock_desy_bigdata"
+
+    def __init__(self, base_name=base_name):
+        super().__init__(base_name=base_name,
+                         parent_sample_class=MirongParentSample,
+                         min_sep_arcsec=8,
+                         n_chunks=2)
+
+    def submit_to_cluster(
+            self,
+            node_memory,
+            single_chunk=None
+    ):
+        logger.info("emulating cluster work")
+
+        # from timewise/wise_bigdata_desy_cluster.py
+        if isinstance(single_chunk, type(None)):
+            _start_id = 1
+            _end_id = int(self.n_chunks*self.n_cluster_jobs_per_chunk)
+        else:
+            _start_id = int(single_chunk*self.n_cluster_jobs_per_chunk) + 1
+            _end_id = int(_start_id + self.n_cluster_jobs_per_chunk) - 1
+
+        logger.debug(f"Jobs from {_start_id} to {_end_id}")
+
+        for job_id in range(_start_id, _end_id+1):
+            logger.debug(f"Job {job_id}")
+            chunk_number = self._get_chunk_number_for_job(job_id)
+            self._subprocess_select_and_bin(service='tap', chunk_number=chunk_number, jobID=job_id)
+            self.calculate_metadata(service='tap', chunk_number=chunk_number, jobID=job_id)
+
+        return 1
+
+    def wait_for_job(self, job_id=None):
+        logger.info("called dummy wait for cluster")
+
+    def clean_up(self):
+        logger.info(f"removing {self.cache_dir}")
+        shutil.rmtree(self.cache_dir)
+
+
 ####################################
 # END DEFINING TEST CLASSES        #
 ###########################################################################################################
@@ -134,7 +176,19 @@ class TestMIRFlareCatalogue(unittest.TestCase):
                 fn=fn
             )
 
-    def test_c_wise_bigdata_desy_cluster(self):
+    def test_c_emulate_wise_bigdata(self):
+        logger.info("\n\n Emulating WISEBigDataDESYCluster \n\n")
+        wise_data = WISEBigDataTestVersion()
+
+        wise_data.get_sample_photometric_data(
+            max_nTAPjobs=2,
+            cluster_jobs_per_chunk=2,
+            query_type="positional",
+            skip_input=True,
+            wait=0
+        )
+
+    def test_d_wise_bigdata_desy_cluster(self):
         host = socket.gethostname()
         if np.logical_or("ifh.de" in host, "zeuthen.desy.de" in host):
             host_server = "DESY"
