@@ -8,7 +8,7 @@ from timewise.utils import get_mirong_sample
 
 
 main_logger.setLevel('DEBUG')
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("timewise.test")
 
 
 mirong_sample = get_mirong_sample()
