@@ -518,7 +518,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             logger.debug(f"combining chunk {chunk}")
 
             try:
-                self._combine_data_products('tap', chunk_number=chunk, remove=False, overwrite=self._overwrite)
+                self._combine_data_products('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
 
                 if self._storage_dir:
                     filenames_to_move = [
