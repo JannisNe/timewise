@@ -482,8 +482,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             node_memory, chunk = self._cluster_queue.get(block=True)
 
             logger.info(f'got all TAP results for chunk {chunk}. submitting to cluster')
-            # job_id = self.submit_to_cluster(node_memory=node_memory, single_chunk=chunk)
-            job_id = 1
+            job_id = self.submit_to_cluster(node_memory=node_memory, single_chunk=chunk)
 
             if not job_id:
                 logger.warning(f"could not submit {chunk} to cluster! Try later")
@@ -492,21 +491,21 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
             else:
                 logger.debug(f'waiting for chunk {chunk} (Cluster job {job_id})')
-                # self.wait_for_job(job_id)
+                self.wait_for_job(job_id)
                 logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}).')
 
-                # log_files = glob.glob(f"./{job_id}_*")
-                # log_files_abs = [os.path.abspath(p) for p in log_files]
-                # logger.debug(f"moving {len(log_files_abs)} log files to {self.cluster_log_dir}")
-                # for f in log_files_abs:
-                #     shutil.move(f, self.cluster_log_dir)
+                log_files = glob.glob(f"./{job_id}_*")
+                log_files_abs = [os.path.abspath(p) for p in log_files]
+                logger.debug(f"moving {len(log_files_abs)} log files to {self.cluster_log_dir}")
+                for f in log_files_abs:
+                    shutil.move(f, self.cluster_log_dir)
 
                 logger.debug("waiting on lock")
                 # this locks the combining so that only one thread at a time is reading / writing to disk
                 with self.disc_lock:
                     logger.debug(f'Acquired lock, Start combining')
                     try:
-                        self._combine_data_products('tap', chunk_number=chunk, remove=False, overwrite=self._overwrite)
+                        self._combine_data_products('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
 
                         if self._storage_dir:
                             filenames_to_move = [
