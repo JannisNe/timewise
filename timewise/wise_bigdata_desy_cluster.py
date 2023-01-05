@@ -81,6 +81,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._cluster_queue = queue.Queue()
         self._io_queue = queue.PriorityQueue()
         self._io_queue_done = queue.Queue()
+        self._combining_queue = queue.Queue()
 
     # ---------------------------------------------------------------------------------- #
     # START using gzip to compress the data when saving     #
@@ -111,8 +112,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         logger.debug(f"loading {fn}")
         try:
-            with gzip.open(fn, 'r') as fin:
-                data_product = json.loads(fin.read().decode('utf-8'))
+            with gzip.open(fn, 'rt', encoding="utf-8") as fzip:
+                data_product = json.load(fzip)
             if return_filename:
                 return data_product, fn
             return data_product
@@ -151,8 +152,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
             except FileNotFoundError as e:
                 logger.info(f"FileNotFoundError: {e}. Making new binned lightcurves.")
 
-        with gzip.open(fn, 'w') as f:
-            f.write(json.dumps(data_product).encode('utf-8'))
+        with gzip.open(fn, 'wt', encoding="utf-8") as fzip:
+            json.dump(data_product, fzip)
 
     def _load_lightcurves(
             self,
@@ -299,9 +300,10 @@ class WISEDataDESYCluster(WiseDataByVisit):
         cluster_threads = [threading.Thread(target=self._cluster_thread, daemon=True, name=f"ClusterThread{_}")
                            for _ in range(max_nTAPjobs)]
         io_thread = threading.Thread(target=self._io_thread, daemon=True, name="IOThread")
+        combining_thread = threading.Thread(target=self._combining_thread, daemon=True, name="CombiningThread")
         status_thread = threading.Thread(target=self._status_thread, daemon=True, name='StatusThread')
 
-        for t in tap_threads + cluster_threads + [io_thread]:
+        for t in tap_threads + cluster_threads + [io_thread, combining_thread]:
             logger.debug('starting thread')
             t.start()
 
@@ -328,6 +330,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
         logger.debug('TAP done')
         self._cluster_queue.join()
         logger.debug('cluster done')
+        self._combining_queue.join()
+        logger.debug('combining done')
 
     @backoff.on_exception(
         backoff.expo,
@@ -491,7 +495,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
             else:
                 logger.debug(f'waiting for chunk {chunk} (Cluster job {job_id})')
-                self.wait_for_job()
+                self.wait_for_job(job_id)
                 logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}).')
 
                 log_files = glob.glob(f"./{job_id}_*")
@@ -500,27 +504,40 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 for f in log_files_abs:
                     shutil.move(f, self.cluster_log_dir)
 
-                logger.debug(f'Start combining')
+                gc.collect()
 
-                try:
-                    with self.disc_lock:
-                        self._combine_data_products('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
+                logger.debug(f"cluster thread done for chunk {chunk} (Cluster job {job_id}). "
+                             f"Submitting to combining queue")
+                self._combining_queue.put(chunk)
+                self._cluster_queue.task_done()
 
-                        if self._storage_dir:
-                            filenames_to_move = [
-                                self._data_product_filename(service='tap', chunk_number=chunk),
-                            ]
+    def _combining_thread(self):
+        logger.debug(f'started combining thread')
+        while True:
+            chunk = self._combining_queue.get(block=True)
+            logger.debug(f"combining chunk {chunk}")
 
-                            for t in self.photometry_table_keymap.keys():
-                                filenames_to_move.append(self._chunk_photometry_cache_filename(t, chunk))
+            try:
+                self._combine_data_products('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
 
-                            for fn in filenames_to_move:
-                                self._move_file_to_storage(fn)
+                if self._storage_dir:
+                    filenames_to_move = [
+                        self._data_product_filename(service='tap', chunk_number=chunk),
+                    ]
 
-                finally:
-                    self._cluster_queue.task_done()
-                    self._done_tasks += 1
-                    gc.collect()
+                    for t in self.photometry_table_keymap.keys():
+                        filenames_to_move.append(self._chunk_photometry_cache_filename(t, chunk))
+
+                    for fn in filenames_to_move:
+                        try:
+                            self._move_file_to_storage(fn)
+                        except shutil.SameFileError as e:
+                            logger.error(f"{e}. Not moving.")
+
+            finally:
+                self._combining_queue.task_done()
+                self._done_tasks += 1
+                gc.collect()
 
     def _status_thread(self):
         logger.debug('started status thread')
