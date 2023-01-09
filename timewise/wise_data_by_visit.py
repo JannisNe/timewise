@@ -66,7 +66,7 @@ class WiseDataByVisit(WISEDataBase):
         # ---------------------   remove outliers in the bins   ---------------------- #
 
         # if we do not want to clean outliers just set the threshold to infinity
-        outlier_thresh = np.inf if not self.clean_outliers_when_binning else 100
+        outlier_thresh = np.inf if not remove_outliers else 20
 
         # set up empty masks
         outlier_mask = np.array([False] * len(f)) if outlier_mask is None else outlier_mask
@@ -141,17 +141,17 @@ class WiseDataByVisit(WISEDataBase):
             # take the maximum value of the measured single exposure errors and the standard deviation
             u = np.maximum(std, e_meas)
 
-            # if np.any(np.isnan(u)):
-            #     ids = np.where(np.isnan(u))[0]
-            #     msg = ""
-            #     for inan_index in ids:
-            #         nanf = f[visit_mask == inan_index]
-            #         nane = e[visit_mask == inan_index]
-            #         msg += f"u is nan for {inan_index}th bin\n{nanf}\n{nane}\n\n"
-            #     # raise ValueError(msg)
+            # calculate 90% confidence interval
+            u70 = np.zeros_like(counts, dtype=float)
+            u70[one_points_mask] = 0
+            visits_at_least_two_point = np.unique(visit_mask[~one_points_mask[visit_mask]])
+            u70[visits_at_least_two_point] = np.array([
+                np.quantile(abs(f[(visit_mask == i) & use_mask] - median[i]), .7, method="interpolated_inverted_cdf")
+                for i in visits_at_least_two_point
+            ])
 
             # ---------------------   remove outliers in the bins   ---------------------- #
-            remaining_outliers = (abs(median[visit_mask] - f) > outlier_thresh * u[visit_mask]) & ~outlier_mask
+            remaining_outliers = (abs(median[visit_mask] - f) > outlier_thresh * u70[visit_mask]) & ~outlier_mask
             outlier_mask |= remaining_outliers
             n_remaining_outlier = sum(remaining_outliers) if remove_outliers else 0
             # setting remaining_outliers to 0 will exit the while loop
@@ -210,13 +210,17 @@ class WiseDataByVisit(WISEDataBase):
                 f = lightcurve[f"{b}{lum_ext}"]
                 e = lightcurve[f"{b}{lum_ext}{self.error_key_ext}"]
 
+                # we will flag outliers based on the flux only
+                remove_outliers = lum_ext == self.flux_key_ext and self.clean_outliers_when_binning
+                outlier_mask = outlier_masks.get(self.flux_key_ext, None)
+
                 mean, u, bin_ulim_bool, outlier_mask, use_mask, n_points = self.calculate_epoch(
-                    f, e, visit_mask, counts, remove_outliers=True
+                    f, e, visit_mask, counts, remove_outliers=remove_outliers, outlier_mask=outlier_mask
                 )
                 n_outliers = np.sum(outlier_mask)
 
-                if n_outliers > 0:
-                    logger.info(f"{lum_ext}: removed {n_outliers} outliers")
+                if (n_outliers > 0):
+                    logger.info(f"removed {n_outliers} outliers")
 
                 binned_data[f'{b}{self.mean_key}{lum_ext}'] = mean
                 binned_data[f'{b}{lum_ext}{self.rms_key}'] = u
