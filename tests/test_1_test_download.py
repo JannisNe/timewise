@@ -103,7 +103,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
     def test_a_wise_data(self):
         logger.info('\n\n Testing WISE Data \n')
         wise_data = WISEDataTestVersion()
-        wise_data.match_all_chunks()
+        wise_data.match_all_chunks(additional_columns=["w1mpro"])
 
         logger.info('\n' + wise_data.parent_sample.df.to_string())
 

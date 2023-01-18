@@ -321,20 +321,27 @@ class WISEDataBase(abc.ABC):
 
     def match_all_chunks(self,
                          table_name="AllWISE Source Catalog",
-                         save_when_done=True):
+                         save_when_done=True,
+                         additional_columns=None):
         """
-        Some descritopn
+        Match the parent sample to a WISE catalogue and add the result to the parent sample.
 
         :param table_name: The name of the table you want to match against
         :type table_name: str
         :param save_when_done: save the parent sample dataframe with the matching info when done
         :type save_when_done: bool
+        :param additional_columns: optional, additional columns to add to the matching table
+        :type additional_columns: list
         :return:
         """
 
         logger.info(f'matching all chunks to {table_name}')
+
+        if additional_columns is None:
+            additional_columns = []
+
         for i in range(self.n_chunks):
-            self._match_single_chunk(i, table_name)
+            self._match_single_chunk(i, table_name, additional_columns)
 
         _dupe_mask = self._get_dubplicated_wise_id_mask()
 
@@ -404,9 +411,15 @@ class WISEDataBase(abc.ABC):
         else:
             return 0
 
-    def _match_to_wise(self, in_filename, out_filename, mask, table_name,
-                       # remove_when_done=True,
-                       N_retries=10, **gator_kwargs):
+    def _match_to_wise(
+            self,
+            in_filename,
+            out_filename,
+            mask,
+            table_name,
+            N_retries=10,
+            **gator_kwargs
+    ):
         selected_parent_sample = copy.copy(
             self.parent_sample.df.loc[mask, [self.parent_ra_key, self.parent_dec_key]])
         selected_parent_sample.rename(columns={self.parent_dec_key: 'dec',
@@ -449,25 +462,35 @@ class WISEDataBase(abc.ABC):
             finally:
                 N_retries -= 1
 
-    def _match_single_chunk(self, chunk_number, table_name):
+    def _match_single_chunk(self, chunk_number, table_name, additional_columns=None):
         """
         Match the parent sample to WISE
 
         :param chunk_number: number of the declination chunk
         :type chunk_number: int
         :param table_name: optional, WISE table to match to, default is AllWISE Source Catalog
-        :type table_name: str
+        :type table_name: str,
+        :param additional_columns: optional, additional columns to be added to the parent sample
+        :type additional_columns: list
         """
 
         dec_intervall_mask = self.chunk_map == chunk_number
         logger.debug(f"Any selected: {np.any(dec_intervall_mask)}")
         _parent_sample_declination_band_file = os.path.join(self.cache_dir, f"parent_sample_chunk{chunk_number}.xml")
         _output_file = os.path.join(self.cache_dir, f"parent_sample_chunk{chunk_number}.tbl")
+
+        additional_keys = (
+            "," + ",".join(additional_columns)
+            if (additional_columns is not None) and (len(additional_columns) > 0)
+            else ""
+        )
+
         gator_res = self._match_to_wise(
             in_filename=_parent_sample_declination_band_file,
             out_filename=_output_file,
             mask=dec_intervall_mask,
-            table_name=table_name
+            table_name=table_name,
+            additional_keys=additional_keys,
         )
 
         for fn in [_parent_sample_declination_band_file, _output_file]:
@@ -488,6 +511,18 @@ class WISEDataBase(abc.ABC):
             dec_intervall_mask,
             self.parent_wise_source_id_key
         ] = list(gator_res["cntr"])
+
+        if len(additional_columns) > 0:
+            for col in additional_columns:
+                logger.debug(f"inserting {col}")
+
+                if col not in self.parent_sample.df.columns:
+                    self.parent_sample.df[col] = np.nan
+
+                self.parent_sample.df.loc[
+                    dec_intervall_mask,
+                    col
+                ] = list(gator_res[col])
 
         _no_match_mask = self.parent_sample.df[self.parent_sample_wise_skysep_key].isna() & dec_intervall_mask
         for k, default in self.parent_sample_default_entries.items():
