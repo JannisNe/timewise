@@ -125,7 +125,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
             wise_data.calculate_metadata(service=s)
 
             logger.info(f" --- Test plot lightcurves --- ")
-            lcs = wise_data.load_binned_lcs(s)
+            lcs = wise_data.load_data_product(s)
             plot_id = list(lcs.keys())[0].split('_')[0]
             for lumk in ['mag', 'flux_density', 'luminosity']:
                 fn = os.path.join(wise_data.plots_dir, f"{plot_id}_{lumk}.pdf")
@@ -163,7 +163,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         wise_data.calculate_metadata(service=s)
 
         logger.info(f" --- Test plot lightcurves --- ")
-        lcs = wise_data.load_binned_lcs(s)
+        lcs = wise_data.load_data_product(s)
         plot_id = list(lcs.keys())[0].split('_')[0]
         for lumk in ['mag', 'flux_density', 'luminosity']:
             fn = os.path.join(wise_data.plots_dir, f"{plot_id}_{lumk}.pdf")
@@ -228,7 +228,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
             )
 
             N_downloaded = sum([
-                len(wise_desy_bigdata._load_data_product(service="tap", chunk_number=c, use_bigdata_dir=True))
+                len(wise_desy_bigdata.load_data_product(service="tap", chunk_number=c))
                 for c in range(wise_desy_bigdata.n_chunks)
             ])
 
