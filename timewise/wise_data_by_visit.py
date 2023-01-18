@@ -40,9 +40,9 @@ class WiseDataByVisit(WISEDataBase):
         self.clean_outliers_when_binning = clean_outliers_when_binning
         self.multiply_flux_error = multiply_flux_error
 
-    def calculate_epoch(self, f, e, visit_mask, counts, remove_outliers, outlier_mask=None):
+    def calculate_epochs(self, f, e, visit_mask, counts, remove_outliers, outlier_mask=None):
         """
-        Calculates the epoch of a lightcurve.
+        Calculates the binned epochs of a lightcurve.
 
         :param f: the fluxes
         :type f: np.array
@@ -59,7 +59,6 @@ class WiseDataByVisit(WISEDataBase):
         :return: the epoch
         :rtype: float
         """
-        # TODO: add doc
         u_lims = pd.isna(e)
         nan_mask = pd.isna(f)
 
@@ -214,8 +213,11 @@ class WiseDataByVisit(WISEDataBase):
                 remove_outliers = lum_ext == self.flux_key_ext and self.clean_outliers_when_binning
                 outlier_mask = outlier_masks.get(self.flux_key_ext, None)
 
-                mean, u, bin_ulim_bool, outlier_mask, use_mask, n_points = self.calculate_epoch(
-                    f, e, visit_mask, counts, remove_outliers=remove_outliers, outlier_mask=outlier_mask
+                mean, u, bin_ulim_bool, outlier_mask, use_mask, n_points = self.calculate_epochs(
+                    f, e, visit_mask,
+                    counts,
+                    remove_outliers=remove_outliers,
+                    outlier_mask=outlier_mask
                 )
                 n_outliers = np.sum(outlier_mask)
 
@@ -269,10 +271,14 @@ class WiseDataByVisit(WISEDataBase):
             flux_densities_e = inst_fluxes_e * flux_dens_const[visit_mask]
 
             # bin flux densities
-            mean_fd, u_fd, ul_fd, outlier_mask_fd, use_mask_fd, n_points_fd = self.calculate_epoch(
-                flux_densities, flux_densities_e, visit_mask, counts,
-                remove_outliers=False, outlier_mask=outlier_masks[self.flux_key_ext]
-                # we do not remove outliers here because they have already been removed in the inst flux calculation
+            mean_fd, u_fd, ul_fd, outlier_mask_fd, use_mask_fd, n_points_fd = self.calculate_epochs(
+                flux_densities,
+                flux_densities_e,
+                visit_mask, counts,
+                remove_outliers=False,
+                outlier_mask=
+                outlier_masks[
+                    self.flux_key_ext]
             )
             binned_data[f'{b}{self.mean_key}{self.flux_density_key_ext}'] = mean_fd
             binned_data[f'{b}{self.flux_density_key_ext}{self.rms_key}'] = u_fd
