@@ -1355,7 +1355,7 @@ class WISEDataBase(abc.ABC):
         :param service: The service with which the lightcurves were downloaded
         :type service: str
         """
-        data_product = self.load_binned_lcs(service=service)
+        data_product = self.load_data_product(service=service)
         for i, i_data_product in tqdm.tqdm(data_product.items(), desc='adding flux densities'):
             data_product[i]["timewise_lightcurve"] = self.add_flux_density(
                 i_data_product["timewise_lightcurve"],
@@ -1433,7 +1433,7 @@ class WISEDataBase(abc.ABC):
         if (not redshift_key) and (not distance_key):
             raise ValueError('Either distance key or redshift key has to be given!')
 
-        data_product = self.load_binned_lcs(service=service)
+        data_product = self.load_data_product(service=service)
         for i, i_data_product in tqdm.tqdm(data_product.items(), desc='adding luminosities'):
             parent_sample_idx = int(i.split('_')[0])
             info = self.parent_sample.df.loc[parent_sample_idx]
@@ -1495,7 +1495,7 @@ class WISEDataBase(abc.ABC):
         """
 
         logger.debug(f"loading binned lightcurves")
-        data_product = self.load_binned_lcs(service)
+        data_product = self.load_data_product(service)
         _get_unbinned_lcs_fct = self.get_unbinned_lightcurves if service == 'tap' else self._get_unbinned_lightcurves_gator
 
         wise_id = self.parent_sample.df.loc[int(parent_sample_idx), self.parent_wise_source_id_key]
