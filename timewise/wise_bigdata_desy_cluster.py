@@ -95,7 +95,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         return fn + ".gz"
 
-    def _load_data_product(
+    def load_data_product(
             self,
             service,
             chunk_number=None,
@@ -142,8 +142,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         if not overwrite:
             try:
-                old_data_product = self._load_data_product(service=service, chunk_number=chunk_number, jobID=jobID,
-                                                           use_bigdata_dir=use_bigdata_dir)
+                old_data_product = self.load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
 
                 if old_data_product is not None:
                     logger.debug(f"Found {len(old_data_product)}. Combining")
@@ -804,7 +803,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         """Make a pretty plot of a lightcurve
 
         :param parent_sample_idx: The index in the parent sample of the lightcurve
-        :type parent_sample_idx: int
+        :type parent_sample_idx: int or str
         :param service: the service with which the lightcurves were downloaded
         :type service: str
         :param plot_unbinned: plot unbinned data
@@ -828,7 +827,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         logger.debug(f"loading binned lightcurves")
 
-        _get_unbinned_lcs_fct = self._get_unbinned_lightcurves \
+        _get_unbinned_lcs_fct = self.get_unbinned_lightcurves \
             if service == 'tap' else self._get_unbinned_lightcurves_gator
 
         wise_id = self.parent_sample.df.loc[int(parent_sample_idx), self.parent_wise_source_id_key]
@@ -837,7 +836,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         logger.debug(f"{wise_id} for {parent_sample_idx}")
 
         _chunk_number = self._get_chunk_number(parent_sample_index=parent_sample_idx)
-        data_product = self._load_data_product(
+        data_product = self.load_data_product(
             service,
             chunk_number=_chunk_number,
             use_bigdata_dir=load_from_bigdata_dir
@@ -847,7 +846,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         if plot_unbinned:
 
             if service == 'tap':
-                unbinned_lcs = self._get_unbinned_lightcurves(_chunk_number)
+                unbinned_lcs = self.get_unbinned_lightcurves(_chunk_number)
 
             else:
                 unbinned_lcs = self._get_unbinned_lightcurves_gator(_chunk_number)
@@ -870,15 +869,22 @@ class WISEDataDESYCluster(WiseDataByVisit):
     # -------------------------------------------
 
     @cache
-    def get_red_chi2(self, chunk, lum_key, use_bigdata_dir):
-        # TODO: add doc
+    def get_red_chi2(self, chunk, lum_key, use_bigdata_dir=False):
+        """
+        Get the reduced chi2 for a given chunk or multiple chunks
+
+        :param chunk: the chunk number or list of chunk numbers
+        :type chunk: int or list
+        :param lum_key: the unit of luminosity to use in the plot, either of 'mag', 'flux' or 'flux_density'
+        :type lum_key: str
+        :param use_bigdata_dir: load from the big data storage directory, default is False
+        :type use_bigdata_dir: bool, optional
+        :return: the reduced chi2 for each band, the DataFrame will have columns `chi2`, `med_lum` and `N_datapoints`
+        :rtype: dict[str, pd.DataFrame]
+        """
 
         logger.info(f"getting reduced chi2 for chunk {chunk}")
-        data_product = self._load_data_product(
-            service="tap",
-            chunk_number=chunk,
-            use_bigdata_dir=use_bigdata_dir
-        )
+        data_product = self.load_data_product(service="tap", chunk_number=chunk, use_bigdata_dir=use_bigdata_dir)
 
         chi2_val = {b: dict() for b in self.bands}
 
@@ -919,7 +925,30 @@ class WISEDataDESYCluster(WiseDataByVisit):
             cumulative=True,
             upper_bound=4
     ):
-        # TODO: add doc
+        """
+        Make a plot of the reduced chi2 distribution for a given chunk or multiple chunks
+
+        :param index_mask: a mask to apply to the parent sample, eg {'AGNs': agn_mask}
+        :type index_mask: dict
+        :param chunks: the chunk number or list of chunk numbers
+        :type chunks: int or list
+        :param load_from_bigdata_dir: load from the big data storage directory, default is False
+        :type load_from_bigdata_dir: bool, optional
+        :param lum_key: the unit of luminosity to use in the plot, either of 'mag', 'flux' or 'flux_density'
+        :type lum_key: str
+        :param interactive: return the figure and axes if True, default is False
+        :type interactive: bool
+        :param save: save the plot, default is False
+        :type save: bool
+        :param nbins: the number of bins to use in the histogram, default is 100
+        :type nbins: int
+        :param cumulative: plot the cumulative distribution, default is True
+        :type cumulative: bool
+        :param upper_bound: the upper bound of the x-axis, default is 4
+        :type upper_bound: float
+        :return: the matplotlib.Figure and matplotlib.Axes if `interactive=True`
+        :rtype: tuple[mpl.Figure, mpl.Axes]
+        """
 
         if chunks is None:
             chunks = list(range(self.n_chunks))
@@ -1089,13 +1118,18 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
     @cache
     def get_coverage(self, chunk, lum_key, load_from_bigdata_dir=False):
-        # TODO: this is a bit of a hack, but it works, also add docstring
+        """
+        Get the coverage of the MEASURED median for a given chunk and lum_key
+
+        :param chunk: chunk number
+        :type chunk: int, list[int]]
+        :param lum_key: luminosity key
+        :type lum_key: str
+        :param load_from_bigdata_dir: if True, load the coverage from the bigdata directory
+        :type load_from_bigdata_dir: bool, optional
+        """
         logger.info(f"getting coverage for chunk {chunk}")
-        data_product = self._load_data_product(
-            service="tap",
-            chunk_number=chunk,
-            use_bigdata_dir=load_from_bigdata_dir
-        )
+        data_product = self.load_data_product(service="tap", chunk_number=chunk, use_bigdata_dir=load_from_bigdata_dir)
 
         coverage_val = {b: dict() for b in self.bands}
 
@@ -1120,7 +1154,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
     @staticmethod
     def get_quantiles_label(df, cl=0.68):
         """
-
+        Get the quantiles label for a given coverage level
         """
         med = np.nanmedian(df)
         ic = np.nanpercentile(df, [50 - cl / 2 * 100, 50 + cl / 2 * 100]) - med
@@ -1137,7 +1171,26 @@ class WISEDataDESYCluster(WiseDataByVisit):
             save=False,
             nbins=100,
     ):
-        # TODO: add docstring
+        """
+        Make the coverage plots for the measured median of the specified luminosity unit
+
+        :param index_mask: index mask to apply to the data, e.g. {"AGNs": agn_mask}
+        :type index_mask: dict, optional
+        :param chunks: chunks to use, if None use all chunks
+        :type chunks: list[int], int, optional
+        :param load_from_bigdata_dir: if True, load the coverage from the bigdata directory
+        :type load_from_bigdata_dir: bool, optional
+        :param lum_key: luminosity key, either of "_flux_density" or "_mag", default is "_flux_density"
+        :type lum_key: str, optional
+        :param interactive: if True, return the figures and axes, otherwise close them
+        :type interactive: bool, optional
+        :param save: if True, save the figures
+        :type save: bool, optional
+        :param nbins: number of bins for the histograms
+        :type nbins: int, optional
+        :return: if interactive, return the figures and axes, otherwise close them
+        :rtype: list[tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]]
+        """
 
         if chunks is None:
             chunks = list(range(self.n_chunks))

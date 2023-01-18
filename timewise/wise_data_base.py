@@ -637,7 +637,18 @@ class WISEDataBase(abc.ABC):
             else:
                 return os.path.join(self._cache_photometry_dir, fn + f"_{jobID}.json")
 
-    def _load_data_product(self, service, chunk_number=None, jobID=None, return_filename=False):
+    def load_data_product(self, service, chunk_number=None, jobID=None, return_filename=False):
+        """
+        Load data product from disk
+
+        :param service: service used to download data ('tap' or 'gator')
+        :type service: str
+        :param chunk_number: chunk number to load, if None load combined file for this service
+        :type chunk_number: int, optional
+        :param jobID: jobID to load, if None load the combined file for this chunk
+        :type jobID: int, optional
+        :param return_filename: return filename of data product, defaults to False
+        """
         fn = self._data_product_filename(service, chunk_number, jobID)
         logger.debug(f"loading {fn}")
         try:
@@ -658,7 +669,7 @@ class WISEDataBase(abc.ABC):
 
         if not overwrite:
             try:
-                old_data_product = self._load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
+                old_data_product = self.load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
                 logger.debug(f"Found {len(old_data_product)}. Combining")
                 data_product = data_product.update(old_data_product)
             except FileNotFoundError as e:
@@ -666,21 +677,6 @@ class WISEDataBase(abc.ABC):
 
         with open(fn, "w") as f:
             json.dump(data_product, f, indent=4)
-
-    def load_binned_lcs(self, service):
-        """Loads the binned lightcurves. For any int `ID` the lightcurves can convieniently read into a pandas.DataFrame
-        via
-
-            lc = pandas.DataFrame.from_dict(json_dictionary[ID])
-
-        :param service: the service with which the lightcuvres were downloaded
-        :type service: str
-        :return: the binned lightcurves
-        :rtype: dict
-        """
-        if service not in self._cached_final_products['lightcurves']:
-            self._cached_final_products['lightcurves'][service] = self._load_data_product(service)
-        return self._cached_final_products['lightcurves'][service]
 
     def _combine_data_products(self, service=None, chunk_number=None, remove=False, overwrite=False):
         if not service:
@@ -705,7 +701,7 @@ class WISEDataBase(abc.ABC):
             kw = dict(kwargs)
             kw[itr[0]] = i
             kw['return_filename'] = True
-            res = self._load_data_product(**kw)
+            res = self.load_data_product(**kw)
             if not isinstance(res, type(None)):
                 ilcs, ifn = res
                 fns.append(ifn)
@@ -1103,7 +1099,15 @@ class WISEDataBase(abc.ABC):
         else:
             r = list(map(self._subprocess_select_and_bin, service_list, chunk_list))
 
-    def _get_unbinned_lightcurves(self, chunk_number, clear=False):
+    def get_unbinned_lightcurves(self, chunk_number, clear=False):
+        """
+        Get the unbinned lightcurves for a given chunk number.
+
+        :param chunk_number: int
+        :type chunk_number: int
+        :param clear: remove files after loading, defaults to False
+        :type clear: bool, optional
+        """
         # load only the files for this chunk
         fns = [os.path.join(self._cache_photometry_dir, fn)
                for fn in os.listdir(self._cache_photometry_dir)
@@ -1126,10 +1130,7 @@ class WISEDataBase(abc.ABC):
     def _subprocess_select_and_bin(self, service, chunk_number=None, jobID=None):
         # run through the ids and bin the lightcurves
         if service == 'tap':
-            lightcurves = self._get_unbinned_lightcurves(
-                chunk_number,
-                clear=self.clear_unbinned_photometry_when_binning
-            )
+            lightcurves = self.get_unbinned_lightcurves(chunk_number, clear=self.clear_unbinned_photometry_when_binning)
         elif service == 'gator':
             lightcurves = self._get_unbinned_lightcurves_gator(
                 chunk_number,
@@ -1145,7 +1146,7 @@ class WISEDataBase(abc.ABC):
 
         logger.debug(f"chunk {chunk_number}: going through {len(indices)} IDs")
 
-        data_product = self._load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
+        data_product = self.load_data_product(service=service, chunk_number=chunk_number, jobID=jobID)
 
         if data_product is None:
             logger.info(f"Starting data product for {len(indices)} indices.")
@@ -1310,7 +1311,7 @@ class WISEDataBase(abc.ABC):
         :param service: The service with which the lightcurves were downloaded
         :type service: str
         """
-        data_product = self.load_binned_lcs(service=service)
+        data_product = self.load_data_product(service=service)
         for i, i_data_product in tqdm.tqdm(data_product.items(), desc='adding flux densities'):
             data_product[i]["timewise_lightcurve"] = self.add_flux_density(
                 i_data_product["timewise_lightcurve"],
@@ -1388,7 +1389,7 @@ class WISEDataBase(abc.ABC):
         if (not redshift_key) and (not distance_key):
             raise ValueError('Either distance key or redshift key has to be given!')
 
-        data_product = self.load_binned_lcs(service=service)
+        data_product = self.load_data_product(service=service)
         for i, i_data_product in tqdm.tqdm(data_product.items(), desc='adding luminosities'):
             parent_sample_idx = int(i.split('_')[0])
             info = self.parent_sample.df.loc[parent_sample_idx]
@@ -1450,8 +1451,8 @@ class WISEDataBase(abc.ABC):
         """
 
         logger.debug(f"loading binned lightcurves")
-        data_product = self.load_binned_lcs(service)
-        _get_unbinned_lcs_fct = self._get_unbinned_lightcurves if service == 'tap' else self._get_unbinned_lightcurves_gator
+        data_product = self.load_data_product(service)
+        _get_unbinned_lcs_fct = self.get_unbinned_lightcurves if service == 'tap' else self._get_unbinned_lightcurves_gator
 
         wise_id = self.parent_sample.df.loc[int(parent_sample_idx), self.parent_wise_source_id_key]
         if isinstance(wise_id, float) and not np.isnan(wise_id):
@@ -1464,7 +1465,7 @@ class WISEDataBase(abc.ABC):
             _chunk_number = self._get_chunk_number(parent_sample_index=parent_sample_idx)
 
             if service == 'tap':
-                unbinned_lcs = self._get_unbinned_lightcurves(_chunk_number)
+                unbinned_lcs = self.get_unbinned_lightcurves(_chunk_number)
 
             else:
                 unbinned_lcs = self._get_unbinned_lightcurves_gator(_chunk_number)
@@ -1548,7 +1549,7 @@ class WISEDataBase(abc.ABC):
         :param overwrite: overwrite existing metadata file
         :type overwrite: bool
         """
-        data_product = self._load_data_product(service, chunk_number, jobID)
+        data_product = self.load_data_product(service, chunk_number, jobID)
         for ID, i_data_product in tqdm.tqdm(data_product.items(), desc="calculating metadata"):
             if "timewise_lightcurve" in i_data_product:
                 lc = pd.DataFrame.from_dict(i_data_product["timewise_lightcurve"])
