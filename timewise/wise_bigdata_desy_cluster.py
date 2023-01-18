@@ -883,7 +883,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
         logger.debug(f"{wise_id} for {parent_sample_idx}")
 
         _chunk_number = self._get_chunk_number(parent_sample_index=parent_sample_idx)
-        data_product = self.load_data_product(service, chunk_number=_chunk_number)
+        data_product = self.load_data_product(
+            service,
+            chunk_number=_chunk_number,
+            use_bigdata_dir=load_from_bigdata_dir
+        )
         lc = pd.DataFrame.from_dict(data_product[parent_sample_idx]["timewise_lightcurve"])
 
         if plot_unbinned:
