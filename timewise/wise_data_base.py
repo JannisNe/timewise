@@ -11,7 +11,6 @@ import subprocess
 import threading
 import time
 import tqdm
-import warnings
 
 import astropy.units as u
 import matplotlib.pyplot as plt
@@ -667,49 +666,6 @@ class WISEDataBase(abc.ABC):
 
         with open(fn, "w") as f:
             json.dump(data_product, f, indent=4)
-
-    def _lightcurve_filename(self, service, chunk_number=None, jobID=None):
-
-        warnings.warn("Separate `binned_lightcurves` and `metadata` will be deprecated in v0.3.0!", DeprecationWarning)
-
-        if (chunk_number is None) and (jobID is None):
-            return os.path.join(self.lightcurve_dir, f"binned_lightcurves_{service}.json")
-        else:
-            fn = f"binned_lightcurves_{service}{self._split_chunk_key}{chunk_number}"
-            if (chunk_number is not None) and (jobID is None):
-                return os.path.join(self._cache_photometry_dir, fn + ".json")
-            else:
-                return os.path.join(self._cache_photometry_dir, fn + f"_{jobID}.json")
-
-    def _load_lightcurves(self, service, chunk_number=None, jobID=None, return_filename=False):
-        fn = self._lightcurve_filename(service, chunk_number, jobID)
-        logger.debug(f"loading {fn}")
-        try:
-            with open(fn, "r") as f:
-                lcs = json.load(f)
-            if return_filename:
-                return lcs, fn
-            return lcs
-        except FileNotFoundError:
-            logger.warning(f"No file {fn}")
-
-    def _save_lightcurves(self, lcs, service, chunk_number=None, jobID=None, overwrite=False):
-        fn = self._lightcurve_filename(service, chunk_number, jobID)
-        logger.debug(f"saving {len(lcs)} new lightcurves to {fn}")
-
-        if fn == self._lightcurve_filename(service):
-            self._cached_final_products['lightcurves'][service] = lcs
-
-        if not overwrite:
-            try:
-                old_lcs = self._load_lightcurves(service=service, chunk_number=chunk_number, jobID=jobID)
-                logger.debug(f"Found {len(old_lcs)}. Combining")
-                lcs = lcs.update(old_lcs)
-            except FileNotFoundError as e:
-                logger.info(f"FileNotFoundError: {e}. Making new binned lightcurves.")
-
-        with open(fn, "w") as f:
-            json.dump(lcs, f)
 
     def load_binned_lcs(self, service):
         """Loads the binned lightcurves. For any int `ID` the lightcurves can convieniently read into a pandas.DataFrame
@@ -1576,61 +1532,6 @@ class WISEDataBase(abc.ABC):
     ###########################################################################################################
     #  START CALCULATE METADATA         #
     #####################################
-
-    def _metadata_filename(self, service, chunk_number=None, jobID=None):
-
-        warnings.warn("Separate metadata will be deprecated in timewise 0.3!", DeprecationWarning)
-
-        if (chunk_number is None) and (jobID is None):
-            return os.path.join(self.lightcurve_dir, f'metadata_{service}.json')
-        elif (chunk_number is not None) and (jobID is None):
-            return os.path.join(self.cache_dir, f'metadata_{service}{self._split_chunk_key}{chunk_number}.json')
-        elif (chunk_number is not None) and (jobID is not None):
-            return os.path.join(self.cache_dir, f'metadata_{service}{self._split_chunk_key}{chunk_number}_job{jobID}.json')
-        else:
-            raise NotImplementedError
-
-    def _load_metadata(self, service, chunk_number=None, jobID=None, return_filename=False):
-        fn = self._metadata_filename(service, chunk_number, jobID)
-        try:
-            logger.debug(f"loading {fn}")
-            with open(fn, "r") as f:
-                metadata = json.load(f)
-            if return_filename:
-                return metadata, fn
-            return metadata
-        except FileNotFoundError:
-            logger.warning(f"No file {fn}")
-
-    def _save_metadata(self, metadata, service, chunk_number=None, jobID=None, overwrite=False):
-        fn = self._metadata_filename(service, chunk_number, jobID)
-
-        if fn == self._metadata_filename(service):
-            self._cached_final_products['metadata'][service] = metadata
-
-        if not overwrite:
-            try:
-                old_metadata = self._load_metadata(service=service, chunk_number=chunk_number, jobID=jobID)
-                logger.debug(f"Found {len(old_metadata)}. Combining")
-                metadata = metadata.update(old_metadata)
-            except FileNotFoundError as e:
-                logger.info(f"FileNotFoundError: {e}. Making new metadata.")
-
-        logger.debug(f'saving under {fn}')
-        with open(fn, "w") as f:
-            json.dump(metadata, f)
-
-    def load_metadata(self, service):
-        """Load the metadata
-
-        :param service: The service with which the lightcurves were downloaded
-        :type service: str
-        :return: the metadata
-        :rtype: dict
-        """
-        if not service in self._cached_final_products['metadata']:
-            self._cached_final_products['metadata'][service] = self._load_metadata(service)
-        return self._cached_final_products['metadata'][service]
 
     def calculate_metadata(self, service, chunk_number=None, jobID=None, overwrite=True):
         """Calculates the metadata for all downloaded lightcurves.
