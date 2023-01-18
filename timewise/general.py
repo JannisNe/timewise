@@ -20,7 +20,7 @@ else:
 
 BIGDATA_DIR_KEY = 'TIMEWISE_BIGDATA'
 if BIGDATA_DIR_KEY in os.environ:
-    bigdata_dir = os.environ[BIGDATA_DIR_KEY]
+    bigdata_dir = os.path.expanduser(os.environ[BIGDATA_DIR_KEY])
     logger.info(f"Using bigdata directory {bigdata_dir}")
 else:
     bigdata_dir = None
