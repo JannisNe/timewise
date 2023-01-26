@@ -470,21 +470,28 @@ class WISEDataDESYCluster(WiseDataByVisit):
             logger.debug(f"combining chunk {chunk}")
 
             try:
-                self._combine_data_products('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
+                success = self._combine_data_products('tap', chunk_number=chunk, remove=True, overwrite=self._overwrite)
 
-                if self._storage_dir:
-                    filenames_to_move = [
-                        self._data_product_filename(service='tap', chunk_number=chunk),
-                    ]
+                if success:
+                    if self._storage_dir:
+                        filenames_to_move = [
+                            self._data_product_filename(service='tap', chunk_number=chunk),
+                        ]
 
-                    for t in self.photometry_table_keymap.keys():
-                        filenames_to_move.append(self._chunk_photometry_cache_filename(t, chunk))
+                        for t in self.photometry_table_keymap.keys():
+                            filenames_to_move.append(self._chunk_photometry_cache_filename(t, chunk))
+    
+                        for fn in filenames_to_move:
+                            try:
+                                self._move_file_to_storage(fn)
+                            except shutil.SameFileError as e:
+                                logger.error(f"{e}. Not moving.")
 
-                    for fn in filenames_to_move:
-                        try:
-                            self._move_file_to_storage(fn)
-                        except shutil.SameFileError as e:
-                            logger.error(f"{e}. Not moving.")
+                else:
+                    msg = f"Chunk {chunk}: Combining data products not successfully!"
+                    if self._storage_dir:
+                        msg += " Not moving files to storage."
+                    logger.warning(msg)
 
             finally:
                 self._combining_queue.task_done()
