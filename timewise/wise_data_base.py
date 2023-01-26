@@ -683,8 +683,7 @@ class WISEDataBase(abc.ABC):
             service=None,
             chunk_number=None,
             remove=False,
-            overwrite=False,
-            require_n_files=None
+            overwrite=False
     ):
         if not service:
             logger.info("Combining all lightcuves collected with all services")
