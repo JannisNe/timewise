@@ -736,6 +736,11 @@ class WISEDataBase(abc.ABC):
                 for fn in tqdm.tqdm(fns, desc="removing files"):
                     os.remove(fn)
 
+            return True
+
+        else:
+            return False
+
     # ----------------------------------------------------------------------------------- #
     # START using GATOR to get photometry        #
     # ------------------------------------------ #
