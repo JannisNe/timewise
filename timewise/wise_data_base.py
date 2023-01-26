@@ -678,7 +678,14 @@ class WISEDataBase(abc.ABC):
         with open(fn, "w") as f:
             json.dump(data_product, f, indent=4)
 
-    def _combine_data_products(self, service=None, chunk_number=None, remove=False, overwrite=False):
+    def _combine_data_products(
+            self,
+            service=None,
+            chunk_number=None,
+            remove=False,
+            overwrite=False,
+            require_n_files=None
+    ):
         if not service:
             logger.info("Combining all lightcuves collected with all services")
             itr = ['service', ['gator', 'tap']]
@@ -688,7 +695,7 @@ class WISEDataBase(abc.ABC):
             itr = ['chunk_number', range(self.n_chunks)]
             kwargs = {'service': service}
         elif chunk_number is not None:
-            logger.info(f"Combining all lightcurves collected eith {service} for chunk {chunk_number}")
+            logger.info(f"Combining all lightcurves collected with {service} for chunk {chunk_number}")
             itr = ['jobID',
                    list(self.clusterJob_chunk_map.index[self.clusterJob_chunk_map.chunk_number == chunk_number])]
             kwargs = {'service': service, 'chunk_number': chunk_number}
@@ -697,11 +704,13 @@ class WISEDataBase(abc.ABC):
 
         lcs = None
         fns = list()
+        missing_files = 0
         for i in itr[1]:
             kw = dict(kwargs)
             kw[itr[0]] = i
             kw['return_filename'] = True
             res = self.load_data_product(**kw)
+
             if not isinstance(res, type(None)):
                 ilcs, ifn = res
                 fns.append(ifn)
@@ -710,11 +719,23 @@ class WISEDataBase(abc.ABC):
                 else:
                     lcs.update(ilcs)
 
-        self._save_data_product(lcs, service=service, chunk_number=chunk_number, overwrite=overwrite)
+            else:
+                missing_files += 1
 
-        if remove:
-            for fn in tqdm.tqdm(fns, desc="removing files"):
-                os.remove(fn)
+            if missing_files > 0:
+                msg = f"Missing {missing_files} for {service}"
+                if chunk_number is not None:
+                    msg += f" chunk {chunk_number}"
+                msg += "! Not saving data product"
+                logger.warning(msg)
+                break
+
+        if missing_files == 0:
+            self._save_data_product(lcs, service=service, chunk_number=chunk_number, overwrite=overwrite)
+
+            if remove:
+                for fn in tqdm.tqdm(fns, desc="removing files"):
+                    os.remove(fn)
 
     # ----------------------------------------------------------------------------------- #
     # START using GATOR to get photometry        #
