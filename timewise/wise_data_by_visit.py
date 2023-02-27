@@ -1,7 +1,9 @@
+import os
 import pandas as pd
 import numpy as np
 import logging
 from scipy import stats
+import matplotlib.pyplot as plt
 
 from timewise.wise_data_base import WISEDataBase
 from timewise.utils import get_excess_variance
@@ -390,3 +392,40 @@ class WiseDataByVisit(WISEDataBase):
                         metadata[k] = np.nan
 
         return metadata
+
+    def plot_diagnostic_binning(self, ind, lum_key="mag", interactive=False, fn=None, save=True):
+
+        logger.info(f"making binning diagnostic plot")
+        chunk_number = self._get_chunk_number(parent_sample_index=ind)
+        unbinned_lcs = self.get_unbinned_lightcurves(chunk_number=chunk_number)
+
+        lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key]]
+        binned_lightcurve = self.bin_lightcurve(lightcurve)
+
+        fig, axs = plt.subplots(nrows=2)
+
+        self.parent_sample.plot_cutout(ind=ind, ax=axs[0])
+        self._plot_lc(lightcurve=binned_lightcurve, unbinned_lc=unbinned_lcs, lum_key=lum_key, ax=axs[-1])
+
+        visit_map = self.get_visit_map(lightcurve)
+
+        markers = ['o', 'v', '^', '<', '>', '1', '2', '3', '4', '8', 's', 'p', '*', 'h', 'H', '+', 'x', 'D', 'd', '|',
+                   '_', 'P', 'X']
+
+        for visit in np.unique(visit_map):
+            m = visit_map == visit
+            datapoints = lightcurve[m]
+            axs[0].scatter(datapoints.ra, datapoints.dec, label=f"visit {visit}", marker=markers[visit])
+
+        axs[0].legend()
+
+        if save:
+            if fn is None:
+                fn = os.path.join(self.plots_dir, f"{ind}_binning_diag.pdf")
+            logger.debug(f"saving under {fn}")
+            fig.savefig(fn)
+
+        if interactive:
+            return fig, axs
+        else:
+            plt.close()
