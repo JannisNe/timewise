@@ -162,6 +162,29 @@ class WiseDataByVisit(WISEDataBase):
 
         return median, u, bin_ulim_bool, outlier_mask, use_mask, n_points
 
+    @staticmethod
+    def get_visit_map(lightcurve):
+        """
+        Create a map datapoint to visit
+
+        :param lightcurve: the unbinned lightcurve
+        :type lightcurve: pd.DataFrame
+        :returns: visit map
+        :rtype: np.ndarray
+        """
+        # -------------------------   find epoch intervals   -------------------------- #
+        sorted_mjds = np.sort(lightcurve.mjd)
+        epoch_bounds_mask = (sorted_mjds[1:] - sorted_mjds[:-1]) > 100
+        epoch_bins = np.array(
+            [lightcurve.mjd.min() * 0.99] +  # this makes sure that the first datapoint gets selected
+            list(((sorted_mjds[1:] + sorted_mjds[:-1]) / 2)[epoch_bounds_mask]) +  # finding the middle between
+                                                                                   # two visits
+            [lightcurve.mjd.max() * 1.01]    # this just makes sure that the last datapoint gets selected as well
+        )
+
+        visit_mask = np.digitize(lightcurve.mjd, epoch_bins) - 1
+        return visit_mask
+
     def bin_lightcurve(self, lightcurve):
         """
         Combine the data by visits of the satellite of one region in the sky.
@@ -178,24 +201,14 @@ class WiseDataByVisit(WISEDataBase):
         :rtype: pandas.DataFrame
         """
 
-        # -------------------------   find epoch intervals   -------------------------- #
-        sorted_mjds = np.sort(lightcurve.mjd)
-        epoch_bounds_mask = (sorted_mjds[1:] - sorted_mjds[:-1]) > 100
-        epoch_bins = np.array(
-            [lightcurve.mjd.min() * 0.99] +  # this makes sure that the first datapoint gets selected
-            list(((sorted_mjds[1:] + sorted_mjds[:-1]) / 2)[epoch_bounds_mask]) +  # finding the middle between
-                                                                                   # two visits
-            [lightcurve.mjd.max() * 1.01]    # this just makes sure that the last datapoint gets selected as well
-        )
-
         # -------------------------   create visit mask   -------------------------- #
-        visit_mask = np.digitize(lightcurve.mjd, epoch_bins) - 1
-        counts = np.bincount(visit_mask)
+        visit_map = self.get_visit_map(lightcurve)
+        counts = np.bincount(visit_map)
 
         binned_data = dict()
 
         # -------------------------   calculate mean mjd   -------------------------- #
-        binned_data["mean_mjd"] = np.bincount(visit_mask, weights=lightcurve.mjd) / counts
+        binned_data["mean_mjd"] = np.bincount(visit_map, weights=lightcurve.mjd) / counts
 
         # -------------------------   loop through bands   -------------------------- #
         for b in self.bands:
@@ -214,7 +227,7 @@ class WiseDataByVisit(WISEDataBase):
                 outlier_mask = outlier_masks.get(self.flux_key_ext, None)
 
                 mean, u, bin_ulim_bool, outlier_mask, use_mask, n_points = self.calculate_epochs(
-                    f, e, visit_mask,
+                    f, e, visit_map,
                     counts,
                     remove_outliers=remove_outliers,
                     outlier_mask=outlier_mask
@@ -245,13 +258,13 @@ class WiseDataByVisit(WISEDataBase):
             zps = np.zeros_like(inst_fluxes)
             zps[zp_mask] = mags[zp_mask] + 2.5 * np.log10(inst_fluxes[zp_mask])
             # find visits with no zeropoints
-            n_valid_zps = np.bincount(visit_mask, weights=zp_mask)
+            n_valid_zps = np.bincount(visit_map, weights=zp_mask)
             at_least_one_valid_zp = n_valid_zps > 0
             # calculate the median zeropoint for each visit
             zps_median = np.zeros_like(n_valid_zps, dtype=float)
             zps_median[n_valid_zps > 0] = np.array([
-                np.median(zps[(visit_mask == i) & zp_mask])
-                for i in np.unique(visit_mask[at_least_one_valid_zp[visit_mask]])
+                np.median(zps[(visit_map == i) & zp_mask])
+                for i in np.unique(visit_map[at_least_one_valid_zp[visit_map]])
             ])
             # if there are only non-detections then fall back to default zeropoint
             zps_median[n_valid_zps == 0] = self.magnitude_zeropoints['Mag'][b]
@@ -267,14 +280,14 @@ class WiseDataByVisit(WISEDataBase):
             flux_dens_const = mag_zp * 10 ** (-zps_median / 2.5)
 
             # calculate flux densities from instrument counts
-            flux_densities = inst_fluxes * flux_dens_const[visit_mask]
-            flux_densities_e = inst_fluxes_e * flux_dens_const[visit_mask]
+            flux_densities = inst_fluxes * flux_dens_const[visit_map]
+            flux_densities_e = inst_fluxes_e * flux_dens_const[visit_map]
 
             # bin flux densities
             mean_fd, u_fd, ul_fd, outlier_mask_fd, use_mask_fd, n_points_fd = self.calculate_epochs(
                 flux_densities,
                 flux_densities_e,
-                visit_mask, counts,
+                visit_map, counts,
                 remove_outliers=False,
                 outlier_mask=
                 outlier_masks[
