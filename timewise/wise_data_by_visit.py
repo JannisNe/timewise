@@ -406,6 +406,10 @@ class WiseDataByVisit(WISEDataBase):
     ):
 
         logger.info(f"making binning diagnostic plot")
+        pos = self.parent_sample.df.loc[
+            ind,
+            [self.parent_sample.default_keymap["ra"], self.parent_sample.default_keymap["dec"]]
+        ]
         chunk_number = self._get_chunk_number(parent_sample_index=ind)
 
         if service == "tap":
@@ -433,11 +437,13 @@ class WiseDataByVisit(WISEDataBase):
 
             label = str(visit)
             marker = markers[visit]
+            ra = (datapoints.ra - pos[self.parent_sample.default_keymap["ra"]]) * 3600
+            dec = (datapoints.dec - pos[self.parent_sample.default_keymap["dec"]]) * 3600
 
             if ("sigra" in datapoints.columns) and ("sigdec" in datapoints.columns):
                 axs[0].errorbar(
-                    datapoints.ra,
-                    datapoints.dec,
+                    ra,
+                    dec,
                     xerr=datapoints.sigra / 3600,
                     yerr=datapoints.sigdec / 3600,
                     label=label,
@@ -445,12 +451,13 @@ class WiseDataByVisit(WISEDataBase):
                     ls=""
                 )
             else:
-                axs[0].scatter(datapoints.ra, datapoints.dec, label=label, marker=marker)
+                axs[0].scatter(ra, dec, label=label, marker=marker)
 
         title = axs[0].get_title()
         axs[0].set_title("")
         axs[0].legend(ncol=5, bbox_to_anchor=(0, 1, 1, 0), loc="lower left", mode="expand", title=title)
         axs[0].set_aspect(1, adjustable="box")
+        fig.tight_layout()
 
         if save:
             if fn is None:

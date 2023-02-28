@@ -250,13 +250,12 @@ def plot_panstarrs_cutout(
 ):
     arcsec_per_px = 0.25
     ang_px = int(arcsec / arcsec_per_px)
-    ang_deg = arcsec / 3600
 
     imshow_kwargs = {
         'origin': 'upper',
-        "extent": ([ra + ang_deg / 2, ra - ang_deg / 2, dec - ang_deg / 2, dec + ang_deg / 2])
+        "extent": ([arcsec / 2, -arcsec / 2, -arcsec / 2, arcsec / 2])
     }
-    scatter_args = [ra, dec]
+    scatter_args = [0, 0]
     scatter_kwargs = {'marker': 'x', 'color': 'red'}
 
     if not plot_color_image:
@@ -291,10 +290,20 @@ def plot_panstarrs_cutout(
         axss.scatter(*scatter_args, **scatter_kwargs)
 
     _this_title = title if title else f"{ra}_{dec}"
+    si = "-" if dec > 0 else "+"
+    ylabel = f"Dec {si} {abs(dec):.2f} [arcsec]"
+    xlabel = f"RA - {ra:.2f} [arcsec]"
     try:
         axss.set_title(_this_title)
+        axss.set_xlabel(xlabel)
+        axss.set_ylabel(ylabel)
+        axss.grid(ls=":", alpha=0.5)
     except AttributeError:  # in this case axss is an array
+        axss[0].set_ylabel(ylabel)
+        fig.supxlabel(xlabel)
         fig.suptitle(_this_title)
+        for a in axss:
+            a.grid(ls=":", alpha=0.5)
 
     if save:
         logger.info(f'saving under {fn}')
