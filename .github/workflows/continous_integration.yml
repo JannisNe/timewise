@@ -55,7 +55,7 @@ jobs:
           python -m pip install poetry
           python -m poetry install
           cd SciScript-Python
-          python Install.py sciserver-v2.1.0
+          poetry run python Install.py sciserver-v2.1.0
           cd ..
 
       # Runs a set of commands using the runners shell
