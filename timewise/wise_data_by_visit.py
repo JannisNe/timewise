@@ -1,7 +1,9 @@
+import os
 import pandas as pd
 import numpy as np
 import logging
 from scipy import stats
+import matplotlib.pyplot as plt
 
 from timewise.wise_data_base import WISEDataBase
 from timewise.utils import get_excess_variance
@@ -162,6 +164,29 @@ class WiseDataByVisit(WISEDataBase):
 
         return median, u, bin_ulim_bool, outlier_mask, use_mask, n_points
 
+    @staticmethod
+    def get_visit_map(lightcurve):
+        """
+        Create a map datapoint to visit
+
+        :param lightcurve: the unbinned lightcurve
+        :type lightcurve: pd.DataFrame
+        :returns: visit map
+        :rtype: np.ndarray
+        """
+        # -------------------------   find epoch intervals   -------------------------- #
+        sorted_mjds = np.sort(lightcurve.mjd)
+        epoch_bounds_mask = (sorted_mjds[1:] - sorted_mjds[:-1]) > 100
+        epoch_bins = np.array(
+            [lightcurve.mjd.min() * 0.99] +  # this makes sure that the first datapoint gets selected
+            list(((sorted_mjds[1:] + sorted_mjds[:-1]) / 2)[epoch_bounds_mask]) +  # finding the middle between
+                                                                                   # two visits
+            [lightcurve.mjd.max() * 1.01]    # this just makes sure that the last datapoint gets selected as well
+        )
+
+        visit_mask = np.digitize(lightcurve.mjd, epoch_bins) - 1
+        return visit_mask
+
     def bin_lightcurve(self, lightcurve):
         """
         Combine the data by visits of the satellite of one region in the sky.
@@ -178,24 +203,14 @@ class WiseDataByVisit(WISEDataBase):
         :rtype: pandas.DataFrame
         """
 
-        # -------------------------   find epoch intervals   -------------------------- #
-        sorted_mjds = np.sort(lightcurve.mjd)
-        epoch_bounds_mask = (sorted_mjds[1:] - sorted_mjds[:-1]) > 100
-        epoch_bins = np.array(
-            [lightcurve.mjd.min() * 0.99] +  # this makes sure that the first datapoint gets selected
-            list(((sorted_mjds[1:] + sorted_mjds[:-1]) / 2)[epoch_bounds_mask]) +  # finding the middle between
-                                                                                   # two visits
-            [lightcurve.mjd.max() * 1.01]    # this just makes sure that the last datapoint gets selected as well
-        )
-
         # -------------------------   create visit mask   -------------------------- #
-        visit_mask = np.digitize(lightcurve.mjd, epoch_bins) - 1
-        counts = np.bincount(visit_mask)
+        visit_map = self.get_visit_map(lightcurve)
+        counts = np.bincount(visit_map)
 
         binned_data = dict()
 
         # -------------------------   calculate mean mjd   -------------------------- #
-        binned_data["mean_mjd"] = np.bincount(visit_mask, weights=lightcurve.mjd) / counts
+        binned_data["mean_mjd"] = np.bincount(visit_map, weights=lightcurve.mjd) / counts
 
         # -------------------------   loop through bands   -------------------------- #
         for b in self.bands:
@@ -214,7 +229,7 @@ class WiseDataByVisit(WISEDataBase):
                 outlier_mask = outlier_masks.get(self.flux_key_ext, None)
 
                 mean, u, bin_ulim_bool, outlier_mask, use_mask, n_points = self.calculate_epochs(
-                    f, e, visit_mask,
+                    f, e, visit_map,
                     counts,
                     remove_outliers=remove_outliers,
                     outlier_mask=outlier_mask
@@ -245,13 +260,13 @@ class WiseDataByVisit(WISEDataBase):
             zps = np.zeros_like(inst_fluxes)
             zps[zp_mask] = mags[zp_mask] + 2.5 * np.log10(inst_fluxes[zp_mask])
             # find visits with no zeropoints
-            n_valid_zps = np.bincount(visit_mask, weights=zp_mask)
+            n_valid_zps = np.bincount(visit_map, weights=zp_mask)
             at_least_one_valid_zp = n_valid_zps > 0
             # calculate the median zeropoint for each visit
             zps_median = np.zeros_like(n_valid_zps, dtype=float)
             zps_median[n_valid_zps > 0] = np.array([
-                np.median(zps[(visit_mask == i) & zp_mask])
-                for i in np.unique(visit_mask[at_least_one_valid_zp[visit_mask]])
+                np.median(zps[(visit_map == i) & zp_mask])
+                for i in np.unique(visit_map[at_least_one_valid_zp[visit_map]])
             ])
             # if there are only non-detections then fall back to default zeropoint
             zps_median[n_valid_zps == 0] = self.magnitude_zeropoints['Mag'][b]
@@ -267,14 +282,14 @@ class WiseDataByVisit(WISEDataBase):
             flux_dens_const = mag_zp * 10 ** (-zps_median / 2.5)
 
             # calculate flux densities from instrument counts
-            flux_densities = inst_fluxes * flux_dens_const[visit_mask]
-            flux_densities_e = inst_fluxes_e * flux_dens_const[visit_mask]
+            flux_densities = inst_fluxes * flux_dens_const[visit_map]
+            flux_densities_e = inst_fluxes_e * flux_dens_const[visit_map]
 
             # bin flux densities
             mean_fd, u_fd, ul_fd, outlier_mask_fd, use_mask_fd, n_points_fd = self.calculate_epochs(
                 flux_densities,
                 flux_densities_e,
-                visit_mask, counts,
+                visit_map, counts,
                 remove_outliers=False,
                 outlier_mask=
                 outlier_masks[
@@ -377,3 +392,73 @@ class WiseDataByVisit(WISEDataBase):
                         metadata[k] = np.nan
 
         return metadata
+
+    def plot_diagnostic_binning(
+            self,
+            service,
+            ind,
+            lum_key="mag",
+            interactive=False,
+            fn=None,
+            save=True,
+            which="panstarrs",
+            arcsec=20
+    ):
+
+        logger.info(f"making binning diagnostic plot")
+        chunk_number = self._get_chunk_number(parent_sample_index=ind)
+
+        if service == "tap":
+            unbinned_lcs = self.get_unbinned_lightcurves(chunk_number=chunk_number)
+        else:
+            unbinned_lcs = self._get_unbinned_lightcurves_gator(chunk_number=chunk_number)
+
+        lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == ind]
+        binned_lightcurve = self.bin_lightcurve(lightcurve)
+
+        fig, axs = plt.subplots(nrows=2, gridspec_kw={"height_ratios": [3, 2]}, figsize=(5, 10))
+
+        kwargs = {"plot_color_image": True} if which == "panstarrs" else dict()
+        self.parent_sample.plot_cutout(ind=ind, ax=axs[0], which=which, arcsec=arcsec, **kwargs)
+        self._plot_lc(lightcurve=binned_lightcurve, unbinned_lc=lightcurve, lum_key=lum_key, ax=axs[-1], save=False)
+
+        visit_map = self.get_visit_map(lightcurve)
+
+        markers = ['o', 'v', '^', '<', '>', '1', '2', '3', '4', '8', 's', 'p', '*', 'h', 'H', '+', 'x', 'D', 'd', '|',
+                   '_', 'P', 'X']
+
+        for visit in np.unique(visit_map):
+            m = visit_map == visit
+            datapoints = lightcurve[m]
+
+            label = str(visit)
+            marker = markers[visit]
+
+            if ("sigra" in datapoints.columns) and ("sigdec" in datapoints.columns):
+                axs[0].errorbar(
+                    datapoints.ra,
+                    datapoints.dec,
+                    xerr=datapoints.sigra / 3600,
+                    yerr=datapoints.sigdec / 3600,
+                    label=label,
+                    marker=marker,
+                    ls=""
+                )
+            else:
+                axs[0].scatter(datapoints.ra, datapoints.dec, label=label, marker=marker)
+
+        title = axs[0].get_title()
+        axs[0].set_title("")
+        axs[0].legend(ncol=5, bbox_to_anchor=(0, 1, 1, 0), loc="lower left", mode="expand", title=title)
+        axs[0].set_aspect(1, adjustable="box")
+
+        if save:
+            if fn is None:
+                fn = os.path.join(self.plots_dir, f"{ind}_binning_diag.pdf")
+            logger.debug(f"saving under {fn}")
+            fig.savefig(fn)
+
+        if interactive:
+            return fig, axs
+        else:
+            plt.close()

@@ -107,7 +107,8 @@ class TestMIRFlareCatalogue(unittest.TestCase):
 
         logger.info('\n' + wise_data.parent_sample.df.to_string())
 
-        # wise_data.parent_sample.plot_cutout(0, arcsec=40, save=True)
+        wise_data.parent_sample.plot_cutout(0, arcsec=40, save=True, which="sdss")
+        wise_data.parent_sample.plot_cutout(0, arcsec=40, save=True, which="panstarrs")
 
         logger.info(f"\n\n Testing getting photometry \n")
         for s in ['gator', 'tap']:
