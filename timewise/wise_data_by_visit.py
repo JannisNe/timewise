@@ -427,7 +427,7 @@ class WiseDataByVisit(WISEDataBase):
             axs[0].scatter(datapoints.ra, datapoints.dec, label=f"visit {visit}", marker=markers[visit])
 
         axs[0].legend(ncol=4)
-        axs[0].set_aspect(1, adjustable="datalim")
+        axs[0].set_aspect(1, adjustable="box")
 
         if save:
             if fn is None:
