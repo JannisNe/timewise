@@ -4,7 +4,7 @@ import numpy as np
 import logging
 
 from timewise.general import main_logger, cache_dir, plots_dir
-from timewise.utils import plot_sdss_cutout
+from timewise.utils import plot_sdss_cutout, plot_panstarrs_cutout
 
 
 logger = logging.getLogger(__name__)
@@ -74,8 +74,14 @@ class ParentSampleBase(abc.ABC):
         return ou
 
     @staticmethod
-    def _plot_cutout(ra, dec, arcsec, interactive, **kwargs):
-        return plot_sdss_cutout(ra, dec, arcsec=arcsec, interactive=interactive, **kwargs)
+    def _plot_cutout(ra, dec, arcsec, interactive, which="sdss", **kwargs):
+        print(kwargs)
+        if which == "sdss":
+            return plot_sdss_cutout(ra, dec, arcsec=arcsec, interactive=interactive, **kwargs)
+        elif which == "panstarrs":
+            return plot_panstarrs_cutout(ra, dec, arcsec=arcsec, interactive=interactive, **kwargs)
+        else:
+            raise ValueError(f"{which} not an implemented survey! Choose one of 'sdss' or 'panstarrs'.")
 
     def save_local(self):
         logger.debug(f"saving under {self.local_sample_copy}")
