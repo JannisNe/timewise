@@ -291,7 +291,10 @@ def plot_panstarrs_cutout(
         axss.scatter(*scatter_args, **scatter_kwargs)
 
     _this_title = title if title else f"{ra}_{dec}"
-    axss.set_title(_this_title)
+    try:
+        axss.set_title(_this_title)
+    except AttributeError:  # in this case axss is an array
+        fig.suptitle(_this_title)
 
     if save:
         logger.info(f'saving under {fn}')
