@@ -410,7 +410,7 @@ class WiseDataByVisit(WISEDataBase):
         lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == ind]
         binned_lightcurve = self.bin_lightcurve(lightcurve)
 
-        fig, axs = plt.subplots(nrows=2)
+        fig, axs = plt.subplots(nrows=2, gridspec_kw={"height_ratios": [3, 2]}, figsize=(5, 10))
 
         kwargs = {"plot_color_image": True} if which == "panstarrs" else dict()
         self.parent_sample.plot_cutout(ind=ind, ax=axs[0], which=which, **kwargs)
