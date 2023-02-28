@@ -393,19 +393,28 @@ class WiseDataByVisit(WISEDataBase):
 
         return metadata
 
-    def plot_diagnostic_binning(self, ind, lum_key="mag", interactive=False, fn=None, save=True):
+    def plot_diagnostic_binning(
+            self,
+            ind,
+            lum_key="mag",
+            interactive=False,
+            fn=None,
+            save=True,
+            which="panstarrs"
+    ):
 
         logger.info(f"making binning diagnostic plot")
         chunk_number = self._get_chunk_number(parent_sample_index=ind)
         unbinned_lcs = self.get_unbinned_lightcurves(chunk_number=chunk_number)
 
-        lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key]]
+        lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == ind]
         binned_lightcurve = self.bin_lightcurve(lightcurve)
 
         fig, axs = plt.subplots(nrows=2)
 
-        self.parent_sample.plot_cutout(ind=ind, ax=axs[0])
-        self._plot_lc(lightcurve=binned_lightcurve, unbinned_lc=unbinned_lcs, lum_key=lum_key, ax=axs[-1])
+        kwargs = {"plot_color_image": True} if which == "panstarrs" else dict()
+        self.parent_sample.plot_cutout(ind=ind, ax=axs[0], which=which, **kwargs)
+        self._plot_lc(lightcurve=binned_lightcurve, unbinned_lc=lightcurve, lum_key=lum_key, ax=axs[-1], save=False)
 
         visit_map = self.get_visit_map(lightcurve)
 
@@ -417,7 +426,8 @@ class WiseDataByVisit(WISEDataBase):
             datapoints = lightcurve[m]
             axs[0].scatter(datapoints.ra, datapoints.dec, label=f"visit {visit}", marker=markers[visit])
 
-        axs[0].legend()
+        axs[0].legend(ncol=4)
+        axs[0].set_aspect(1, adjustable="datalim")
 
         if save:
             if fn is None:
