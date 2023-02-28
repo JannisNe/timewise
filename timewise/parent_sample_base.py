@@ -48,7 +48,7 @@ class ParentSampleBase(abc.ABC):
         :param kwargs: any additional kwargs will be passed to `matplotlib.pyplot.subplots()`
         :return: figure and axes if `interactive=True`
         """
-        sel = self.df.iloc[np.atleast_1d(ind)]
+        sel = self.df.loc[np.atleast_1d(ind)]
         ra, dec = sel[self.default_keymap["ra"]], sel[self.default_keymap["dec"]]
         title = [r[self.default_keymap["id"]] for i, r in sel.iterrows()]
 
