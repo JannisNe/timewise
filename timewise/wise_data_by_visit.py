@@ -395,17 +395,23 @@ class WiseDataByVisit(WISEDataBase):
 
     def plot_diagnostic_binning(
             self,
+            service,
             ind,
             lum_key="mag",
             interactive=False,
             fn=None,
             save=True,
-            which="panstarrs"
+            which="panstarrs",
+            arcsec=20
     ):
 
         logger.info(f"making binning diagnostic plot")
         chunk_number = self._get_chunk_number(parent_sample_index=ind)
-        unbinned_lcs = self.get_unbinned_lightcurves(chunk_number=chunk_number)
+
+        if service == "tap":
+            unbinned_lcs = self.get_unbinned_lightcurves(chunk_number=chunk_number)
+        else:
+            unbinned_lcs = self._get_unbinned_lightcurves_gator(chunk_number=chunk_number)
 
         lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == ind]
         binned_lightcurve = self.bin_lightcurve(lightcurve)
@@ -413,7 +419,7 @@ class WiseDataByVisit(WISEDataBase):
         fig, axs = plt.subplots(nrows=2, gridspec_kw={"height_ratios": [3, 2]}, figsize=(5, 10))
 
         kwargs = {"plot_color_image": True} if which == "panstarrs" else dict()
-        self.parent_sample.plot_cutout(ind=ind, ax=axs[0], which=which, **kwargs)
+        self.parent_sample.plot_cutout(ind=ind, ax=axs[0], which=which, arcsec=arcsec, **kwargs)
         self._plot_lc(lightcurve=binned_lightcurve, unbinned_lc=lightcurve, lum_key=lum_key, ax=axs[-1], save=False)
 
         visit_map = self.get_visit_map(lightcurve)
@@ -424,9 +430,26 @@ class WiseDataByVisit(WISEDataBase):
         for visit in np.unique(visit_map):
             m = visit_map == visit
             datapoints = lightcurve[m]
-            axs[0].scatter(datapoints.ra, datapoints.dec, label=f"visit {visit}", marker=markers[visit])
 
-        axs[0].legend(ncol=4)
+            label = str(visit)
+            marker = markers[visit]
+
+            if ("sigra" in datapoints.columns) and ("sigdec" in datapoints.columns):
+                axs[0].errorbar(
+                    datapoints.ra,
+                    datapoints.dec,
+                    xerr=datapoints.sigra / 3600,
+                    yerr=datapoints.sigdec / 3600,
+                    label=label,
+                    marker=marker,
+                    ls=""
+                )
+            else:
+                axs[0].scatter(datapoints.ra, datapoints.dec, label=label, marker=marker)
+
+        title = axs[0].get_title()
+        axs[0].set_title("")
+        axs[0].legend(ncol=5, bbox_to_anchor=(0, 1, 1, 0), loc="lower left", mode="expand", title=title)
         axs[0].set_aspect(1, adjustable="box")
 
         if save:
