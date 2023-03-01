@@ -461,21 +461,30 @@ class WiseDataByVisit(WISEDataBase):
 
             label = str(visit)
             marker = markers[visit]
+            color = f"C{visit}"
             ra = (datapoints.ra - pos[self.parent_sample.default_keymap["ra"]]) * 3600
             dec = (datapoints.dec - pos[self.parent_sample.default_keymap["dec"]]) * 3600
 
             if ("sigra" in datapoints.columns) and ("sigdec" in datapoints.columns):
+                has_sig = ~datapoints.sigra.isna() & ~datapoints.sigdec.isna()
                 axs[0].errorbar(
-                    ra,
-                    dec,
-                    xerr=datapoints.sigra / 3600,
-                    yerr=datapoints.sigdec / 3600,
+                    ra[has_sig],
+                    dec[has_sig],
+                    xerr=datapoints.sigra[has_sig] / 3600,
+                    yerr=datapoints.sigdec[has_sig] / 3600,
                     label=label,
                     marker=marker,
-                    ls=""
+                    ls="",
+                    color=color
+                )
+                axs[0].scatter(
+                    datapoints.ra[~has_sig],
+                    datapoints.dec[~has_sig],
+                    marker=marker,
+                    color=color
                 )
             else:
-                axs[0].scatter(ra, dec, label=label, marker=marker)
+                axs[0].scatter(ra, dec, label=label, marker=marker, color=color)
 
         title = axs[0].get_title()
         axs[0].set_title("")
@@ -485,7 +494,7 @@ class WiseDataByVisit(WISEDataBase):
 
         if save:
             if fn is None:
-                fn = os.path.join(self.plots_dir, f"{ind}_binning_diag.pdf")
+                fn = os.path.join(self.plots_dir, f"{ind}_binning_diag_{which}cutout.pdf")
             logger.debug(f"saving under {fn}")
             fig.savefig(fn)
 
