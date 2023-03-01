@@ -404,8 +404,34 @@ class WiseDataByVisit(WISEDataBase):
             which="panstarrs",
             arcsec=20
     ):
+        """
+        Show a skymap of the single detections and which bin they belong to next to the binned lightcurve
+
+        :param service: service used to download data, either of 'tap' or 'gator'
+        :type service: str
+        :param ind: index of the object in the parent sample
+        :type ind: str, int
+        :param lum_key: the key of the brightness unit, either of `flux` (instrument flux in counts) or `mag`
+        :type lum_key: str
+        :param interactive: if function is used interactively, return mpl.Figure and mpl.axes if True
+        :type interactive: bool
+        :param fn: filename for saving
+        :type fn: str
+        :param save: saves figure if True
+        :type save: bool
+        :param which: survey to get the cutout from, either of 'sdss' or 'panstarrs'
+        :type which: str
+        :param arcsec: size of cutout
+        :type arcsec: float
+        :returns: Figure and axes if `interactive=True`
+        :rtype: mpl.Figure, mpl.Axes
+        """
 
         logger.info(f"making binning diagnostic plot")
+        pos = self.parent_sample.df.loc[
+            ind,
+            [self.parent_sample.default_keymap["ra"], self.parent_sample.default_keymap["dec"]]
+        ]
         chunk_number = self._get_chunk_number(parent_sample_index=ind)
 
         if service == "tap":
@@ -416,11 +442,13 @@ class WiseDataByVisit(WISEDataBase):
         lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == ind]
         binned_lightcurve = self.bin_lightcurve(lightcurve)
 
-        fig, axs = plt.subplots(nrows=2, gridspec_kw={"height_ratios": [3, 2]}, figsize=(5, 10))
+        fig, axs = plt.subplots(nrows=2, gridspec_kw={"height_ratios": [3, 2]}, figsize=(5, 8))
 
         kwargs = {"plot_color_image": True} if which == "panstarrs" else dict()
         self.parent_sample.plot_cutout(ind=ind, ax=axs[0], which=which, arcsec=arcsec, **kwargs)
         self._plot_lc(lightcurve=binned_lightcurve, unbinned_lc=lightcurve, lum_key=lum_key, ax=axs[-1], save=False)
+        axs[-1].set_ylabel("Apparent Vega Magnitude")
+        axs[-1].grid(ls=":", alpha=0.5)
 
         visit_map = self.get_visit_map(lightcurve)
 
@@ -433,28 +461,40 @@ class WiseDataByVisit(WISEDataBase):
 
             label = str(visit)
             marker = markers[visit]
+            color = f"C{visit}"
+            ra = (datapoints.ra - pos[self.parent_sample.default_keymap["ra"]]) * 3600
+            dec = (datapoints.dec - pos[self.parent_sample.default_keymap["dec"]]) * 3600
 
             if ("sigra" in datapoints.columns) and ("sigdec" in datapoints.columns):
+                has_sig = ~datapoints.sigra.isna() & ~datapoints.sigdec.isna()
                 axs[0].errorbar(
-                    datapoints.ra,
-                    datapoints.dec,
-                    xerr=datapoints.sigra / 3600,
-                    yerr=datapoints.sigdec / 3600,
+                    ra[has_sig],
+                    dec[has_sig],
+                    xerr=datapoints.sigra[has_sig] / 3600,
+                    yerr=datapoints.sigdec[has_sig] / 3600,
                     label=label,
                     marker=marker,
-                    ls=""
+                    ls="",
+                    color=color
+                )
+                axs[0].scatter(
+                    datapoints.ra[~has_sig],
+                    datapoints.dec[~has_sig],
+                    marker=marker,
+                    color=color
                 )
             else:
-                axs[0].scatter(datapoints.ra, datapoints.dec, label=label, marker=marker)
+                axs[0].scatter(ra, dec, label=label, marker=marker, color=color)
 
         title = axs[0].get_title()
         axs[0].set_title("")
         axs[0].legend(ncol=5, bbox_to_anchor=(0, 1, 1, 0), loc="lower left", mode="expand", title=title)
         axs[0].set_aspect(1, adjustable="box")
+        fig.tight_layout()
 
         if save:
             if fn is None:
-                fn = os.path.join(self.plots_dir, f"{ind}_binning_diag.pdf")
+                fn = os.path.join(self.plots_dir, f"{ind}_binning_diag_{which}cutout.pdf")
             logger.debug(f"saving under {fn}")
             fig.savefig(fn)
 
