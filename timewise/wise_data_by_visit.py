@@ -404,6 +404,28 @@ class WiseDataByVisit(WISEDataBase):
             which="panstarrs",
             arcsec=20
     ):
+        """
+        Show a skymap of the single detections and which bin they belong to next to the binned lightcurve
+
+        :param service: service used to download data, either of 'tap' or 'gator'
+        :type service: str
+        :param ind: index of the object in the parent sample
+        :type ind: str, int
+        :param lum_key: the key of the brightness unit, either of `flux` (instrument flux in counts) or `mag`
+        :type lum_key: str
+        :param interactive: if function is used interactively, return mpl.Figure and mpl.axes if True
+        :type interactive: bool
+        :param fn: filename for saving
+        :type fn: str
+        :param save: saves figure if True
+        :type save: bool
+        :param which: survey to get the cutout from, either of 'sdss' or 'panstarrs'
+        :type which: str
+        :param arcsec: size of cutout
+        :type arcsec: float
+        :returns: Figure and axes if `interactive=True`
+        :rtype: mpl.Figure, mpl.Axes
+        """
 
         logger.info(f"making binning diagnostic plot")
         pos = self.parent_sample.df.loc[
