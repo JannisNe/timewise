@@ -302,7 +302,7 @@ def plot_panstarrs_cutout(
         fig.supylabel(ylabel)
         fig.supxlabel(xlabel)
         fig.suptitle(_this_title)
-        for a in axss:
+        for a in axss.flatten():
             a.grid(ls=":", alpha=0.5)
 
     if save:
