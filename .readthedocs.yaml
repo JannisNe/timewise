@@ -17,8 +17,10 @@ build:
       - curl -sSL https://install.python-poetry.org | python3 -
       # Tell poetry to not use a virtual environment
       - $HOME/.local/bin/poetry config virtualenvs.create false
-      # Install project's dependencies
+    post_install:
+        # Install project's dependencies
       - $HOME/.local/bin/poetry install --with docs
+      - python -c "import myst_parser; print(myst_parser.__version__)"
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
