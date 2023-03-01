@@ -17,7 +17,7 @@ tqdm = "^4.64.0"
 requests = "^2.28.1"
 pandas = "^1.4.3"
 numpy = "^1.23.2"
-pyvo = {git = "https://github.com/astropy/pyvo.git", rev="f10aff5"}
+pyvo = "^1.4"
 astropy = "^5.1"
 matplotlib = "^3.5.3"
 coveralls = "^3.3.1"
