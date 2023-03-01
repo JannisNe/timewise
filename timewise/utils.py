@@ -299,7 +299,7 @@ def plot_panstarrs_cutout(
         axss.set_ylabel(ylabel)
         axss.grid(ls=":", alpha=0.5)
     except AttributeError:  # in this case axss is an array
-        axss[0].set_ylabel(ylabel)
+        fig.supylabel(ylabel)
         fig.supxlabel(xlabel)
         fig.suptitle(_this_title)
         for a in axss:
