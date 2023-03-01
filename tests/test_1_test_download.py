@@ -139,6 +139,8 @@ class TestMIRFlareCatalogue(unittest.TestCase):
                     fn=fn
                 )
 
+            wise_data.plot_diagnostic_binning(service="gator", ind=plot_id)
+
     def test_b_test_photometry_download_by_allwise_id(self):
         logger.info('\n\n Testing WISE Data \n')
         wise_data = WISEDataTestVersion(
