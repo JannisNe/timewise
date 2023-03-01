@@ -1262,7 +1262,7 @@ test = ["pytest-astropy", "requests-mock"]
 
 [package.source]
 type = "git"
-url = "git@github.com:astropy/pyvo.git"
+url = "https://github.com/astropy/pyvo.git"
 reference = "f10aff5"
 resolved_reference = "f10aff5b0075ae8d6a3e0b819c0aad6134882b42"
 
@@ -1808,4 +1808,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8, <3.12"
-content-hash = "0867546035cc2f5b33e060e1b849dc6d84a6a06c988d19ab8d24449f53e4c3d5"
+content-hash = "4500d88f0c84f2316fa338a9e23a4ce06acbb83b311c79ce70217f4fcc5e1ac1"
