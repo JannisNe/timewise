@@ -21,6 +21,7 @@ from astropy import constants
 from astropy.cosmology import Planck18
 from astropy.io import ascii
 from astropy.table import Table
+from astropy.coordinates import SkyCoord
 
 from timewise.general import cache_dir, plots_dir, output_dir, logger_format, backoff_hndlr
 from timewise.utils import StableTAPService
@@ -1151,6 +1152,30 @@ class WISEDataBase(abc.ABC):
                 os.remove(fn)
 
         return lightcurves
+
+    @staticmethod
+    def get_position_mask(lightcurve):
+        coords = SkyCoord(lightcurve.ra, lightcurve.dec, unit="deg")
+
+        # we can use the standard median for Dec
+        med_offset_dec = np.median(coords.dec)
+        # We have to do a weighted median for RA
+        w = np.sin(np.deg2rad(coords.dec)) ** 2
+        sort_inds = np.argsort(coords.ra)
+        cum_w = np.cumsum(w[sort_inds])
+        cutoff = np.sum(w) / 2
+        med_offset_ra = coords.ra[sort_inds][cum_w >= cutoff][0]
+        med_pos = SkyCoord(med_offset_ra, med_offset_dec)
+
+        # find the 90% closest datapoints
+        sep = coords.separation(med_pos)
+        sep90 = np.quantile(sep, 0.9)
+        sep_mask = sep < sep90
+
+        # keep datapoints within 3 sigma
+        sig = max([np.std(sep[sep_mask]), 0.2*u.arcsec])
+        keep_mask = sep <= 5 * sig
+        return keep_mask
 
     def _subprocess_select_and_bin(self, service, chunk_number=None, jobID=None):
         # run through the ids and bin the lightcurves
