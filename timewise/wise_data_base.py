@@ -1526,11 +1526,24 @@ class WISEDataBase(abc.ABC):
                                 markeredgecolor='k', ecolor='k', capsize=2)
                     ax.scatter(lightcurve.mean_mjd[ul_mask], lightcurve[f"{b}{self.mean_key}_{lum_key}"][ul_mask],
                                marker='v', c=self.band_plot_colors[b], alpha=0.7, s=2)
+
                 if not isinstance(unbinned_lc, type(None)):
-                    ax.errorbar(unbinned_lc.mjd, unbinned_lc[f"{b}_{lum_key}"],
-                                yerr=unbinned_lc[f"{b}_{lum_key}{self.error_key_ext}"],
-                                label=f"{b} unbinned", ls='', marker='o', c=self.band_plot_colors[b], markersize=4,
-                                alpha=0.3)
+                    m = ~unbinned_lc[f"{b}_{lum_key}"].isna()
+                    ul_mask = unbinned_lc[f"{b}_{lum_key}{self.error_key_ext}"].isna()
+
+                    tot_m = m & ~ul_mask
+                    if np.any(tot_m):
+                        ax.errorbar(unbinned_lc.mjd[tot_m], unbinned_lc[f"{b}_{lum_key}"][tot_m],
+                                    yerr=unbinned_lc[f"{b}_{lum_key}{self.error_key_ext}"][tot_m],
+                                    label=f"{b} unbinned", ls='', marker='o', c=self.band_plot_colors[b], markersize=4,
+                                    alpha=0.3)
+
+                    single_ul_m = m & ul_mask
+                    if np.any(single_ul_m):
+                        label = f"{b} unbinned upper limits" if not np.any(tot_m) else ""
+                        ax.scatter(unbinned_lc.mjd[single_ul_m], unbinned_lc[f"{b}_{lum_key}"][single_ul_m],
+                                   marker="d", c=self.band_plot_colors[b], alpha=0.3, s=1, label=label)
+
             except KeyError as e:
                 raise KeyError(f"Could not find brightness key {e}!")
 
