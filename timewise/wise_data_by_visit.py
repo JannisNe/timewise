@@ -462,7 +462,8 @@ class WiseDataByVisit(WISEDataBase):
                 counts,
                 remove_outliers=True
             )
-            outlier_masks[b] = outlier_mask
+            if np.any(outlier_mask):
+                outlier_masks[b] = outlier_mask
 
         # get a mask indicating outliers based on position
         position_mask = self.calculate_position_mask(lightcurve)
@@ -519,11 +520,11 @@ class WiseDataByVisit(WISEDataBase):
         # for each band indicate the outliers based on brightness with circles
         for b, outlier_mask in outlier_masks.items():
             brightness_outlier_scatter_style = {
-                "marker": r'$\u25CC$',
-                "markerfacecolor": self.band_plot_colors[b],
-                "markeredgecolor": self.band_plot_colors[b],
-                "markersize": 30,
-                "linestyle": 'none'
+                "marker": '$\u25cc$',
+                "facecolors": self.band_plot_colors[b],
+                "edgecolors": self.band_plot_colors[b],
+                "s": 60,
+                "lw": 2
             }
 
             axs[0].scatter(
@@ -540,25 +541,26 @@ class WiseDataByVisit(WISEDataBase):
             )
 
         # indicate the outliers by position with triangles
-        position_outlier_scatter_style = {
-            "marker": r'$\u25A2$',
-            "markerfacecolor": "orange",
-            "markeredgecolor": "orange",
-            "markersize": 30,
-            "linestyle": 'none'
-        }
-        axs[0].scatter(
-            ra[~position_mask],
-            dec[~position_mask],
-            label="outlier by position",
-            **position_outlier_scatter_style
-        )
-        for b in self.bands:
-            axs[1].scatter(
-                lightcurve.mjd[~position_mask],
-                lightcurve[f"{b}_{lum_key}"],
+        if np.any(~position_mask):
+            position_outlier_scatter_style = {
+                "marker": '$\u25A2$',
+                "facecolors": "orange",
+                "edgecolors": "orange",
+                "s": 60,
+                "lw": 2
+            }
+            axs[0].scatter(
+                ra[~position_mask],
+                dec[~position_mask],
+                label="outlier by position",
                 **position_outlier_scatter_style
             )
+            for b in self.bands:
+                axs[1].scatter(
+                    lightcurve.mjd[~position_mask],
+                    lightcurve[f"{b}_{lum_key}"][~position_mask],
+                    **position_outlier_scatter_style
+                )
 
         # formatting
         title = axs[0].get_title()
