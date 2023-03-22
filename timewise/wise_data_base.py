@@ -1153,30 +1153,6 @@ class WISEDataBase(abc.ABC):
 
         return lightcurves
 
-    @staticmethod
-    def get_position_mask(lightcurve):
-        coords = SkyCoord(lightcurve.ra, lightcurve.dec, unit="deg")
-
-        # we can use the standard median for Dec
-        med_offset_dec = np.median(coords.dec)
-        # We have to do a weighted median for RA
-        w = np.sin(np.deg2rad(coords.dec)) ** 2
-        sort_inds = np.argsort(coords.ra)
-        cum_w = np.cumsum(w[sort_inds])
-        cutoff = np.sum(w) / 2
-        med_offset_ra = coords.ra[sort_inds][cum_w >= cutoff][0]
-        med_pos = SkyCoord(med_offset_ra, med_offset_dec)
-
-        # find the 90% closest datapoints
-        sep = coords.separation(med_pos)
-        sep90 = np.quantile(sep, 0.9)
-        sep_mask = sep < sep90
-
-        # keep datapoints within 3 sigma
-        sig = max([np.std(sep[sep_mask]), 0.2*u.arcsec])
-        keep_mask = sep <= 5 * sig
-        return keep_mask
-
     def _subprocess_select_and_bin(self, service, chunk_number=None, jobID=None):
         # run through the ids and bin the lightcurves
         if service == 'tap':
@@ -1470,6 +1446,80 @@ class WISEDataBase(abc.ABC):
 
     #################################
     # END GET PHOTOMETRY DATA       #
+    ###########################################################################################################
+
+    ###########################################################################################################
+    # START MAKE POSITIONAL MASK        #
+    #####################################
+
+    @staticmethod
+    def calculate_position_mask(lightcurve):
+        """
+        Create a mask that based on the position of the single exposures.
+        Find the median position $\xi_{med}$ and find the 90%-quantile of datapoints from that.
+        Then, calculate the standard deviation of the separation from the median position and keep
+        all datapoints within five times that.
+
+        :param lightcurve: unstacked lightcurve
+        :type lightcurve: pd.DataFrame
+        :return: positional mask
+        :rtype: np.ndarray
+        """
+        coords = SkyCoord(lightcurve.ra, lightcurve.dec, unit="deg")
+
+        # we can use the standard median for Dec
+        med_offset_dec = np.median(coords.dec)
+        # We have to do a weighted median for RA
+        w = np.sin(np.deg2rad(coords.dec)) ** 2
+        sort_inds = np.argsort(coords.ra)
+        cum_w = np.cumsum(w[sort_inds])
+        cutoff = np.sum(w) / 2
+        med_offset_ra = coords.ra[sort_inds][cum_w >= cutoff][0]
+        med_pos = SkyCoord(med_offset_ra, med_offset_dec)
+
+        # find the 90% closest datapoints
+        sep = coords.separation(med_pos)
+        sep90 = np.quantile(sep, 0.9)
+        sep_mask = sep < sep90
+
+        # keep datapoints within 3 sigma
+        sig = max([np.std(sep[sep_mask]), 0.2*u.arcsec])
+        keep_mask = sep <= 5 * sig
+        return keep_mask
+
+    def get_position_mask(self, service, chunk_number):
+
+        logger.info(f"getting position masks for {service}, chunk {chunk_number}")
+        fn = os.path.join(self.cache_dir, "position_masks", f"{service}_chunk{chunk_number}.json")
+
+        if not os.path.isfile(fn):
+            logger.debug(f"No file {fn}. Calculating position masks.")
+
+            if service == "tap":
+                unbinned_lcs = self.get_unbinned_lightcurves(chunk_number)
+            elif service == "gator":
+                unbinned_lcs = self._get_unbinned_lightcurves_gator(chunk_number)
+            else:
+                raise ValueError(f"Service must be one of 'gator' or 'tap', not {service}!")
+
+            position_masks = dict()
+
+            for i in unbinned_lcs[self._tap_orig_id_key].unique():
+                lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == i]
+                position_masks[i] = list(self.calculate_position_mask(lightcurve))
+
+            with open(fn, "w") as f:
+                json.dump(position_masks, f)
+
+        else:
+            logger.debug(f"loading {fn}")
+            with open(fn, "r") as f:
+                position_masks = json.load(f)
+
+        return position_masks
+
+    #####################################
+    # END MAKE POSITIONAL MASK          #
     ###########################################################################################################
 
     ###########################################################################################################
