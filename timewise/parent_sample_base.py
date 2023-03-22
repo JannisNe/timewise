@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import logging
 
-from timewise.general import main_logger, cache_dir, plots_dir
+from timewise.general import cache_dir, plots_dir
 from timewise.utils import plot_sdss_cutout, plot_panstarrs_cutout
 
 
@@ -75,7 +75,6 @@ class ParentSampleBase(abc.ABC):
 
     @staticmethod
     def _plot_cutout(ra, dec, arcsec, interactive, which="sdss", **kwargs):
-        print(kwargs)
         if which == "sdss":
             return plot_sdss_cutout(ra, dec, arcsec=arcsec, interactive=interactive, **kwargs)
         elif which == "panstarrs":
