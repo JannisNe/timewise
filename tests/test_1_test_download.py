@@ -1,4 +1,7 @@
-import unittest, shutil, os, socket
+import unittest
+import shutil
+import os
+import socket
 import numpy as np
 import logging
 
@@ -63,7 +66,8 @@ class WISEBigDataTestVersion(WISEDataDESYCluster):
     def submit_to_cluster(
             self,
             node_memory,
-            single_chunk=None
+            single_chunk=None,
+            mask_by_position=False
     ):
         logger.info("emulating cluster work")
 
@@ -80,7 +84,12 @@ class WISEBigDataTestVersion(WISEDataDESYCluster):
         for job_id in range(_start_id, _end_id+1):
             logger.debug(f"Job {job_id}")
             chunk_number = self._get_chunk_number_for_job(job_id)
-            self._subprocess_select_and_bin(service='tap', chunk_number=chunk_number, jobID=job_id)
+            self._subprocess_select_and_bin(
+                service='tap',
+                chunk_number=chunk_number,
+                jobID=job_id,
+                mask_by_position=mask_by_position
+            )
             self.calculate_metadata(service='tap', chunk_number=chunk_number, jobID=job_id)
 
         return 1
@@ -114,7 +123,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         for s in ['gator', 'tap']:
 
             logger.info(f"\nTesting {s.upper()}")
-            wise_data.get_photometric_data(service=s)
+            wise_data.get_photometric_data(service=s, mask_by_position=True)
 
             logger.info(f" --- Test adding flux densities --- ")
             wise_data.add_flux_densities_to_saved_lightcurves(s)
@@ -188,7 +197,8 @@ class TestMIRFlareCatalogue(unittest.TestCase):
             cluster_jobs_per_chunk=2,
             query_type="positional",
             skip_input=True,
-            wait=0
+            wait=0,
+            mask_by_position=True
         )
 
         logger.info(f" --- Test chi2 plots --- ")
@@ -210,7 +220,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
 
     def test_d_wise_bigdata_desy_cluster(self):
         host = socket.gethostname()
-        if np.logical_or("ifh.de" in host, "zeuthen.desy.de" in host):
+        if np.logical_or("ifh.de" in host, ("zeuthen.desy.de" in host) and ("wgs" in host)):
             host_server = "DESY"
         else:
             host_server = None
@@ -228,6 +238,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
             wise_desy_bigdata.get_sample_photometric_data(
                 cluster_jobs_per_chunk=2,
                 wait=0,
+                mask_by_position=True
             )
 
             N_downloaded = sum([
