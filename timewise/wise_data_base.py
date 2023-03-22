@@ -206,7 +206,7 @@ class WISEDataBase(abc.ABC):
         self._split_chunk_key = '__chunk'
         self._cached_raw_photometry_prefix = 'raw_photometry'
         self.tap_jobs = None
-        self.queue = queue.Queue()
+        self.queue = None
         self.clear_unbinned_photometry_when_binning = False
         self._cached_final_products = {
             'lightcurves': dict(),
