@@ -1467,7 +1467,7 @@ class WISEDataBase(abc.ABC):
     def calculate_position_mask(lightcurve):
         """
         Create a mask that based on the position of the single exposures.
-        Find the median position $\xi_{med}$ and find the 90%-quantile of datapoints from that.
+        Find the median position and find the 90%-quantile of datapoints from that.
         Then, calculate the standard deviation of the separation from the median position and keep
         all datapoints within five times that.
 
