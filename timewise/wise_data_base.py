@@ -1153,7 +1153,7 @@ class WISEDataBase(abc.ABC):
 
         return lightcurves
 
-    def _subprocess_select_and_bin(self, service, chunk_number=None, jobID=None):
+    def _subprocess_select_and_bin(self, service, chunk_number=None, jobID=None, mask_by_position=False):
         # run through the ids and bin the lightcurves
         if service == 'tap':
             lightcurves = self.get_unbinned_lightcurves(chunk_number, clear=self.clear_unbinned_photometry_when_binning)
@@ -1178,9 +1178,17 @@ class WISEDataBase(abc.ABC):
             logger.info(f"Starting data product for {len(indices)} indices.")
             data_product = self._start_data_product(parent_sample_indices=indices)
 
+        if mask_by_position:
+            position_mask = self.get_position_mask(service, chunk_number)
+        else:
+            position_mask = None
+
         for parent_sample_entry_id in tqdm.tqdm(indices, desc="binning"):
             m = lightcurves[self._tap_orig_id_key] == parent_sample_entry_id
             lightcurve = lightcurves[m]
+
+            if position_mask is not None:
+                lightcurve = lightcurve[position_mask[parent_sample_entry_id]]
 
             if len(lightcurve) < 1:
                 logger.warning(f"No data for {parent_sample_entry_id}")
@@ -1506,7 +1514,7 @@ class WISEDataBase(abc.ABC):
 
             for i in unbinned_lcs[self._tap_orig_id_key].unique():
                 lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == i]
-                position_masks[i] = list(self.calculate_position_mask(lightcurve))
+                position_masks[str(i)] = list(self.calculate_position_mask(lightcurve))
 
             with open(fn, "w") as f:
                 json.dump(position_masks, f)
