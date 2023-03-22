@@ -549,7 +549,7 @@ class WISEDataBase(abc.ABC):
 
     def get_photometric_data(self, tables=None, perc=1, wait=0, service=None, nthreads=100,
                              chunks=None, overwrite=True, remove_chunks=False, query_type='positional',
-                             skip_download=False):
+                             skip_download=False, mask_by_position=False):
         """
         Load photometric data from the IRSA server for the matched sample. The result will be saved under
 
@@ -575,6 +575,8 @@ class WISEDataBase(abc.ABC):
         :type query_type: str
         :param skip_download: if `True` skip downloading and only do binning
         :type skip_download: bool
+        :param mask_by_position: if `True` mask single exposures that are too far away from the bulk
+        :type mask_by_position: bool
         """
 
         mag = True
@@ -619,7 +621,7 @@ class WISEDataBase(abc.ABC):
         else:
             logger.info("skipping download, assume data is already downloaded.")
 
-        self._select_individual_lightcurves_and_bin(service=service, chunks=chunks)
+        self._select_individual_lightcurves_and_bin(service=service, chunks=chunks, mask_by_position=mask_by_position)
         for c in chunks:
             self.calculate_metadata(service=service, chunk_number=c, overwrite=True)
 
@@ -1090,12 +1092,13 @@ class WISEDataBase(abc.ABC):
     #     select individual lightcurves and bin
     # ----------------------------------------------------------------------
 
-    def _select_individual_lightcurves_and_bin(self, ncpu=35, service='tap', chunks=None):
+    def _select_individual_lightcurves_and_bin(self, ncpu=35, service='tap', chunks=None, mask_by_position=False):
         logger.info('selecting individual lightcurves and bin ...')
         ncpu = min(self.n_chunks, ncpu)
         logger.debug(f"using {ncpu} CPUs")
         chunk_list = list(range(self.n_chunks)) if not chunks else chunks
         service_list = [service] * len(chunk_list)
+        pos_mask_list = [mask_by_position] * len(chunk_list)
         logger.debug(f"multiprocessing arguments: chunks: {chunk_list}, service: {service_list}")
 
         while True:
@@ -1114,7 +1117,7 @@ class WISEDataBase(abc.ABC):
                 tqdm.tqdm(
                     p.starmap(
                         self._subprocess_select_and_bin,
-                        zip(service_list, chunk_list)
+                        zip(service_list, chunk_list, pos_mask_list)
                     ),
                     total=self.n_chunks,
                     desc='select and bin'
@@ -1123,7 +1126,7 @@ class WISEDataBase(abc.ABC):
             p.close()
             p.join()
         else:
-            r = list(map(self._subprocess_select_and_bin, service_list, chunk_list))
+            r = list(map(self._subprocess_select_and_bin, service_list, chunk_list, pos_mask_list))
 
     def get_unbinned_lightcurves(self, chunk_number, clear=False):
         """
