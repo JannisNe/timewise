@@ -272,7 +272,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         for c in chunks:
             if not skip_download:
-                self._tap_queue.put((tables, c, wait, mag, flux, node_memory, query_type))
+                self._tap_queue.put((tables, c, wait, mag, flux, node_memory, query_type, mask_by_position))
             else:
                 self._cluster_queue.put((node_memory, c, mask_by_position))
 
@@ -361,7 +361,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def _tap_thread(self):
         logger.debug(f'started tap thread')
         while True:
-            tables, chunk, wait, mag, flux, node_memory, query_type = self._tap_queue.get(block=True)
+            tables, chunk, wait, mag, flux, node_memory, query_type, mask_by_position = self._tap_queue.get(block=True)
             logger.debug(f'querying IRSA for chunk {chunk}')
 
             submit_to_cluster = True
@@ -409,7 +409,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
             self._tap_queue.task_done()
             if submit_to_cluster:
-                self._cluster_queue.put((node_memory, chunk))
+                self._cluster_queue.put((node_memory, chunk, mask_by_position))
 
             gc.collect()
 
@@ -445,7 +445,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
             if not job_id:
                 logger.warning(f"could not submit {chunk} to cluster! Try later")
-                self._cluster_queue.put((node_memory, chunk))
+                self._cluster_queue.put((node_memory, chunk, mask_by_position))
                 self._cluster_queue.task_done()
 
             else:
