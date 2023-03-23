@@ -84,13 +84,17 @@ class WISEBigDataTestVersion(WISEDataDESYCluster):
         for job_id in range(_start_id, _end_id+1):
             logger.debug(f"Job {job_id}")
             chunk_number = self._get_chunk_number_for_job(job_id)
-            self._subprocess_select_and_bin(
-                service='tap',
-                chunk_number=chunk_number,
-                jobID=job_id,
-                mask_by_position=mask_by_position
-            )
-            self.calculate_metadata(service='tap', chunk_number=chunk_number, jobID=job_id)
+
+            try:
+                self._subprocess_select_and_bin(
+                    service='tap',
+                    chunk_number=chunk_number,
+                    jobID=job_id,
+                    mask_by_position=mask_by_position
+                )
+                self.calculate_metadata(service='tap', chunk_number=chunk_number, jobID=job_id)
+            except ValueError as e:
+                logger.error(f"ValueError: {e}")
 
         return 1
 
