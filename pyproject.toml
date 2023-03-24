@@ -34,7 +34,7 @@ optional = true
 
 [tool.poetry.group.docs.dependencies]
 myst-parser = ">=0.18,<0.20"
-furo = "^2022.6.21"
+furo = "^2022.12.7"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
