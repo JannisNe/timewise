@@ -441,7 +441,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
             node_memory, chunk, mask_by_position = self._cluster_queue.get(block=True)
 
             logger.info(f'got all TAP results for chunk {chunk}. submitting to cluster')
-            job_id = self.submit_to_cluster(node_memory=node_memory, single_chunk=chunk)
+            job_id = self.submit_to_cluster(
+                node_memory=node_memory,
+                single_chunk=chunk,
+                mask_by_position=mask_by_position
+            )
 
             if not job_id:
                 logger.warning(f"could not submit {chunk} to cluster! Try later")
