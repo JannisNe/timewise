@@ -1098,6 +1098,7 @@ class WISEDataBase(abc.ABC):
         logger.debug(f"using {ncpu} CPUs")
         chunk_list = list(range(self.n_chunks)) if not chunks else chunks
         service_list = [service] * len(chunk_list)
+        jobID_list = [None] * len(chunk_list)
         pos_mask_list = [mask_by_position] * len(chunk_list)
         logger.debug(f"multiprocessing arguments: chunks: {chunk_list}, service: {service_list}")
 
@@ -1117,7 +1118,7 @@ class WISEDataBase(abc.ABC):
                 tqdm.tqdm(
                     p.starmap(
                         self._subprocess_select_and_bin,
-                        zip(service_list, chunk_list, pos_mask_list)
+                        zip(service_list, chunk_list, jobID_list, pos_mask_list)
                     ),
                     total=self.n_chunks,
                     desc='select and bin'
@@ -1126,7 +1127,7 @@ class WISEDataBase(abc.ABC):
             p.close()
             p.join()
         else:
-            r = list(map(self._subprocess_select_and_bin, service_list, chunk_list, pos_mask_list))
+            r = list(map(self._subprocess_select_and_bin, service_list, chunk_list, jobID_list, pos_mask_list))
 
     def get_unbinned_lightcurves(self, chunk_number, clear=False):
         """
