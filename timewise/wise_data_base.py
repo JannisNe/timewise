@@ -1519,7 +1519,11 @@ class WISEDataBase(abc.ABC):
 
             for i in unbinned_lcs[self._tap_orig_id_key].unique():
                 lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == i]
-                position_masks[str(i)] = list(self.calculate_position_mask(lightcurve))
+                position_masks[str(i)] = self.calculate_position_mask(lightcurve)
+
+            d = os.path.dirname(fn)
+            if not os.path.isdir(d):
+                os.makedirs(d)
 
             with open(fn, "w") as f:
                 json.dump(position_masks, f)
