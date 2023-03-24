@@ -1501,6 +1501,16 @@ class WISEDataBase(abc.ABC):
         return pd.Series(keep_mask).to_dict()
 
     def get_position_mask(self, service, chunk_number):
+        """
+        Get the position mask for a chunk
+
+        :param service: The service that was used to download the data, either of `gator` or `tap`
+        :type service: str
+        :param chunk_number: chunk number
+        :type chunk_number: int
+        :returns: position masks
+        :rtype: dict
+        """
 
         logger.info(f"getting position masks for {service}, chunk {chunk_number}")
         fn = os.path.join(self.cache_dir, "position_masks", f"{service}_chunk{chunk_number}.json")
