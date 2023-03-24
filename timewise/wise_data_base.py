@@ -1192,7 +1192,8 @@ class WISEDataBase(abc.ABC):
             lightcurve = lightcurves[m]
 
             if position_mask is not None:
-                lightcurve = lightcurve[position_mask[parent_sample_entry_id]]
+                pos_m = pd.Series(position_mask[str(parent_sample_entry_id)]).values
+                lightcurve = lightcurve[pos_m]
 
             if len(lightcurve) < 1:
                 logger.warning(f"No data for {parent_sample_entry_id}")
@@ -1497,7 +1498,7 @@ class WISEDataBase(abc.ABC):
         # keep datapoints within 3 sigma
         sig = max([np.std(sep[sep_mask]), 0.2*u.arcsec])
         keep_mask = sep <= 5 * sig
-        return keep_mask
+        return pd.Series(keep_mask).to_dict()
 
     def get_position_mask(self, service, chunk_number):
 
