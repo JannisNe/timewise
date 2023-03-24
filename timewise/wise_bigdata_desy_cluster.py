@@ -164,7 +164,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
                                     storage_directory=bigdata_dir,
                                     node_memory='8G',
                                     skip_download=False,
-                                    skip_input=False):
+                                    skip_input=False,
+                                    mask_by_position=False):
         """
         An alternative to `get_photometric_data()` that uses the DESY cluster and is optimised for large datasets.
 
@@ -194,6 +195,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
         :type skip_download: bool
         :param skip_input: if True do not ask if data is correct before download
         :type skip_input: bool
+        :param mask_by_position: if `True` mask single exposures that are too far away from the bulk
+        :type mask_by_position: bool
         """
 
         # --------------------- set defaults --------------------------- #
@@ -269,9 +272,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         for c in chunks:
             if not skip_download:
-                self._tap_queue.put((tables, c, wait, mag, flux, node_memory, query_type))
+                self._tap_queue.put((tables, c, wait, mag, flux, node_memory, query_type, mask_by_position))
             else:
-                self._cluster_queue.put((node_memory, c))
+                self._cluster_queue.put((node_memory, c, mask_by_position))
 
         status_thread.start()
 
@@ -358,7 +361,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def _tap_thread(self):
         logger.debug(f'started tap thread')
         while True:
-            tables, chunk, wait, mag, flux, node_memory, query_type = self._tap_queue.get(block=True)
+            tables, chunk, wait, mag, flux, node_memory, query_type, mask_by_position = self._tap_queue.get(block=True)
             logger.debug(f'querying IRSA for chunk {chunk}')
 
             submit_to_cluster = True
@@ -406,7 +409,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
             self._tap_queue.task_done()
             if submit_to_cluster:
-                self._cluster_queue.put((node_memory, chunk))
+                self._cluster_queue.put((node_memory, chunk, mask_by_position))
 
             gc.collect()
 
@@ -435,14 +438,18 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def _cluster_thread(self):
         logger.debug(f'started cluster thread')
         while True:
-            node_memory, chunk = self._cluster_queue.get(block=True)
+            node_memory, chunk, mask_by_position = self._cluster_queue.get(block=True)
 
             logger.info(f'got all TAP results for chunk {chunk}. submitting to cluster')
-            job_id = self.submit_to_cluster(node_memory=node_memory, single_chunk=chunk)
+            job_id = self.submit_to_cluster(
+                node_memory=node_memory,
+                single_chunk=chunk,
+                mask_by_position=mask_by_position
+            )
 
             if not job_id:
                 logger.warning(f"could not submit {chunk} to cluster! Try later")
-                self._cluster_queue.put((node_memory, chunk))
+                self._cluster_queue.put((node_memory, chunk, mask_by_position))
                 self._cluster_queue.task_done()
 
             else:
@@ -663,6 +670,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             f'--min_sep_arcsec {self.min_sep.to("arcsec").value} '
             f'--n_chunks {self._n_chunks} '
             f'--job_id $1 '
+            f'--mak_by_position $2'
         )
 
         logger.debug("writing executable to " + self.executable_filename)
@@ -686,6 +694,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             self,
             job_ids: (int, List[int]),
             node_memory: str = '8G',
+            mask_by_position: bool = False
     ):
         """
         Produces the submit file that will be submitted to the NPX cluster.
@@ -694,6 +703,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
         :type job_ids: int or list of ints
         :param node_memory: The amount of memory to request for each node
         :type node_memory: str
+        :param mask_by_position: if `True` mask single exposures that are too far away from the bulk
+        :type mask_by_position: bool
         """
 
         q = "1 job_id in " + ", ".join(np.atleast_1d(job_ids).astype(str))
@@ -706,7 +717,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             f"error = $(cluster)_$(process)job.err \n"
             f"should_transfer_files   = YES \n"
             f"when_to_transfer_output = ON_EXIT \n"
-            f"arguments = $(job_id) \n"
+            f"arguments = $(job_id) {mask_by_position}\n"
             f"RequestMemory = {node_memory} \n"
             f"\n"
             f"queue {q}"
@@ -717,7 +728,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         with open(fn, "w") as f:
             f.write(text)
 
-    def submit_to_cluster(self, node_memory, single_chunk=None):
+    def submit_to_cluster(self, node_memory, single_chunk=None, mask_by_position=False):
         """
         Submit jobs to cluster
 
@@ -725,6 +736,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
         :type node_memory: str
         :param single_chunk: number of single chunk to run on the cluster
         :type single_chunk: int
+        :param mask_by_position: if `True` mask single exposures that are too far away from the bulk
+        :type mask_by_position: bool
         :return: ID of the cluster job
         :rtype: int
         """
@@ -736,15 +749,24 @@ class WISEDataDESYCluster(WiseDataByVisit):
             _start_id = int(single_chunk*self.n_cluster_jobs_per_chunk) + 1
             _end_id = int(_start_id + self.n_cluster_jobs_per_chunk) - 1
 
-        ids = list(range(_start_id, _end_id + 1))
+        job_ids = list(range(_start_id, _end_id + 1))
 
         # make data_product files, storing essential info from parent_sample
-        for jobID in ids:
+        for jobID in job_ids:
             indices = self.parent_sample.df.index[self.cluster_jobID_map == jobID]
             logger.debug(f"starting data_product for {len(indices)} objects.")
             data_product = self._start_data_product(parent_sample_indices=indices)
             chunk_number = self._get_chunk_number_for_job(jobID)
             self._save_data_product(data_product, service="tap", chunk_number=chunk_number, jobID=jobID)
+
+        # make position mask files
+        if mask_by_position:
+            if single_chunk:
+                chunk_numbers = [single_chunk]
+            else:
+                chunk_numbers = list(range(self.n_chunks))
+            for c in chunk_numbers:
+                self.get_position_mask(service="tap", chunk_number=c)
 
         parentsample_class_pickle = os.path.join(self.cluster_dir, 'parentsample_class.pkl')
         logger.debug(f"pickling parent sample class to {parentsample_class_pickle}")
@@ -752,9 +774,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
             pickle.dump(self.parent_sample_class, f)
 
         self.make_executable_file()
-        self.make_submit_file(job_ids=ids, node_memory=node_memory)
+        self.make_submit_file(job_ids=job_ids, node_memory=node_memory, mask_by_position=mask_by_position)
 
-        submit_cmd = 'condor_submit ' + self.get_submit_file_filename(ids)
+        submit_cmd = 'condor_submit ' + self.get_submit_file_filename(job_ids)
         logger.info(f"{time.asctime(time.localtime())}: {submit_cmd}")
 
         try:
@@ -1291,6 +1313,7 @@ if __name__ == '__main__':
     parser.add_argument('--base_name', type=str)
     parser.add_argument('--min_sep_arcsec', type=float)
     parser.add_argument('--n_chunks', type=int)
+    parser.add_argument('--mask_by_position', type=bool, default=False)
     parser.add_argument('--clear_unbinned', type=bool, default=False)
     parser.add_argument('--logging_level', type=str, default='INFO')
     cfg = parser.parse_args()
@@ -1312,5 +1335,10 @@ if __name__ == '__main__':
     wd.clear_unbinned_photometry_when_binning = cfg.clear_unbinned
     chunk_number = wd._get_chunk_number_for_job(cfg.job_id)
 
-    wd._subprocess_select_and_bin(service='tap', chunk_number=chunk_number, jobID=cfg.job_id)
+    wd._subprocess_select_and_bin(
+        service='tap',
+        chunk_number=chunk_number,
+        jobID=cfg.job_id,
+        mask_by_position=cfg.mask_by_position
+    )
     wd.calculate_metadata(service='tap', chunk_number=chunk_number, jobID=cfg.job_id)

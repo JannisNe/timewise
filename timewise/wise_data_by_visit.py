@@ -428,33 +428,66 @@ class WiseDataByVisit(WISEDataBase):
         """
 
         logger.info(f"making binning diagnostic plot")
+        # get position
         pos = self.parent_sample.df.loc[
             ind,
             [self.parent_sample.default_keymap["ra"], self.parent_sample.default_keymap["dec"]]
         ]
+        # get chunk number to be able to load the unstacked lightcurve
         chunk_number = self._get_chunk_number(parent_sample_index=ind)
 
+        # load the unstacked lightcurves
         if service == "tap":
             unbinned_lcs = self.get_unbinned_lightcurves(chunk_number=chunk_number)
         else:
             unbinned_lcs = self._get_unbinned_lightcurves_gator(chunk_number=chunk_number)
 
+        # select the datapoints corresponding to our object
         lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == ind]
+        # calculate the stacked lightcurve
         binned_lightcurve = self.bin_lightcurve(lightcurve)
+
+        # get visit map
+        visit_map = self.get_visit_map(lightcurve)
+        counts = np.bincount(visit_map)
+
+        # get the masks indicating outliers per visit based on brightnes
+        outlier_masks = dict()
+        for b in self.bands:
+            f = lightcurve[f"{b}{self.flux_key_ext}"]
+            e = lightcurve[f"{b}{self.flux_key_ext}{self.error_key_ext}"]
+
+            mean, u, bin_ulim_bool, outlier_mask, use_mask, n_points = self.calculate_epochs(
+                f, e, visit_map,
+                counts,
+                remove_outliers=True
+            )
+            if np.any(outlier_mask):
+                outlier_masks[b] = outlier_mask
+
+        # get a mask indicating outliers based on position
+        position_mask = pd.Series(self.calculate_position_mask(lightcurve)).values
+
+        # -----------------   create the plot   ----------------- #
 
         fig, axs = plt.subplots(nrows=2, gridspec_kw={"height_ratios": [3, 2]}, figsize=(5, 8))
 
+        # plot a panstarrs cutout
         kwargs = {"plot_color_image": True} if which == "panstarrs" else dict()
         self.parent_sample.plot_cutout(ind=ind, ax=axs[0], which=which, arcsec=arcsec, **kwargs)
+
+        # plot the lightcurve
         self._plot_lc(lightcurve=binned_lightcurve, unbinned_lc=lightcurve, lum_key=lum_key, ax=axs[-1], save=False)
-        axs[-1].set_ylabel("Apparent Vega Magnitude")
-        axs[-1].grid(ls=":", alpha=0.5)
 
-        visit_map = self.get_visit_map(lightcurve)
-
+        # set markers for visits
         markers = ['o', 'v', '^', '<', '>', '1', '2', '3', '4', '8', 's', 'p', '*', 'h', 'H', '+', 'x', 'D', 'd', '|',
                    '_', 'P', 'X']
 
+        # calculate ra and dec relative to center of cutout
+        ra = (lightcurve.ra - pos[self.parent_sample.default_keymap["ra"]]) * 3600
+        dec = (lightcurve.dec - pos[self.parent_sample.default_keymap["dec"]]) * 3600
+
+        # for each visit plot the datapoints on the cutout
         for visit in np.unique(visit_map):
             m = visit_map == visit
             datapoints = lightcurve[m]
@@ -462,14 +495,12 @@ class WiseDataByVisit(WISEDataBase):
             label = str(visit)
             marker = markers[visit]
             color = f"C{visit}"
-            ra = (datapoints.ra - pos[self.parent_sample.default_keymap["ra"]]) * 3600
-            dec = (datapoints.dec - pos[self.parent_sample.default_keymap["dec"]]) * 3600
 
             if ("sigra" in datapoints.columns) and ("sigdec" in datapoints.columns):
                 has_sig = ~datapoints.sigra.isna() & ~datapoints.sigdec.isna()
                 axs[0].errorbar(
-                    ra[has_sig],
-                    dec[has_sig],
+                    ra[m][has_sig],
+                    dec[m][has_sig],
                     xerr=datapoints.sigra[has_sig] / 3600,
                     yerr=datapoints.sigdec[has_sig] / 3600,
                     label=label,
@@ -478,15 +509,63 @@ class WiseDataByVisit(WISEDataBase):
                     color=color
                 )
                 axs[0].scatter(
-                    datapoints.ra[~has_sig],
-                    datapoints.dec[~has_sig],
+                    ra[m][~has_sig],
+                    dec[m][~has_sig],
                     marker=marker,
                     color=color
                 )
             else:
-                axs[0].scatter(ra, dec, label=label, marker=marker, color=color)
+                axs[0].scatter(ra[m], dec[m], label=label, marker=marker, color=color)
 
+        # for each band indicate the outliers based on brightness with circles
+        for b, outlier_mask in outlier_masks.items():
+            brightness_outlier_scatter_style = {
+                "marker": '$\u25cc$',
+                "facecolors": self.band_plot_colors[b],
+                "edgecolors": self.band_plot_colors[b],
+                "s": 60,
+                "lw": 2
+            }
+
+            axs[0].scatter(
+                ra[outlier_mask],
+                dec[outlier_mask],
+                label=f"{b} outlier by brightness",
+                **brightness_outlier_scatter_style
+
+            )
+            axs[1].scatter(
+                lightcurve.mjd[outlier_mask],
+                lightcurve[f"{b}_{lum_key}"][outlier_mask],
+                **brightness_outlier_scatter_style
+            )
+
+        # indicate the outliers by position with triangles
+        if np.any(~position_mask):
+            position_outlier_scatter_style = {
+                "marker": '$\u25A2$',
+                "facecolors": "orange",
+                "edgecolors": "orange",
+                "s": 60,
+                "lw": 2
+            }
+            axs[0].scatter(
+                ra[~position_mask],
+                dec[~position_mask],
+                label="outlier by position",
+                **position_outlier_scatter_style
+            )
+            for b in self.bands:
+                axs[1].scatter(
+                    lightcurve.mjd[~position_mask],
+                    lightcurve[f"{b}_{lum_key}"][~position_mask],
+                    **position_outlier_scatter_style
+                )
+
+        # formatting
         title = axs[0].get_title()
+        axs[-1].set_ylabel("Apparent Vega Magnitude")
+        axs[-1].grid(ls=":", alpha=0.5)
         axs[0].set_title("")
         axs[0].legend(ncol=5, bbox_to_anchor=(0, 1, 1, 0), loc="lower left", mode="expand", title=title)
         axs[0].set_aspect(1, adjustable="box")

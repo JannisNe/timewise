@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "timewise"
-version = "0.3.7"
+version = "0.3.8"
 description = "A small package to download infrared data from the WISE satellite"
 authors = ["Jannis Necker <jannis.necker@gmail.com>"]
 license = "MIT"
@@ -25,6 +25,7 @@ scikit-image = ">=0.19.3,<0.21.0"
 backoff = "^2.1.2"
 virtualenv = "^20.16.3"
 seaborn = ">=0.11.2,<0.13.0"
+pytest = "^7.2.2"
 
 [tool.poetry.dev-dependencies]
 
