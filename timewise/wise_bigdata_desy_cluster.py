@@ -670,7 +670,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             f'--min_sep_arcsec {self.min_sep.to("arcsec").value} '
             f'--n_chunks {self._n_chunks} '
             f'--job_id $1 '
-            f'--mak_by_position $2'
+            f'--mask_by_position $2'
         )
 
         logger.debug("writing executable to " + self.executable_filename)
