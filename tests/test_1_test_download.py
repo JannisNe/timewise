@@ -246,7 +246,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
             )
 
             N_downloaded = sum([
-                len(wise_desy_bigdata.load_data_product(service="tap", chunk_number=c))
+                len(wise_desy_bigdata.load_data_product(service="tap", chunk_number=c, use_bigdata_dir=True))
                 for c in range(wise_desy_bigdata.n_chunks)
             ])
 
