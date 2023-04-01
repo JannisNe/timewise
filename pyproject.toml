@@ -33,7 +33,7 @@ pytest = "^7.2.2"
 optional = true
 
 [tool.poetry.group.docs.dependencies]
-myst-parser = ">=0.18,<0.20"
+myst-parser = ">=0.18,<1.1"
 furo = "^2022.12.7"
 
 [build-system]
