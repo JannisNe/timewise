@@ -242,6 +242,14 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._overwrite = overwrite
         self._storage_dir = storage_directory
 
+        # --------------------------- set up queues --------------------------- #
+
+        self._tap_queue = queue.Queue()
+        self._cluster_queue = queue.Queue()
+        self._io_queue = queue.PriorityQueue()
+        self._io_queue_done = queue.Queue()
+        self._combining_queue = queue.Queue()
+
         # --------------------------- starting threads --------------------------- #
 
         tap_threads = [threading.Thread(target=self._tap_thread, daemon=True, name=f"TAPThread{_}")
@@ -259,13 +267,6 @@ class WISEDataDESYCluster(WiseDataByVisit):
         logger.debug(f'started {len(tap_threads)} TAP threads and {len(cluster_threads)} cluster threads.')
 
         # --------------------------- filling queue with tasks --------------------------- #
-
-        # set up queues
-        self._tap_queue = queue.Queue()
-        self._cluster_queue = queue.Queue()
-        self._io_queue = queue.PriorityQueue()
-        self._io_queue_done = queue.Queue()
-        self._combining_queue = queue.Queue()
 
         self.start_time = time.time()
         self._total_tasks = len(chunks)
