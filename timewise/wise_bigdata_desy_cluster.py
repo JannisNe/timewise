@@ -69,19 +69,16 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self._n_cluster_jobs_per_chunk = None
         self._storage_dir = None
 
-        # use a lock to prevent multiple threads to load and write to disc simultaneously
-        self.disc_lock = threading.Lock()
-
         # status attributes
         self.start_time = None
         self._total_tasks = None
         self._done_tasks = None
 
-        self._tap_queue = queue.Queue()
-        self._cluster_queue = queue.Queue()
-        self._io_queue = queue.PriorityQueue()
-        self._io_queue_done = queue.Queue()
-        self._combining_queue = queue.Queue()
+        self._tap_queue = None
+        self._cluster_queue = None
+        self._io_queue = None
+        self._io_queue_done = None
+        self._combining_queue = None
 
     # ---------------------------------------------------------------------------------- #
     # START using gzip to compress the data when saving     #
@@ -227,9 +224,6 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         service = 'tap'
 
-        # set up queue
-        self.queue = queue.Queue()
-
         # set up dictionary to store jobs in
         self.tap_jobs = {t: dict() for t in tables}
 
@@ -266,6 +260,13 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         # --------------------------- filling queue with tasks --------------------------- #
 
+        # set up queues
+        self._tap_queue = queue.Queue()
+        self._cluster_queue = queue.Queue()
+        self._io_queue = queue.PriorityQueue()
+        self._io_queue_done = queue.Queue()
+        self._combining_queue = queue.Queue()
+
         self.start_time = time.time()
         self._total_tasks = len(chunks)
         self._done_tasks = 0
@@ -287,6 +288,13 @@ class WISEDataDESYCluster(WiseDataByVisit):
         logger.debug('cluster done')
         self._combining_queue.join()
         logger.debug('combining done')
+
+        # unset queues
+        self._tap_queue = None
+        self._cluster_queue = None
+        self._io_queue = None
+        self._io_queue_done = None
+        self._combining_queue = None
 
     @backoff.on_exception(
         backoff.expo,
