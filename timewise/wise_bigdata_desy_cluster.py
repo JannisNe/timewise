@@ -244,6 +244,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         # --------------------------- set up queues --------------------------- #
 
+        self.queue = queue.Queue()
         self._tap_queue = queue.Queue()
         self._cluster_queue = queue.Queue()
         self._io_queue = queue.PriorityQueue()
@@ -291,6 +292,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         logger.debug('combining done')
 
         # unset queues
+        self.queue = None
         self._tap_queue = None
         self._cluster_queue = None
         self._io_queue = None
@@ -482,7 +484,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def _combining_thread(self):
         logger.debug(f'started combining thread')
         while True:
-            chunk = self._combining_queue.get(block=True)
+
+            try:
+                chunk = self._combining_queue.get(block=True)
+            except AttributeError:  # when self._combining_queue is None, meaning it was reset in main thread
+                break
             logger.debug(f"combining chunk {chunk}")
 
             try:
