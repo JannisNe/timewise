@@ -1328,8 +1328,7 @@ if __name__ == '__main__':
     parser.add_argument('--base_name', type=str)
     parser.add_argument('--min_sep_arcsec', type=float)
     parser.add_argument('--n_chunks', type=int)
-    parser.add_argument('--mask_by_position', type=bool, default=False)
-    parser.add_argument('--clear_unbinned', type=bool, default=False)
+    parser.add_argument('--mask_by_position', type=str, default=False)
     parser.add_argument('--logging_level', type=str, default='INFO')
     cfg = parser.parse_args()
 
@@ -1347,13 +1346,20 @@ if __name__ == '__main__':
                              n_chunks=cfg.n_chunks,
                              parent_sample_class=None)
     wd._load_cluster_info()
-    wd.clear_unbinned_photometry_when_binning = cfg.clear_unbinned
     chunk_number = wd._get_chunk_number_for_job(cfg.job_id)
+
+    match cfg.mask_by_position:
+        case "True":
+            mask_by_position = True
+        case "False":
+            mask_by_position = False
+        case other:
+            raise ValueError(f"mask_by_position has to be either of 'True' or 'False', not {cfg.mask_by_position}")
 
     wd._subprocess_select_and_bin(
         service='tap',
         chunk_number=chunk_number,
         jobID=cfg.job_id,
-        mask_by_position=cfg.mask_by_position
+        mask_by_position=mask_by_position
     )
     wd.calculate_metadata(service='tap', chunk_number=chunk_number, jobID=cfg.job_id)
