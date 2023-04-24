@@ -1533,7 +1533,7 @@ class WISEDataBase(abc.ABC):
 
             d = os.path.dirname(fn)
             if not os.path.isdir(d):
-                os.makedirs(d)
+                os.makedirs(d, exist_ok=True)
 
             with open(fn, "w") as f:
                 json.dump(position_masks, f)
