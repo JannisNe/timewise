@@ -15,8 +15,6 @@ build:
       # Install poetry
       # https://python-poetry.org/docs/#osx--linux--bashonwindows-install-instructions
       - pip install poetry
-      # do this for know until fixed by furo
-      - pip install furo==2022.12.7
       # Tell poetry to not use a virtual environment
       - poetry config virtualenvs.create false
     post_install:
