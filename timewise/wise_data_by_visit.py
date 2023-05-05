@@ -466,7 +466,12 @@ class WiseDataByVisit(WISEDataBase):
                 outlier_masks[b] = outlier_mask
 
         # get a mask indicating outliers based on position
-        position_mask = pd.Series(self.calculate_position_mask(lightcurve)).values
+        bad_indices = self.calculate_position_mask(lightcurve)
+        position_mask = (
+            ~lightcurve.index.isin(bad_indices)
+            if len(bad_indices) > 0
+            else np.array([True] * len(lightcurve))
+        )
 
         # -----------------   create the plot   ----------------- #
 
