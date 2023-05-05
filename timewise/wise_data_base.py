@@ -1478,25 +1478,29 @@ class WISEDataBase(abc.ABC):
         :return: positional mask
         :rtype: np.ndarray
         """
-        coords = SkyCoord(lightcurve.ra, lightcurve.dec, unit="deg")
+        # coords = SkyCoord(lightcurve.ra, lightcurve.dec, unit="deg")
+        ra_rad = np.deg2rad(lightcurve.ra.values)
+        dec_rad = np.deg2rad(lightcurve.dec.values)
 
         # we can use the standard median for Dec
-        med_offset_dec = np.median(coords.dec)
+        med_offset_dec = np.median(dec_rad)
         # We have to do a weighted median for RA
-        w = np.sin(np.deg2rad(coords.dec)) ** 2
-        sort_inds = np.argsort(coords.ra)
+        w = np.sin(np.deg2rad(dec_rad)) ** 2
+        sort_inds = np.argsort(ra_rad)
         cum_w = np.cumsum(w[sort_inds])
         cutoff = np.sum(w) / 2
-        med_offset_ra = coords.ra[sort_inds][cum_w >= cutoff][0]
-        med_pos = SkyCoord(med_offset_ra, med_offset_dec)
+        med_offset_ra = ra_rad[sort_inds][cum_w >= cutoff][0]
 
         # find the 90% closest datapoints
-        sep = coords.separation(med_pos)
+        sep = np.arccos(
+            np.sin(med_offset_dec) * np.sin(dec_rad) +
+            np.cos(med_offset_dec) * np.cos(dec_rad) * np.cos(med_offset_ra - ra_rad)
+        )
         sep90 = np.quantile(sep, 0.9)
         sep_mask = sep < sep90
 
         # keep datapoints within 3 sigma
-        sig = max([np.std(sep[sep_mask]), 0.2*u.arcsec])
+        sig = max([np.std(sep[sep_mask]), np.deg2rad(0.2 / 3600)])
         keep_mask = pd.Series(sep <= 5 * sig)
         bad_indices = lightcurve.index[~keep_mask]
         return list(bad_indices)
