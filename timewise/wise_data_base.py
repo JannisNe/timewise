@@ -1183,15 +1183,15 @@ class WISEDataBase(abc.ABC):
             data_product = self._start_data_product(parent_sample_indices=indices)
 
         if mask_by_position:
-            position_mask = self.get_position_mask(service, chunk_number)
+            bad_indices = self.get_position_mask(service, chunk_number)
         else:
-            position_mask = None
+            bad_indices = None
 
         for parent_sample_entry_id in tqdm.tqdm(indices, desc="binning"):
             m = lightcurves[self._tap_orig_id_key] == parent_sample_entry_id
             lightcurve = lightcurves[m]
 
-            if position_mask is not None:
+            if (bad_indices is not None) and (parent_sample_entry_id in bad_indices):
                 pos_m = pd.Series(position_mask[str(parent_sample_entry_id)]).values
                 lightcurve = lightcurve[pos_m]
 
@@ -1498,7 +1498,7 @@ class WISEDataBase(abc.ABC):
         # keep datapoints within 3 sigma
         sig = max([np.std(sep[sep_mask]), 0.2*u.arcsec])
         keep_mask = pd.Series(sep <= 5 * sig)
-        bad_indices = keep_mask.index[~keep_mask]
+        bad_indices = lightcurve.index[~keep_mask]
         return list(bad_indices)
 
     def get_position_mask(self, service, chunk_number):
