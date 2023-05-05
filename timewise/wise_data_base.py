@@ -1183,16 +1183,16 @@ class WISEDataBase(abc.ABC):
             data_product = self._start_data_product(parent_sample_indices=indices)
 
         if mask_by_position:
-            position_mask = self.get_position_mask(service, chunk_number)
+            bad_indices = self.get_position_mask(service, chunk_number)
         else:
-            position_mask = None
+            bad_indices = None
 
         for parent_sample_entry_id in tqdm.tqdm(indices, desc="binning"):
             m = lightcurves[self._tap_orig_id_key] == parent_sample_entry_id
             lightcurve = lightcurves[m]
 
-            if position_mask is not None:
-                pos_m = pd.Series(position_mask[str(parent_sample_entry_id)]).values
+            if (bad_indices is not None) and (parent_sample_entry_id in bad_indices):
+                pos_m = ~lightcurve.index.isin(bad_indices)
                 lightcurve = lightcurve[pos_m]
 
             if len(lightcurve) < 1:
@@ -1497,8 +1497,9 @@ class WISEDataBase(abc.ABC):
 
         # keep datapoints within 3 sigma
         sig = max([np.std(sep[sep_mask]), 0.2*u.arcsec])
-        keep_mask = sep <= 5 * sig
-        return pd.Series(keep_mask).to_dict()
+        keep_mask = pd.Series(sep <= 5 * sig)
+        bad_indices = lightcurve.index[~keep_mask]
+        return list(bad_indices)
 
     def get_position_mask(self, service, chunk_number):
         """
@@ -1529,7 +1530,9 @@ class WISEDataBase(abc.ABC):
 
             for i in unbinned_lcs[self._tap_orig_id_key].unique():
                 lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == i]
-                position_masks[str(i)] = self.calculate_position_mask(lightcurve)
+                bad_indices = self.calculate_position_mask(lightcurve)
+                if len(bad_indices) > 0:
+                    position_masks[str(i)] = bad_indices
 
             d = os.path.dirname(fn)
             if not os.path.isdir(d):
