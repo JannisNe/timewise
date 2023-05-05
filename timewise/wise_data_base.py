@@ -1497,8 +1497,9 @@ class WISEDataBase(abc.ABC):
 
         # keep datapoints within 3 sigma
         sig = max([np.std(sep[sep_mask]), 0.2*u.arcsec])
-        keep_mask = sep <= 5 * sig
-        return pd.Series(keep_mask).to_dict()
+        keep_mask = pd.Series(sep <= 5 * sig)
+        bad_indices = keep_mask.index[~keep_mask]
+        return list(bad_indices)
 
     def get_position_mask(self, service, chunk_number):
         """
@@ -1529,7 +1530,9 @@ class WISEDataBase(abc.ABC):
 
             for i in unbinned_lcs[self._tap_orig_id_key].unique():
                 lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == i]
-                position_masks[str(i)] = self.calculate_position_mask(lightcurve)
+                bad_indices = self.calculate_position_mask(lightcurve)
+                if len(bad_indices) > 0:
+                    position_masks[str(i)] = bad_indices
 
             d = os.path.dirname(fn)
             if not os.path.isdir(d):
