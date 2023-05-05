@@ -1192,7 +1192,7 @@ class WISEDataBase(abc.ABC):
             lightcurve = lightcurves[m]
 
             if (bad_indices is not None) and (parent_sample_entry_id in bad_indices):
-                pos_m = pd.Series(position_mask[str(parent_sample_entry_id)]).values
+                pos_m = ~lightcurve.index.isin(bad_indices)
                 lightcurve = lightcurve[pos_m]
 
             if len(lightcurve) < 1:
