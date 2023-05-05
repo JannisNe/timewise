@@ -1532,7 +1532,7 @@ class WISEDataBase(abc.ABC):
 
             position_masks = dict()
 
-            for i in unbinned_lcs[self._tap_orig_id_key].unique():
+            for i in tqdm.tqdm(unbinned_lcs[self._tap_orig_id_key].unique(), "calculating position masks"):
                 lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == i]
                 bad_indices = self.calculate_position_mask(lightcurve)
                 if len(bad_indices) > 0:
