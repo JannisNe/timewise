@@ -1492,10 +1492,11 @@ class WISEDataBase(abc.ABC):
         med_offset_ra = ra_rad[sort_inds][cum_w >= cutoff][0]
 
         # find the 90% closest datapoints
-        sep = np.arccos(
+        v = (
             np.sin(med_offset_dec) * np.sin(dec_rad) +
             np.cos(med_offset_dec) * np.cos(dec_rad) * np.cos(med_offset_ra - ra_rad)
         )
+        sep = np.arccos(np.minimum(v, 1))
         sep90 = np.quantile(sep, 0.9)
         sep_mask = sep < sep90
 
