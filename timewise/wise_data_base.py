@@ -21,7 +21,7 @@ from astropy import constants
 from astropy.cosmology import Planck18
 from astropy.io import ascii
 from astropy.table import Table
-from astropy.coordinates import SkyCoord
+from astropy.coordinates.angle_utilities import angular_separation
 
 from timewise.general import cache_dir, plots_dir, output_dir, logger_format, backoff_hndlr
 from timewise.utils import StableTAPService
@@ -1491,12 +1491,7 @@ class WISEDataBase(abc.ABC):
         cutoff = np.sum(w) / 2
         med_offset_ra = ra_rad[sort_inds][cum_w >= cutoff][0]
 
-        # find the 90% closest datapoints
-        v = (
-            np.sin(med_offset_dec) * np.sin(dec_rad) +
-            np.cos(med_offset_dec) * np.cos(dec_rad) * np.cos(med_offset_ra - ra_rad)
-        )
-        sep = np.arccos(np.minimum(v, 1))
+        sep = angular_separation(med_offset_ra, med_offset_dec, ra_rad, dec_rad)
         sep90 = np.quantile(sep, 0.9)
         sep_mask = sep < sep90
 
