@@ -1493,7 +1493,7 @@ class WISEDataBase(abc.ABC):
 
         sep = angular_separation(med_offset_ra, med_offset_dec, ra_rad, dec_rad)
         sep90 = np.quantile(sep, 0.9)
-        sep_mask = sep < sep90
+        sep_mask = sep <= sep90
 
         # keep datapoints within 3 sigma
         sig = max([np.std(sep[sep_mask]), np.deg2rad(0.2 / 3600)])
