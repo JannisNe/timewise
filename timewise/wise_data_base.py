@@ -24,7 +24,7 @@ from astropy.table import Table
 from astropy.coordinates.angle_utilities import angular_separation
 
 from timewise.general import cache_dir, plots_dir, output_dir, logger_format, backoff_hndlr
-from timewise.utils import StableTAPService
+from timewise.utils import StableTAPService, get_2d_gaussian_correction
 
 logger = logging.getLogger(__name__)
 
@@ -1468,10 +1468,9 @@ class WISEDataBase(abc.ABC):
     @staticmethod
     def calculate_position_mask(lightcurve, ra, dec):
         """
-        Create a mask that based on the position of the single exposures.
-        Find the median position and find the 90%-quantile of datapoints from that.
-        Then, calculate the standard deviation of the separation from the median position and keep
-        all datapoints within five times that.
+        Estimated the 90th percentile of the angular separations from the given position.
+        Assuming a 2D-Gaussian, calculate the standard deviation for the 90th percentile.
+        Keeps all datapoints within five times the standard deviation.
 
         :param lightcurve: unstacked lightcurve
         :type lightcurve: pd.DataFrame
@@ -1486,13 +1485,13 @@ class WISEDataBase(abc.ABC):
         dec_rad = np.deg2rad(lightcurve.dec.values)
 
         sep = angular_separation(ra, dec, ra_rad, dec_rad)
-        sep90 = np.quantile(sep, 0.9)
-        sep_mask = sep <= sep90
+        sep_cl = 0.9
+        sep_ic = np.quantile(sep, sep_cl)
+        # here we assume a 2D-gaussian
+        sig = sep_ic / get_2d_gaussian_correction(cl=sep_cl)
+        sep_mask = sep <= 5 * sig
 
-        # keep datapoints within 3 sigma
-        sig = max([np.std(sep[sep_mask]), np.deg2rad(0.2 / 3600)])
-        keep_mask = pd.Series(sep <= 5 * sig)
-        bad_indices = lightcurve.index[~keep_mask]
+        bad_indices = lightcurve.index[~sep_mask]
         return list(bad_indices)
 
     def get_position_mask(self, service, chunk_number):
