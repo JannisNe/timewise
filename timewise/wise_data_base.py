@@ -1466,7 +1466,7 @@ class WISEDataBase(abc.ABC):
     #####################################
 
     @staticmethod
-    def calculate_position_mask(lightcurve):
+    def calculate_position_mask(lightcurve, ra, dec):
         """
         Create a mask that based on the position of the single exposures.
         Find the median position and find the 90%-quantile of datapoints from that.
@@ -1475,27 +1475,17 @@ class WISEDataBase(abc.ABC):
 
         :param lightcurve: unstacked lightcurve
         :type lightcurve: pd.DataFrame
+        :param ra: RA in radians of the source
+        :type ra: float
+        :param dec: Dec in radians of the source
+        :type dec: float
         :return: positional mask
         :rtype: np.ndarray
         """
-        # coords = SkyCoord(lightcurve.ra, lightcurve.dec, unit="deg")
         ra_rad = np.deg2rad(lightcurve.ra.values)
         dec_rad = np.deg2rad(lightcurve.dec.values)
 
-        if any(ra_rad > 1.95 * np.pi) & any(ra_rad < 0.05 * np.pi):
-            ra_rad += np.pi
-            ra_rad %= 2 * np.pi
-
-        # we can use the standard median for Dec
-        med_offset_dec = np.median(dec_rad)
-        # We have to do a weighted median for RA
-        w = np.sin(dec_rad) ** 2
-        sort_inds = np.argsort(ra_rad)
-        cum_w = np.cumsum(w[sort_inds])
-        cutoff = np.sum(w) / 2
-        med_offset_ra = ra_rad[sort_inds][cum_w >= cutoff][0]
-
-        sep = angular_separation(med_offset_ra, med_offset_dec, ra_rad, dec_rad)
+        sep = angular_separation(ra, dec, ra_rad, dec_rad)
         sep90 = np.quantile(sep, 0.9)
         sep_mask = sep <= sep90
 
@@ -1533,8 +1523,10 @@ class WISEDataBase(abc.ABC):
             position_masks = dict()
 
             for i in tqdm.tqdm(unbinned_lcs[self._tap_orig_id_key].unique(), "calculating position masks"):
+                ra = np.radians(self.parent_sample.df.loc[i, self.parent_sample.default_keymap["ra"]])
+                dec = np.radians(self.parent_sample.df.loc[i, self.parent_sample.default_keymap["dec"]])
                 lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == i]
-                bad_indices = self.calculate_position_mask(lightcurve)
+                bad_indices = self.calculate_position_mask(lightcurve, ra, dec)
                 if len(bad_indices) > 0:
                     position_masks[str(i)] = bad_indices
 
