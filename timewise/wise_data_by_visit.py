@@ -466,7 +466,8 @@ class WiseDataByVisit(WISEDataBase):
                 outlier_masks[b] = outlier_mask
 
         # get a mask indicating outliers based on position
-        bad_indices = self.calculate_position_mask(lightcurve)
+        ra_rad, dec_rad = np.radians(pos.astype(float))
+        bad_indices = self.calculate_position_mask(lightcurve, ra=ra_rad, dec=dec_rad)
         position_mask = (
             ~lightcurve.index.isin(bad_indices)
             if len(bad_indices) > 0
