@@ -1482,6 +1482,10 @@ class WISEDataBase(abc.ABC):
         ra_rad = np.deg2rad(lightcurve.ra.values)
         dec_rad = np.deg2rad(lightcurve.dec.values)
 
+        if any(ra_rad > 1.95 * np.pi) & any(ra_rad < 0.05 * np.pi):
+            ra_rad += np.pi
+            ra_rad %= 2 * np.pi
+
         # we can use the standard median for Dec
         med_offset_dec = np.median(dec_rad)
         # We have to do a weighted median for RA
