@@ -1485,7 +1485,7 @@ class WISEDataBase(abc.ABC):
         # we can use the standard median for Dec
         med_offset_dec = np.median(dec_rad)
         # We have to do a weighted median for RA
-        w = np.sin(np.deg2rad(dec_rad)) ** 2
+        w = np.sin(dec_rad) ** 2
         sort_inds = np.argsort(ra_rad)
         cum_w = np.cumsum(w[sort_inds])
         cutoff = np.sum(w) / 2
