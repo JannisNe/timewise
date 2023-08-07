@@ -69,6 +69,10 @@ class TimewiseConfigLoader(BaseModel):
                 super().__init__(_base_name)
                 self.df = pd.read_csv(_filename)
 
+                for k, v in self.default_keymap.items():
+                    if v not in self.df.columns:
+                        raise KeyError(f"Can not map '{v}' to '{k}': '{v}' not in table columns! Adjust keymap")
+
         wise_data_config = {
             "base_name": _base_name,
             "parent_sample_class": DynamicParentSample,
