@@ -133,8 +133,9 @@ class TimewiseConfig(BaseModel):
     def run_config(self):
         logger.info("running config")
         for method, arguments in self.instructions.items():
-            logger.debug(f"running {method} with arguments {arguments}")
-            self.wise_data.__getattribute__(method)(**arguments)
+            _arguments = arguments or dict()
+            logger.debug(f"running {method} with arguments {_arguments}")
+            self.wise_data.__getattribute__(method)(**_arguments)
 
     @staticmethod
     def read_yaml(filename):
