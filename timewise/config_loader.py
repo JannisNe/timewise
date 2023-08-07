@@ -1,5 +1,6 @@
 import logging
 import yaml
+import json
 import os
 import inspect
 from pydantic import BaseModel, field_validator, FieldValidationInfo
@@ -83,6 +84,7 @@ class TimewiseConfigLoader(BaseModel):
         logger.debug(f"reading {filename}")
         with open(filename, "r") as f:
             config_dict = yaml.safe_load(f)
+        logger.debug(f"config: {json.dumps(config_dict, indent=4)}")
         return TimewiseConfigLoader(**config_dict)
 
 
@@ -98,7 +100,8 @@ class TimewiseConfig(BaseModel):
     @classmethod
     def validate_instructions(cls, v: dict, info: FieldValidationInfo):
         # get the WiseData class
-        wise_data = wise_data_classes[info.data["wise_data"]]
+        wise_data = info.data["wise_data"]
+        wise_data_class_name = type(wise_data).__name__
         # collect its members
         members = inspect.getmembers(wise_data)
         # loop through the methods and the corresponding arguments that wre given in the instructions
@@ -113,16 +116,17 @@ class TimewiseConfig(BaseModel):
                     param_list = list(signature.parameters)
                     # check if the member is a normal method, i.e. if the first arguments is 'self'
                     is_method = param_list[0] == "self"
+                    _arguments = arguments or dict()
                     try:
                         if is_method:
-                            signature.bind(WiseDataByVisit, **arguments)
+                            signature.bind(WiseDataByVisit, **_arguments)
                         else:
-                            signature.bind(**arguments)
+                            signature.bind(**_arguments)
                     except TypeError as e:
-                        raise ValueError(f"{wise_data.__name__}.{method}: {e}!")
+                        raise ValueError(f"{wise_data_class_name}.{method}: {e}!")
 
             if not found:
-                raise ValueError(f"{wise_data.__name__} does not have a method {method}!")
+                raise ValueError(f"{wise_data_class_name} does not have a method {method}!")
 
         return v
 
