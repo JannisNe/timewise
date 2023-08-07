@@ -8,6 +8,9 @@ readme = "README.md"
 documentation = "https://timewise.readthedocs.io/en/latest"
 repository = "https://github.com/JannisNe/timewise"
 
+[tool.poetry.scripts]
+timewise = "timewise.cli:timewise_cli"
+
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/JannisNe/timewise/issues"
 
