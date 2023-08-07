@@ -83,6 +83,15 @@ the unittest
 
     python -m unittest discover tests/
 
+*****
+Usage
+*****
+
+How you want to access :code:`timewise` depends on your use case. If you want
+to use the functionality off the shelf, head over to the CLI.
+If you want to do more involved things or embed :code:`timewise` in your
+code, check out the usage of the Classes directly.
+
 
 ****
 Cite
@@ -97,6 +106,7 @@ CONTENTS
 
 .. toctree::
    installation
+   cli
    getting_started
    api
    :maxdepth: 1
