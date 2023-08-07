@@ -1,5 +1,7 @@
 import logging
 from argparse import ArgumentParser
+
+from timewise.general import main_logger
 from timewise.config_loader import TimewiseConfig
 
 
@@ -12,5 +14,5 @@ def timewise_cli():
     parser.add_argument("-l", "--logging-level", default="INFO", type=str)
     cfg = vars(parser.parse_args())
 
-    logging.getLogger("timewise").setLevel(cfg.pop("logging_level"))
+    main_logger.setLevel(cfg.pop("logging_level"))
     TimewiseConfig.run_yaml(cfg["config"])
