@@ -20,6 +20,56 @@ wise_data_classes = {
 }
 
 
+class TimewiseConfig(BaseModel):
+
+    wise_data: WISEDataBase
+    instructions: dict
+
+    class Config:
+        arbitrary_types_allowed = True
+
+    @field_validator("instructions")
+    @classmethod
+    def validate_instructions(cls, v: dict, info: FieldValidationInfo):
+        # get the WiseData class
+        wise_data = info.data["wise_data"]
+        wise_data_class_name = type(wise_data).__name__
+        # collect its members
+        members = inspect.getmembers(wise_data)
+        # loop through the methods and the corresponding arguments that wre given in the instructions
+        for method, arguments in v.items():
+            found = False
+            # check each member for a fit
+            for member_name, member in members:
+                if member_name == method:
+                    found = True
+                    # get the call signature of the member and see if it fits the given arguments
+                    signature = inspect.signature(member)
+                    param_list = list(signature.parameters)
+                    # check if the member is a normal method, i.e. if the first arguments is 'self'
+                    is_method = param_list[0] == "self"
+                    _arguments = arguments or dict()
+                    try:
+                        if is_method:
+                            signature.bind(WiseDataByVisit, **_arguments)
+                        else:
+                            signature.bind(**_arguments)
+                    except TypeError as e:
+                        raise ValueError(f"{wise_data_class_name}.{method}: {e}!")
+
+            if not found:
+                raise ValueError(f"{wise_data_class_name} does not have a method {method}!")
+
+        return v
+
+    def run_config(self):
+        logger.info("running config")
+        for method, arguments in self.instructions.items():
+            _arguments = arguments or dict()
+            logger.debug(f"running {method} with arguments {_arguments}")
+            self.wise_data.__getattribute__(method)(**_arguments)
+
+
 class TimewiseConfigLoader(BaseModel):
 
     base_name: str
@@ -81,7 +131,7 @@ class TimewiseConfigLoader(BaseModel):
         }
         wise_data = wise_data_classes[_class_name](**wise_data_config)
 
-        return wise_data, self.instructions
+        return TimewiseConfig(wise_data=wise_data, instructions=self.instructions)
 
     @staticmethod
     def read_yaml(filename):
@@ -89,69 +139,10 @@ class TimewiseConfigLoader(BaseModel):
         with open(filename, "r") as f:
             config_dict = yaml.safe_load(f)
         logger.debug(f"config: {json.dumps(config_dict, indent=4)}")
-        return TimewiseConfigLoader(**config_dict)
-
-
-class TimewiseConfig(BaseModel):
-
-    wise_data: WISEDataBase
-    instructions: dict
-
-    class Config:
-        arbitrary_types_allowed = True
-
-    @field_validator("instructions")
-    @classmethod
-    def validate_instructions(cls, v: dict, info: FieldValidationInfo):
-        # get the WiseData class
-        wise_data = info.data["wise_data"]
-        wise_data_class_name = type(wise_data).__name__
-        # collect its members
-        members = inspect.getmembers(wise_data)
-        # loop through the methods and the corresponding arguments that wre given in the instructions
-        for method, arguments in v.items():
-            found = False
-            # check each member for a fit
-            for member_name, member in members:
-                if member_name == method:
-                    found = True
-                    # get the call signature of the member and see if it fits the given arguments
-                    signature = inspect.signature(member)
-                    param_list = list(signature.parameters)
-                    # check if the member is a normal method, i.e. if the first arguments is 'self'
-                    is_method = param_list[0] == "self"
-                    _arguments = arguments or dict()
-                    try:
-                        if is_method:
-                            signature.bind(WiseDataByVisit, **_arguments)
-                        else:
-                            signature.bind(**_arguments)
-                    except TypeError as e:
-                        raise ValueError(f"{wise_data_class_name}.{method}: {e}!")
-
-            if not found:
-                raise ValueError(f"{wise_data_class_name} does not have a method {method}!")
-
-        return v
-
-    def run_config(self):
-        logger.info("running config")
-        for method, arguments in self.instructions.items():
-            _arguments = arguments or dict()
-            logger.debug(f"running {method} with arguments {_arguments}")
-            self.wise_data.__getattribute__(method)(**_arguments)
-
-    @staticmethod
-    def read_yaml(filename):
-        config_loader = TimewiseConfigLoader.read_yaml(filename)
-        wise_data, instructions = config_loader.parse_config()
-        return TimewiseConfig(
-            wise_data=wise_data,
-            instructions=instructions
-        )
+        return TimewiseConfigLoader(**config_dict).parse_config()
 
     @staticmethod
     def run_yaml(filename):
         logger.info(f"running {filename}")
-        config = TimewiseConfig.read_yaml(filename)
+        config = TimewiseConfigLoader.read_yaml(filename)
         config.run_config()
