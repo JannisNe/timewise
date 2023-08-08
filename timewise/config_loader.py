@@ -67,6 +67,7 @@ class TimewiseConfig(BaseModel):
             _arguments = arguments or dict()
             logger.debug(f"running {method} with arguments {_arguments}")
             self.wise_data.__getattribute__(method)(**_arguments)
+        logger.info("successfully ran config")
 
 
 class TimewiseConfigLoader(BaseModel):
