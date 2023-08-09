@@ -100,7 +100,7 @@ class TimewiseConfigLoader(BaseModel):
     @validator("default_keymap")
     def validate_keymap(cls, v: dict):
         for k in ["ra", "dec", "id"]:
-            if k not  in v:
+            if k not in v:
                 raise ValueError(f"Keymap is missing key {k}!")
         return v
 
@@ -146,10 +146,10 @@ class TimewiseConfigLoader(BaseModel):
         with open(filename, "r") as f:
             config_dict = yaml.safe_load(f)
         logger.debug(f"config: {json.dumps(config_dict, indent=4)}")
-        return TimewiseConfigLoader(**config_dict).parse_config()
+        return TimewiseConfigLoader(**config_dict)
 
     @staticmethod
     def run_yaml(filename):
         logger.info(f"running {filename}")
-        config = TimewiseConfigLoader.read_yaml(filename)
+        config = TimewiseConfigLoader.read_yaml(filename).parse_config()
         config.run_config()
