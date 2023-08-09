@@ -142,16 +142,16 @@ class TimewiseConfigLoader(BaseModel):
 
         return TimewiseConfig(wise_data=wise_data, timewise_instructions=self.timewise_instructions)
 
-    @staticmethod
-    def read_yaml(filename):
+    @classmethod
+    def read_yaml(cls, filename):
         logger.debug(f"reading {filename}")
         with open(filename, "r") as f:
             config_dict = yaml.safe_load(f)
         logger.debug(f"config: {json.dumps(config_dict, indent=4)}")
-        return TimewiseConfigLoader(**config_dict)
+        return cls(**config_dict)
 
-    @staticmethod
-    def run_yaml(filename):
+    @classmethod
+    def run_yaml(cls, filename):
         logger.info(f"running {filename}")
-        config = TimewiseConfigLoader.read_yaml(filename).parse_config()
+        config = cls.read_yaml(filename).parse_config()
         config.run_config()
