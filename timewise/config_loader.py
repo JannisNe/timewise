@@ -23,12 +23,12 @@ wise_data_classes = {
 class TimewiseConfig(BaseModel):
 
     wise_data: WISEDataBase
-    instructions: dict
+    timewise_instructions: dict
 
     class Config:
         arbitrary_types_allowed = True
 
-    @validator("instructions")
+    @validator("timewise_instructions")
     def validate_instructions(cls, v: dict, values: dict):
         # get the WiseData class
         wise_data = values["wise_data"]
@@ -63,7 +63,7 @@ class TimewiseConfig(BaseModel):
 
     def run_config(self):
         logger.info("running config")
-        for method, arguments in self.instructions.items():
+        for method, arguments in self.timewise_instructions.items():
             _arguments = arguments or dict()
             logger.debug(f"running {method} with arguments {_arguments}")
             self.wise_data.__getattribute__(method)(**_arguments)
@@ -78,7 +78,7 @@ class TimewiseConfigLoader(BaseModel):
     min_sep_arcsec: float = 6.
     n_chunks: int = 1
     default_keymap: dict = {k: k for k in ["ra", "dec", "id"]}
-    instructions: dict
+    timewise_instructions: dict
 
     @validator("filename")
     def validate_file(cls, v: str):
@@ -128,7 +128,7 @@ class TimewiseConfigLoader(BaseModel):
         }
         wise_data = wise_data_classes[_class_name](**wise_data_config)
 
-        return TimewiseConfig(wise_data=wise_data, instructions=self.instructions)
+        return TimewiseConfig(wise_data=wise_data, instructions=self.timewise_instructions)
 
     @staticmethod
     def read_yaml(filename):
