@@ -23,50 +23,52 @@ wise_data_classes = {
 class TimewiseConfig(BaseModel):
 
     wise_data: WISEDataBase
-    timewise_instructions: dict
+    timewise_instructions: list[dict]
 
     class Config:
         arbitrary_types_allowed = True
 
     @validator("timewise_instructions")
-    def validate_instructions(cls, v: dict, values: dict):
+    def validate_instructions(cls, v: list[dict], values: dict):
         # get the WiseData class
         wise_data = values["wise_data"]
         wise_data_class_name = type(wise_data).__name__
         # collect its members
         members = inspect.getmembers(wise_data)
         # loop through the methods and the corresponding arguments that wre given in the instructions
-        for method, arguments in v.items():
-            found = False
-            # check each member for a fit
-            for member_name, member in members:
-                if member_name == method:
-                    found = True
-                    # get the call signature of the member and see if it fits the given arguments
-                    signature = inspect.signature(member)
-                    param_list = list(signature.parameters)
-                    # check if the member is a normal method, i.e. if the first arguments is 'self'
-                    is_method = param_list[0] == "self"
-                    _arguments = arguments or dict()
-                    try:
-                        if is_method:
-                            signature.bind(WiseDataByVisit, **_arguments)
-                        else:
-                            signature.bind(**_arguments)
-                    except TypeError as e:
-                        raise ValueError(f"{wise_data_class_name}.{method}: {e}!")
+        for instructions in v:
+            for method, arguments in instructions.items():
+                found = False
+                # check each member for a fit
+                for member_name, member in members:
+                    if member_name == method:
+                        found = True
+                        # get the call signature of the member and see if it fits the given arguments
+                        signature = inspect.signature(member)
+                        param_list = list(signature.parameters)
+                        # check if the member is a normal method, i.e. if the first arguments is 'self'
+                        is_method = param_list[0] == "self"
+                        _arguments = arguments or dict()
+                        try:
+                            if is_method:
+                                signature.bind(WiseDataByVisit, **_arguments)
+                            else:
+                                signature.bind(**_arguments)
+                        except TypeError as e:
+                            raise ValueError(f"{wise_data_class_name}.{method}: {e}!")
 
-            if not found:
-                raise ValueError(f"{wise_data_class_name} does not have a method {method}!")
+                if not found:
+                    raise ValueError(f"{wise_data_class_name} does not have a method {method}!")
 
         return v
 
     def run_config(self):
         logger.info("running config")
-        for method, arguments in self.timewise_instructions.items():
-            _arguments = arguments or dict()
-            logger.debug(f"running {method} with arguments {_arguments}")
-            self.wise_data.__getattribute__(method)(**_arguments)
+        for instructions in self.timewise_instructions:
+            for method, arguments in instructions.items():
+                _arguments = arguments or dict()
+                logger.info(f"running {method} with arguments {_arguments}")
+                self.wise_data.__getattribute__(method)(**_arguments)
         logger.info("successfully ran config")
 
 
@@ -79,7 +81,7 @@ class TimewiseConfigLoader(BaseModel):
     min_sep_arcsec: float = 6.
     n_chunks: int = 1
     default_keymap: dict = {k: k for k in ["ra", "dec", "id"]}
-    timewise_instructions: dict
+    timewise_instructions: list[dict]
 
     @validator("filename")
     def validate_file(cls, v: str, values: dict):
@@ -138,7 +140,7 @@ class TimewiseConfigLoader(BaseModel):
         }
         wise_data = wise_data_classes[_class_name](**wise_data_config)
 
-        return TimewiseConfig(wise_data=wise_data, instructions=self.timewise_instructions)
+        return TimewiseConfig(wise_data=wise_data, timewise_instructions=self.timewise_instructions)
 
     @staticmethod
     def read_yaml(filename):
