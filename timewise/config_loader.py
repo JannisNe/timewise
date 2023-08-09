@@ -73,7 +73,8 @@ class TimewiseConfig(BaseModel):
 class TimewiseConfigLoader(BaseModel):
 
     base_name: str
-    filename: str
+    load_parent_sample: bool = True
+    filename: str = None
     class_name: str = "WiseDataByVisit"
     min_sep_arcsec: float = 6.
     n_chunks: int = 1
@@ -81,9 +82,12 @@ class TimewiseConfigLoader(BaseModel):
     timewise_instructions: dict
 
     @validator("filename")
-    def validate_file(cls, v: str):
-        if not os.path.isfile(v):
-            raise ValueError(f"No file {v}!")
+    def validate_file(cls, v: str, values: dict):
+        if values["load_parent_sample"]:
+            if v is None:
+                raise ValueError("Filename has to be given when load_parent_sample=True!")
+            if not os.path.isfile(v):
+                raise ValueError(f"No file {v}!")
         return v
 
     @validator("class_name")
@@ -109,20 +113,26 @@ class TimewiseConfigLoader(BaseModel):
         _filename = self.filename
         _class_name = self.class_name
 
-        class DynamicParentSample(ParentSampleBase):
-            default_keymap = _default_keymap
+        if self.load_parent_sample:
+            class DynamicParentSample(ParentSampleBase):
+                default_keymap = _default_keymap
 
-            def __init__(self):
-                super().__init__(_base_name)
-                self.df = pd.read_csv(_filename)
+                def __init__(self):
+                    super().__init__(_base_name)
+                    self.df = pd.read_csv(_filename)
 
-                for k, v in self.default_keymap.items():
-                    if v not in self.df.columns:
-                        raise KeyError(f"Can not map '{v}' to '{k}': '{v}' not in table columns! Adjust keymap")
+                    for k, v in self.default_keymap.items():
+                        if v not in self.df.columns:
+                            raise KeyError(f"Can not map '{v}' to '{k}': '{v}' not in table columns! Adjust keymap")
+
+            parent_sample_class = DynamicParentSample
+
+        else:
+            parent_sample_class = None
 
         wise_data_config = {
             "base_name": _base_name,
-            "parent_sample_class": DynamicParentSample,
+            "parent_sample_class": parent_sample_class,
             "n_chunks": self.n_chunks,
             "min_sep_arcsec": self.min_sep_arcsec
         }
