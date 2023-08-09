@@ -3,7 +3,7 @@ import yaml
 import json
 import os
 import inspect
-from pydantic import BaseModel, field_validator, FieldValidationInfo
+from pydantic import BaseModel, validator
 import pandas as pd
 
 from timewise import WiseDataByVisit, WISEDataDESYCluster
@@ -28,11 +28,10 @@ class TimewiseConfig(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    @field_validator("instructions")
-    @classmethod
-    def validate_instructions(cls, v: dict, info: FieldValidationInfo):
+    @validator("instructions")
+    def validate_instructions(cls, v: dict, values: dict):
         # get the WiseData class
-        wise_data = info.data["wise_data"]
+        wise_data = values["wise_data"]
         wise_data_class_name = type(wise_data).__name__
         # collect its members
         members = inspect.getmembers(wise_data)
@@ -68,6 +67,7 @@ class TimewiseConfig(BaseModel):
             _arguments = arguments or dict()
             logger.debug(f"running {method} with arguments {_arguments}")
             self.wise_data.__getattribute__(method)(**_arguments)
+        logger.info("successfully ran config")
 
 
 class TimewiseConfigLoader(BaseModel):
@@ -80,23 +80,20 @@ class TimewiseConfigLoader(BaseModel):
     default_keymap: dict = {k: k for k in ["ra", "dec", "id"]}
     instructions: dict
 
-    @field_validator("filename")
-    @classmethod
+    @validator("filename")
     def validate_file(cls, v: str):
         if not os.path.isfile(v):
             raise ValueError(f"No file {v}!")
         return v
 
-    @field_validator("class_name")
-    @classmethod
+    @validator("class_name")
     def validate_class_name(cls, v: str):
         if v not in wise_data_classes:
             available_classes = ", ".join(list(wise_data_classes.keys()))
             ValueError(f"WiseData class {v} not implemented! (Only {available_classes} are available)")
         return v
 
-    @field_validator("default_keymap")
-    @classmethod
+    @validator("default_keymap")
     def validate_keymap(cls, v: dict):
         for k in ["ra", "dec", "id"]:
             if k not  in v:

@@ -3,7 +3,9 @@ import logging, os
 
 # Setting up the Logger
 main_logger = logging.getLogger('timewise')
-logger_format = logging.Formatter('%(levelname)s:%(threadName)s %(name)s - %(asctime)s: %(message)s', "%H:%M:%S")
+logger_format = logging.Formatter(
+    '%(levelname)s:%(name)s:%(funcName)s - [%(threadName)s] - %(asctime)s: \n\t%(message)s', "%H:%M:%S"
+)
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(logger_format)
 main_logger.addHandler(stream_handler)
