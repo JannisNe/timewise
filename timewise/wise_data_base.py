@@ -152,14 +152,11 @@ class WISEDataBase(abc.ABC):
         #########################
 
         self.parent_sample_class = parent_sample_class
-        parent_sample = parent_sample_class() if parent_sample_class else None
         self.base_name = base_name
         self.min_sep = min_sep_arcsec * u.arcsec
         self._n_chunks = n_chunks
 
         # --------------------------- vvvv set up parent sample vvvv --------------------------- #
-        self.parent_ra_key = parent_sample.default_keymap['ra'] if parent_sample else None
-        self.parent_dec_key = parent_sample.default_keymap['dec'] if parent_sample else None
         self.parent_wise_source_id_key = WISEDataBase.parent_wise_source_id_key
         self.parent_sample_wise_skysep_key = WISEDataBase.parent_sample_wise_skysep_key
         self.parent_sample_default_entries = {
@@ -167,17 +164,8 @@ class WISEDataBase(abc.ABC):
             self.parent_sample_wise_skysep_key: np.inf
         }
 
-        self.parent_sample = parent_sample
-
-        if self.parent_sample:
-            for k, default in self.parent_sample_default_entries.items():
-                if k not in parent_sample.df.columns:
-                    self.parent_sample.df[k] = default
-
-            self._no_allwise_source = self.parent_sample.df[self.parent_sample_wise_skysep_key] == np.inf
-
-        else:
-            self._no_allwise_source = None
+        self._parent_sample = None
+        self._no_allwise_source = None
         # --------------------------- ^^^^ set up parent sample ^^^^ --------------------------- #
 
         # set up directories
@@ -232,6 +220,21 @@ class WISEDataBase(abc.ABC):
         self.n_chunks = self._n_chunks
 
     @property
+    def parent_sample(self):
+        if self.parent_sample_class is None:
+            raise ValueError("Can not load ParentSample because no parent sample class was given!")
+
+        if self._parent_sample is None:
+            self._parent_sample = self.parent_sample_class()
+            for k, default in self.parent_sample_default_entries.items():
+                if k not in self._parent_sample.df.columns:
+                    self.parent_sample.df[k] = default
+
+            self._no_allwise_source = self._parent_sample.df[self.parent_sample_wise_skysep_key] == np.inf
+
+        return self._parent_sample
+
+    @property
     def n_chunks(self):
         return self._n_chunks
 
@@ -243,7 +246,7 @@ class WISEDataBase(abc.ABC):
             logger.warning(f"Very large number of chunks ({value})! "
                            f"Pay attention when getting photometry to not kill IRSA!")
 
-        if self.parent_sample:
+        if self.parent_sample_class:
 
             self.chunk_map = np.zeros(len(self.parent_sample.df))
             N_in_chunk = int(round(len(self.chunk_map) / self._n_chunks))
