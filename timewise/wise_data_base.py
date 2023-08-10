@@ -421,11 +421,10 @@ class WISEDataBase(abc.ABC):
             N_retries=10,
             **gator_kwargs
     ):
-        selected_parent_sample = copy.copy(
-            self.parent_sample.df.loc[mask, [self.parent_ra_key, self.parent_dec_key]])
-        selected_parent_sample.rename(columns={self.parent_dec_key: 'dec',
-                                               self.parent_ra_key: 'ra'},
-                                      inplace=True)
+        ra_key = self.parent_sample.default_keymap["ra"]
+        dec_key = self.parent_sample.default_keymap["dec"]
+        selected_parent_sample = copy.copy(self.parent_sample.df.loc[mask, [ra_key, dec_key]])
+        selected_parent_sample.rename(columns={dec_key: 'dec', ra_key: 'ra'}, inplace=True)
         logger.debug(f"{len(selected_parent_sample)} selected")
 
         # write to IPAC formatted table
