@@ -23,7 +23,7 @@ wise_data_classes = {
 class TimewiseConfig(BaseModel):
 
     wise_data: WISEDataBase
-    timewise_instructions: list[dict]
+    timewise_instructions: list[dict] = list()
 
     class Config:
         arbitrary_types_allowed = True
@@ -81,7 +81,7 @@ class TimewiseConfigLoader(BaseModel):
     min_sep_arcsec: float = 6.
     n_chunks: int = 1
     default_keymap: dict = {k: k for k in ["ra", "dec", "id"]}
-    timewise_instructions: list[dict]
+    timewise_instructions: list[dict] = list()
 
     @validator("filename")
     def validate_file(cls, v: str, values: dict):
@@ -96,7 +96,7 @@ class TimewiseConfigLoader(BaseModel):
     def validate_class_name(cls, v: str):
         if v not in wise_data_classes:
             available_classes = ", ".join(list(wise_data_classes.keys()))
-            ValueError(f"WiseData class {v} not implemented! (Only {available_classes} are available)")
+            raise ValueError(f"WiseData class {v} not implemented! (Only {available_classes} are available)")
         return v
 
     @validator("default_keymap")
