@@ -152,14 +152,11 @@ class WISEDataBase(abc.ABC):
         #########################
 
         self.parent_sample_class = parent_sample_class
-        parent_sample = parent_sample_class() if parent_sample_class else None
         self.base_name = base_name
         self.min_sep = min_sep_arcsec * u.arcsec
         self._n_chunks = n_chunks
 
         # --------------------------- vvvv set up parent sample vvvv --------------------------- #
-        self.parent_ra_key = parent_sample.default_keymap['ra'] if parent_sample else None
-        self.parent_dec_key = parent_sample.default_keymap['dec'] if parent_sample else None
         self.parent_wise_source_id_key = WISEDataBase.parent_wise_source_id_key
         self.parent_sample_wise_skysep_key = WISEDataBase.parent_sample_wise_skysep_key
         self.parent_sample_default_entries = {
@@ -167,17 +164,8 @@ class WISEDataBase(abc.ABC):
             self.parent_sample_wise_skysep_key: np.inf
         }
 
-        self.parent_sample = parent_sample
-
-        if self.parent_sample:
-            for k, default in self.parent_sample_default_entries.items():
-                if k not in parent_sample.df.columns:
-                    self.parent_sample.df[k] = default
-
-            self._no_allwise_source = self.parent_sample.df[self.parent_sample_wise_skysep_key] == np.inf
-
-        else:
-            self._no_allwise_source = None
+        self._parent_sample = None
+        self._no_allwise_source = None
         # --------------------------- ^^^^ set up parent sample ^^^^ --------------------------- #
 
         # set up directories
@@ -228,8 +216,23 @@ class WISEDataBase(abc.ABC):
         # START CHUNK MASK      #
         #########################
 
-        self.chunk_map = None
+        self._chunk_map = None
         self.n_chunks = self._n_chunks
+
+    @property
+    def parent_sample(self):
+        if self.parent_sample_class is None:
+            raise ValueError("Can not load ParentSample because no parent sample class was given!")
+
+        if self._parent_sample is None:
+            self._parent_sample = self.parent_sample_class()
+            for k, default in self.parent_sample_default_entries.items():
+                if k not in self._parent_sample.df.columns:
+                    self.parent_sample.df[k] = default
+
+            self._no_allwise_source = self._parent_sample.df[self.parent_sample_wise_skysep_key] == np.inf
+
+        return self._parent_sample
 
     @property
     def n_chunks(self):
@@ -237,28 +240,26 @@ class WISEDataBase(abc.ABC):
 
     @n_chunks.setter
     def n_chunks(self, value):
-        """Sets the private variable _n_chunks and re-calculates the declination interval masks"""
+        """Sets the private variable _n_chunks"""
+        # if a new value is set, set _chunk_map to None to trigger re-evaluation
+        if self._n_chunks != value:
+            self._n_chunks = None
 
-        if value > 50:
-            logger.warning(f"Very large number of chunks ({value})! "
-                           f"Pay attention when getting photometry to not kill IRSA!")
+    @property
+    def chunk_map(self):
 
-        if self.parent_sample:
+        if self.parent_sample_class is None:
+            raise ValueError("No parent sample given! Can not calculate chunk map!")
 
-            self.chunk_map = np.zeros(len(self.parent_sample.df))
-            N_in_chunk = int(round(len(self.chunk_map) / self._n_chunks))
+        if self._chunk_map is None:
+            self._chunk_map = np.zeros(len(self.parent_sample.df))
+            n_in_chunk = int(round(len(self._chunk_map) / self._n_chunks))
             for i in range(self._n_chunks):
-                start_ind = i * N_in_chunk
-                end_ind = start_ind + N_in_chunk
-                self.chunk_map[start_ind:end_ind] = int(i)
+                start_ind = i * n_in_chunk
+                end_ind = start_ind + n_in_chunk
+                self._chunk_map[start_ind:end_ind] = int(i)
 
-            self._n_chunks = int(max(self.chunk_map)) + 1
-
-            if self._n_chunks != value:
-                logger.info(f"All objectes included in {self._n_chunks:.0f} chunks.")
-
-        else:
-            logger.warning("No parent sample given! Can not calculate dec interval masks!")
+        return self._chunk_map
 
     def _get_chunk_number(self, wise_id=None, parent_sample_index=None):
         if isinstance(wise_id, type(None)) and isinstance(parent_sample_index, type(None)):
@@ -420,11 +421,10 @@ class WISEDataBase(abc.ABC):
             N_retries=10,
             **gator_kwargs
     ):
-        selected_parent_sample = copy.copy(
-            self.parent_sample.df.loc[mask, [self.parent_ra_key, self.parent_dec_key]])
-        selected_parent_sample.rename(columns={self.parent_dec_key: 'dec',
-                                               self.parent_ra_key: 'ra'},
-                                      inplace=True)
+        ra_key = self.parent_sample.default_keymap["ra"]
+        dec_key = self.parent_sample.default_keymap["dec"]
+        selected_parent_sample = copy.copy(self.parent_sample.df.loc[mask, [ra_key, dec_key]])
+        selected_parent_sample.rename(columns={dec_key: 'dec', ra_key: 'ra'}, inplace=True)
         logger.debug(f"{len(selected_parent_sample)} selected")
 
         # write to IPAC formatted table
