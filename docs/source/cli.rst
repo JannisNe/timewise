@@ -35,15 +35,15 @@ An example is shown below:
      ra: RAdeg
      dec: DEdeg
      id: AllWISE_designation
-    instructions:
-     get_photometric_data:
-      service: gator
-     plot_lc:
-      parent_sample_idx: 0
-      service: gator
-     plot_diagnostic_binning:
-      ind: 0
-      service: gator
+    timewise_instructions:
+     - get_photometric_data:
+        service: gator
+     - plot_lc:
+        parent_sample_idx: 0
+        service: gator
+       plot_diagnostic_binning:
+        ind: 0
+        service: gator
 
 
 ********************

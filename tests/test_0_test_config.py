@@ -25,11 +25,11 @@ def make_test_yaml():
         f" ra: RA \n"
         f" dec: DEC \n"
         f" id: Name \n"
-        f"instructions: \n"
-        f" match_all_chunks: \n"
-        f"  additional_columns: \n"
-        f"   - w1mpro \n"
-        f"   - w2mpro \n"
+        f"timewise_instructions: \n"
+        f" - match_all_chunks: \n"
+        f"    additional_columns: \n"
+        f"     - w1mpro \n"
+        f"     - w2mpro \n"
     )
 
     filename = get_test_yaml_filename()
