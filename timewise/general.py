@@ -9,6 +9,7 @@ logger_format = logging.Formatter(
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(logger_format)
 main_logger.addHandler(stream_handler)
+main_logger.propagate = False  # do not propagate to root logger
 
 logger = logging.getLogger(__name__)
 
