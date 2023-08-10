@@ -69,7 +69,6 @@ class TimewiseConfig(BaseModel):
 class TimewiseConfigLoader(BaseModel):
 
     base_name: str
-    load_parent_sample: bool = True
     filename: str = None
     class_module: str = "timewise"
     class_name: str = "WiseDataByVisit"
@@ -121,26 +120,20 @@ class TimewiseConfigLoader(BaseModel):
         _filename = self.filename
         _class_name = self.class_name
 
-        if self.load_parent_sample:
-            class DynamicParentSample(ParentSampleBase):
-                default_keymap = _default_keymap
+        class DynamicParentSample(ParentSampleBase):
+            default_keymap = _default_keymap
 
-                def __init__(self):
-                    super().__init__(_base_name)
-                    self.df = pd.read_csv(_filename)
+            def __init__(self):
+                super().__init__(_base_name)
+                self.df = pd.read_csv(_filename)
 
-                    for k, v in self.default_keymap.items():
-                        if v not in self.df.columns:
-                            raise KeyError(f"Can not map '{v}' to '{k}': '{v}' not in table columns! Adjust keymap")
-
-            parent_sample_class = DynamicParentSample
-
-        else:
-            parent_sample_class = None
+                for k, v in self.default_keymap.items():
+                    if v not in self.df.columns:
+                        raise KeyError(f"Can not map '{v}' to '{k}': '{v}' not in table columns! Adjust keymap")
 
         wise_data_config = {
             "base_name": _base_name,
-            "parent_sample_class": parent_sample_class,
+            "parent_sample_class": DynamicParentSample,
             "n_chunks": self.n_chunks,
             "min_sep_arcsec": self.min_sep_arcsec
         }
