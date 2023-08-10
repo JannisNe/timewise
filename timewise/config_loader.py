@@ -114,6 +114,7 @@ class TimewiseConfigLoader(BaseModel):
     def parse_config(self):
 
         logger.info(f"Parsing config")
+        logger.debug(json.dumps(self.dict(), indent=4))
 
         _default_keymap = self.default_keymap
         _base_name = self.base_name
