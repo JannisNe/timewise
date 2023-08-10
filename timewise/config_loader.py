@@ -5,19 +5,13 @@ import os
 import inspect
 from pydantic import BaseModel, validator
 import pandas as pd
+import importlib
 
-from timewise import WiseDataByVisit, WISEDataDESYCluster
 from timewise.parent_sample_base import ParentSampleBase
 from timewise.wise_data_base import WISEDataBase
 
 
 logger = logging.getLogger(__name__)
-
-
-wise_data_classes = {
-    "WiseDataByVisit": WiseDataByVisit,
-    "WISEDataDESYCluster": WISEDataDESYCluster
-}
 
 
 class TimewiseConfig(BaseModel):
@@ -51,7 +45,7 @@ class TimewiseConfig(BaseModel):
                         _arguments = arguments or dict()
                         try:
                             if is_method:
-                                signature.bind(WiseDataByVisit, **_arguments)
+                                signature.bind(WISEDataBase, **_arguments)
                             else:
                                 signature.bind(**_arguments)
                         except TypeError as e:
@@ -77,6 +71,7 @@ class TimewiseConfigLoader(BaseModel):
     base_name: str
     load_parent_sample: bool = True
     filename: str = None
+    class_module: str = "timewise"
     class_name: str = "WiseDataByVisit"
     min_sep_arcsec: float = 6.
     n_chunks: int = 1
@@ -92,11 +87,21 @@ class TimewiseConfigLoader(BaseModel):
                 raise ValueError(f"No file {v}!")
         return v
 
+    @validator("class_module")
+    def validate_class_module(cls, v: str):
+        try:
+            importlib.import_module(v)
+        except ImportError:
+            raise ValueError(f"Could not import module {v}!")
+        return v
+
     @validator("class_name")
-    def validate_class_name(cls, v: str):
-        if v not in wise_data_classes:
-            available_classes = ", ".join(list(wise_data_classes.keys()))
-            raise ValueError(f"WiseData class {v} not implemented! (Only {available_classes} are available)")
+    def validate_class_name(cls, v: str, values: dict):
+        class_module = values["class_module"]
+        try:
+            getattr(importlib.import_module(class_module), v)
+        except ImportError:
+            raise ValueError(f"Could not find {v} in {class_module}")
         return v
 
     @validator("default_keymap")
@@ -138,7 +143,8 @@ class TimewiseConfigLoader(BaseModel):
             "n_chunks": self.n_chunks,
             "min_sep_arcsec": self.min_sep_arcsec
         }
-        wise_data = wise_data_classes[_class_name](**wise_data_config)
+        wise_data_class = getattr(importlib.import_module(self.class_module), self.class_name)
+        wise_data = wise_data_class(**wise_data_config)
 
         return TimewiseConfig(wise_data=wise_data, timewise_instructions=self.timewise_instructions)
 
