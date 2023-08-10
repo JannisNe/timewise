@@ -216,7 +216,7 @@ class WISEDataBase(abc.ABC):
         # START CHUNK MASK      #
         #########################
 
-        self.chunk_map = None
+        self._chunk_map = None
         self.n_chunks = self._n_chunks
 
     @property
@@ -240,28 +240,26 @@ class WISEDataBase(abc.ABC):
 
     @n_chunks.setter
     def n_chunks(self, value):
-        """Sets the private variable _n_chunks and re-calculates the declination interval masks"""
+        """Sets the private variable _n_chunks"""
+        # if a new value is set, set _chunk_map to None to trigger re-evaluation
+        if self._n_chunks != value:
+            self._n_chunks = None
 
-        if value > 50:
-            logger.warning(f"Very large number of chunks ({value})! "
-                           f"Pay attention when getting photometry to not kill IRSA!")
+    @property
+    def chunk_map(self):
 
-        if self.parent_sample_class:
+        if self.parent_sample_class is None:
+            raise ValueError("No parent sample given! Can not calculate chunk map!")
 
-            self.chunk_map = np.zeros(len(self.parent_sample.df))
-            N_in_chunk = int(round(len(self.chunk_map) / self._n_chunks))
+        if self._chunk_map is None:
+            self._chunk_map = np.zeros(len(self.parent_sample.df))
+            n_in_chunk = int(round(len(self._chunk_map) / self._n_chunks))
             for i in range(self._n_chunks):
-                start_ind = i * N_in_chunk
-                end_ind = start_ind + N_in_chunk
-                self.chunk_map[start_ind:end_ind] = int(i)
+                start_ind = i * n_in_chunk
+                end_ind = start_ind + n_in_chunk
+                self._chunk_map[start_ind:end_ind] = int(i)
 
-            self._n_chunks = int(max(self.chunk_map)) + 1
-
-            if self._n_chunks != value:
-                logger.info(f"All objectes included in {self._n_chunks:.0f} chunks.")
-
-        else:
-            logger.warning("No parent sample given! Can not calculate dec interval masks!")
+        return self._chunk_map
 
     def _get_chunk_number(self, wise_id=None, parent_sample_index=None):
         if isinstance(wise_id, type(None)) and isinstance(parent_sample_index, type(None)):
