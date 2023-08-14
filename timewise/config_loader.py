@@ -78,10 +78,8 @@ class TimewiseConfigLoader(BaseModel):
     timewise_instructions: list[dict] = list()
 
     @validator("filename")
-    def validate_file(cls, v: str, values: dict):
-        if values["load_parent_sample"]:
-            if v is None:
-                raise ValueError("Filename has to be given when load_parent_sample=True!")
+    def validate_file(cls, v: str):
+        if v is not None:
             if not os.path.isfile(v):
                 raise ValueError(f"No file {v}!")
         return v
