@@ -21,7 +21,7 @@ All possible keywords are:
 **Optional**
 
 * :code:`class_name` (default= :code:`WiseDataByVisit`): The name of the :code:`WISEData` class
-* :code:`class_module` (default= :codfe:`timewise`): The module where :code:`class_name` is implemented (can be outside of `timewise`).
+* :code:`class_module` (default= :code:`timewise`): The module where :code:`class_name` is implemented (can be outside of `timewise`).
 * :code:`min_sep_arcsec` (default=6): The value for the separation [arcsec] to associate datapoints to a source
 * :code:`n_chunks` (default=1): The number of chunks in which to split the sample when downloading. If you are looking at sample with <1e5 objects then one chunk is enough!
 * :code:`default_keymap` (default is :code:`ra` = :code:`ra` etc.): A mapping from :code:`ra`, :code:`dec` and :code:`id` to the respective columns in the CSV file
