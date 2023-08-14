@@ -48,8 +48,6 @@ class TestConfig(unittest.TestCase):
     def test_a_config(self):
         logger.info("\n\n Testing TimewiseConfig \n")
         TimewiseConfigLoader.run_yaml(get_test_yaml_filename())
-
-    def test_b_check_output(self):
         logger.info("checking result")
         fn = Path(cache_dir) / "mirong_test" / "sample.csv"
         df = pd.read_csv(fn)
