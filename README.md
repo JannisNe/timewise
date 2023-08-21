@@ -5,40 +5,10 @@
 [![DOI](https://zenodo.org/badge/449677569.svg)](https://zenodo.org/badge/latestdoi/449677569)
 
 
+![](docs/source/timewise.png)
+# `timewise`: Build IR Lightcurve from WISE data
+Detailed documentation can be found [here](https://timewise.readthedocs.io/en/latest/). 
 
-# `timewise` is great, love it!
-Download infrared lightcurves recorded with the WISE satellite.
-
-## Installation
-
-`timewise` is a python package, installable through `pip`
-```
-pip install timewise
-```
-
-If you would like to contribute just clone the repository. Easy.
-
-
-## Dependencies
-
-All dependencies are listed in `requirements.txt`. If installing with `pip` they will automatically installed.
-Otherwise you can install them with `pip install -r requirements.txt`.
-
-There is one package that does not obey! It's `SciServer`! 
-It's used to access SDSS data and plot cutouts. If you want to use this functionality 
-install [this](https://github.com/sciserver/SciScript-Python) and create an account [here](https://www.sciserver.org).
-As soon as required you will be required to enter your username and password.
-
-
-## Testing
- You can verify that everything is working (because this package is flawless and works everywhere.) by executing
- the unittest
-```
-python -m unittest discover tests/
-```
-
-## Cite
-If you you `timewise` please cite [this](https://zenodo.org/badge/latestdoi/449677569).
-
-## Usage
-Detailed documentation can be found [here](https://timewise.readthedocs.io/en/latest/)
+## Difference lightcurves
+Make sure to check out `timewise-sup`, the Timewise Subtraction Pipeline: 
+[link](https://gitlab.desy.de/jannisnecker/timewise_sup).

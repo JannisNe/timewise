@@ -3,9 +3,11 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+.. image:: timewise.png
+   :align: left
 
-Welcome to timewise's documentation!
-====================================
+``timewise``: Build IR Lightcurve from WISE data
+================================================
 
 .. image:: https://github.com/JannisNe/timewise/actions/workflows/continous_integration.yml/badge.svg
     :target: https://github.com/JannisNe/timewise/actions/workflows/continous_integration.yml
