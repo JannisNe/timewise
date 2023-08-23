@@ -3,9 +3,11 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+.. image:: timewise.png
+   :align: left
 
-Welcome to timewise's documentation!
-====================================
+``timewise``: Build IR Lightcurve from WISE data
+================================================
 
 .. image:: https://github.com/JannisNe/timewise/actions/workflows/continous_integration.yml/badge.svg
     :target: https://github.com/JannisNe/timewise/actions/workflows/continous_integration.yml
@@ -83,6 +85,15 @@ the unittest
 
     python -m unittest discover tests/
 
+*****
+Usage
+*****
+
+How you want to access :code:`timewise` depends on your use case. If you want
+to use the functionality off the shelf, head over to the CLI.
+If you want to do more involved things or embed :code:`timewise` in your
+code, check out the usage of the Classes directly.
+
 
 ****
 Cite
@@ -97,6 +108,7 @@ CONTENTS
 
 .. toctree::
    installation
+   cli
    getting_started
    api
    :maxdepth: 1

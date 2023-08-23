@@ -1,12 +1,15 @@
 [tool.poetry]
 name = "timewise"
-version = "0.3.13"
+version = "0.4.1"
 description = "A small package to download infrared data from the WISE satellite"
 authors = ["Jannis Necker <jannis.necker@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 documentation = "https://timewise.readthedocs.io/en/latest"
 repository = "https://github.com/JannisNe/timewise"
+
+[tool.poetry.scripts]
+timewise = "timewise.cli:timewise_cli"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/JannisNe/timewise/issues"
@@ -15,20 +18,21 @@ repository = "https://github.com/JannisNe/timewise"
 python = ">=3.8, <3.12"
 tqdm = "^4.64.0"
 requests = "^2.28.1"
-pandas = "^1.4.3"
+pandas = ">=1.4.3,<3.0.0"
 numpy = "^1.23.2"
 pyvo = "^1.4.1"
 astropy = "^5.1"
 matplotlib = "^3.5.3"
-coveralls = "^3.3.1"
 scikit-image = ">=0.19.3,<0.21.0"
 backoff = "^2.1.2"
 virtualenv = "^20.16.3"
 seaborn = ">=0.11.2,<0.13.0"
-pytest = "^7.2.2"
 urllib3 = "1.26.15"
+pydantic = ">=1.9.0,<2.0.0"
 
 [tool.poetry.dev-dependencies]
+coveralls = "^3.3.1"
+pytest = "^7.2.2"
 
 [tool.poetry.group.docs]
 optional = true

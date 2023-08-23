@@ -1,4 +1,4 @@
-# Getting Started
+# Using Python Classes
 
 
 #### The `ParentSample` class 

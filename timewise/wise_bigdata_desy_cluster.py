@@ -783,11 +783,6 @@ class WISEDataDESYCluster(WiseDataByVisit):
             for c in chunk_numbers:
                 self.get_position_mask(service="tap", chunk_number=c)
 
-        parentsample_class_pickle = os.path.join(self.cluster_dir, 'parentsample_class.pkl')
-        logger.debug(f"pickling parent sample class to {parentsample_class_pickle}")
-        with open(parentsample_class_pickle, "wb") as f:
-            pickle.dump(self.parent_sample_class, f)
-
         self.make_executable_file()
         self.make_submit_file(job_ids=job_ids, node_memory=node_memory, mask_by_position=mask_by_position)
 
