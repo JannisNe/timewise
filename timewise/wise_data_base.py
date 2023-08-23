@@ -1474,9 +1474,9 @@ class WISEDataBase(abc.ABC):
 
         :param lightcurve: unstacked lightcurve
         :type lightcurve: pd.DataFrame
-        :param ra: RA in radians of the source
+        :param ra: RA in degrees of the source
         :type ra: float
-        :param dec: Dec in radians of the source
+        :param dec: Dec in degrees of the source
         :type dec: float
         :return: positional mask
         :rtype: np.ndarray
