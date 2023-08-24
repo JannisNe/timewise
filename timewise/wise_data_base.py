@@ -1614,6 +1614,8 @@ class WISEDataBase(abc.ABC):
                 or min(cluster_separations) > np.radians(1 / 3600)
         ):
             logger.debug("No cluster found. Selecting all noise datapoints within 1 arcsec.")
+            if len(cluster_separations) > 0:
+                logger.debug(f"Closest cluster is at {cluster_separations} arcsec")
             noise_mask = cluster_res.labels_ == -1
             selected_indices = lightcurve.index[data_mask][noise_mask]
 
