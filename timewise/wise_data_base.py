@@ -22,7 +22,8 @@ from astropy import constants
 from astropy.cosmology import Planck18
 from astropy.io import ascii
 from astropy.table import Table
-from astropy.coordinates.angle_utilities import angular_separation
+from astropy.coordinates.angle_utilities import angular_separation, position_angle
+from sklearn.cluster import HDBSCAN
 
 from timewise.general import cache_dir, plots_dir, output_dir, logger_format, backoff_hndlr
 from timewise.utils import StableTAPService, get_2d_gaussian_correction
@@ -1563,17 +1564,67 @@ class WISEDataBase(abc.ABC):
         ra_rad = np.deg2rad(lightcurve.ra.values)
         dec_rad = np.deg2rad(lightcurve.dec.values)
 
-        sep = angular_separation(ra, dec, ra_rad, dec_rad)
-        sep_cl = 0.9
-        sep_ic = np.quantile(sep, sep_cl)
-        # here we assume a 2D-gaussian
-        sig = sep_ic / get_2d_gaussian_correction(cl=sep_cl)
-        sep_mask = sep <= 5 * sig
+        # calculate separation and position angle
+        _angular_separation = angular_separation(ra, dec, ra_rad, dec_rad)
+        _position_angle = position_angle(ra, dec, ra_rad, dec_rad)
 
-        bad_indices = lightcurve.index[~sep_mask]
+        # The AllWISE multiframe pipeline detects sources on the deep coadded atlas images and then measures the sources
+        # for all available single-exposure images in all bands simultaneously, while the NEOWISE magnitudes are
+        # obtained by PSF fit to individual exposures directly. Effect: all allwise data points that belong to the same
+        # object have the same position. We take only the closest one and treat it as one datapoint in the clustering.
+        allwise_time_mask = lightcurve["mjd"] < 55594
+        allwise_sep_min = np.min(_angular_separation[allwise_time_mask])
+        closest_allwise_mask = (_angular_separation == allwise_sep_min) & allwise_time_mask
+        closest_allwise_mask_first_entry = ~closest_allwise_mask.duplicated() & closest_allwise_mask
+
+        # the data we want to use is then the selected AllWISE datapoint and the NEOWISE-R data
+        data_mask = closest_allwise_mask_first_entry | ~allwise_time_mask
+
+        # instead of the polar coordinates separation and position angle we use cartesian coordinates because the
+        # clustering algorithm works better with them
+        cartesian_full = np.array([
+            _angular_separation * np.cos(_position_angle),
+            _angular_separation * np.sin(_position_angle)
+        ]).T
+        cartesian = cartesian_full[data_mask]
+
+        # we are now ready to do the clustering
+        cluster_distance_arcsec = 0.5  # distance of clusters to be considered as one [arcsec]
+        cluster_res = HDBSCAN(
+            store_centers="centroid",
+            min_cluster_size=min(20, len(cartesian)),
+            allow_single_cluster=True,
+            cluster_selection_epsilon=np.radians(cluster_distance_arcsec / 3600)
+        ).fit(cartesian)
+
+        # we select the closest cluster within 1 arcsec
+        cluster_separations = np.sqrt(np.sum(cluster_res.centroids_ ** 2, axis=1))
+
+        # if there is no cluster within 1 arcsec, we select all noise datapoints within 1 arcsec if there are any
+        if min(cluster_separations) > np.radians(1 / 3600):
+            noise_mask = cluster_res.labels_ == -1
+            selected_indices = lightcurve.index[data_mask][noise_mask]
+
+        # if there is a cluster within 1 arcsec, we select all datapoints belonging to that cluster
+        else:
+            closest_label = cluster_separations.argmin()
+            selected_cluster_mask = res.labels_ == closest_label
+
+            # now we have to trace back the selected datapoints to the original lightcurve
+            selected_indices = lightcurve.index[data_mask][selected_cluster_mask]
+            # if the closest allwise source is selected, we also select all other detections belonging to that source
+            # in the allwise period
+            if lightcurve.index[closest_allwise_mask_first_entry] in selected_indices:
+                closest_allwise_mask_not_first = closest_allwise_mask & ~closest_allwise_mask_first_entry
+                closest_allwise_indices_not_first = lightcurve.index[closest_allwise_mask_not_first]
+                selected_indices = selected_indices.append(closest_allwise_indices_not_first)
+
+        # because in most cases we will have more good indices than bad indices, we store the bad indices instead
+        bad_indices = lightcurve.index.isin(selected_indices)
+
         return list(bad_indices)
 
-    def get_position_mask(self, service, chunk_number, do_allwise_association=True):
+    def get_position_mask(self, service, chunk_number):
         """
         Get the position mask for a chunk
 
