@@ -1622,7 +1622,7 @@ class WISEDataBase(abc.ABC):
         # if there is a cluster within 1 arcsec, we select all datapoints belonging to that cluster
         else:
             closest_label = cluster_separations.argmin()
-            selected_cluster_mask = res.labels_ == closest_label
+            selected_cluster_mask = cluster_res.labels_ == closest_label
 
             # now we have to trace back the selected datapoints to the original lightcurve
             selected_indices = lightcurve.index[data_mask][selected_cluster_mask]
@@ -1632,7 +1632,7 @@ class WISEDataBase(abc.ABC):
             # source in the allwise period
             if (
                     closest_allwise_mask_first_entry is not None
-                    and lightcurve.index[closest_allwise_mask_first_entry] in selected_indices
+                    and lightcurve.index[closest_allwise_mask_first_entry][0] in selected_indices
             ):
                 closest_allwise_mask_not_first = closest_allwise_mask & ~closest_allwise_mask_first_entry
                 closest_allwise_indices_not_first = lightcurve.index[closest_allwise_mask_not_first]
