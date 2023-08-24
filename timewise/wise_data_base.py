@@ -1573,12 +1573,16 @@ class WISEDataBase(abc.ABC):
         # obtained by PSF fit to individual exposures directly. Effect: all allwise data points that belong to the same
         # object have the same position. We take only the closest one and treat it as one datapoint in the clustering.
         allwise_time_mask = lightcurve["mjd"] < 55594
-        allwise_sep_min = np.min(_angular_separation[allwise_time_mask])
-        closest_allwise_mask = (_angular_separation == allwise_sep_min) & allwise_time_mask
-        closest_allwise_mask_first_entry = ~closest_allwise_mask.duplicated() & closest_allwise_mask
+        if any(allwise_time_mask):
+            allwise_sep_min = np.min(_angular_separation[allwise_time_mask])
+            closest_allwise_mask = (_angular_separation == allwise_sep_min) & allwise_time_mask
+            closest_allwise_mask_first_entry = ~closest_allwise_mask.duplicated() & closest_allwise_mask
 
-        # the data we want to use is then the selected AllWISE datapoint and the NEOWISE-R data
-        data_mask = closest_allwise_mask_first_entry | ~allwise_time_mask
+            # the data we want to use is then the selected AllWISE datapoint and the NEOWISE-R data
+            data_mask = closest_allwise_mask_first_entry | ~allwise_time_mask
+        else:
+            closest_allwise_mask_first_entry = None
+            data_mask = np.ones_like(_angular_separation, dtype=bool)
 
         # instead of the polar coordinates separation and position angle we use cartesian coordinates because the
         # clustering algorithm works better with them
@@ -1612,9 +1616,13 @@ class WISEDataBase(abc.ABC):
 
             # now we have to trace back the selected datapoints to the original lightcurve
             selected_indices = lightcurve.index[data_mask][selected_cluster_mask]
-            # if the closest allwise source is selected, we also select all other detections belonging to that source
-            # in the allwise period
-            if lightcurve.index[closest_allwise_mask_first_entry] in selected_indices:
+
+            # if the closest allwise source is selected, we also select all other detections belonging to that
+            # source in the allwise period
+            if (
+                    closest_allwise_mask_first_entry is not None
+                    and lightcurve.index[closest_allwise_mask_first_entry] in selected_indices
+            ):
                 closest_allwise_mask_not_first = closest_allwise_mask & ~closest_allwise_mask_first_entry
                 closest_allwise_indices_not_first = lightcurve.index[closest_allwise_mask_not_first]
                 selected_indices = selected_indices.append(closest_allwise_indices_not_first)
