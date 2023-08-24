@@ -1561,12 +1561,14 @@ class WISEDataBase(abc.ABC):
         :return: positional mask
         :rtype: list
         """
-        ra_rad = np.deg2rad(lightcurve.ra.values)
-        dec_rad = np.deg2rad(lightcurve.dec.values)
+        lc_ra_rad = np.deg2rad(lightcurve.ra.values)
+        lc_dec_rad = np.deg2rad(lightcurve.dec.values)
+        source_ra_rad = np.deg2rad(ra)
+        source_dec_rad = np.deg2rad(dec)
 
         # calculate separation and position angle
-        _angular_separation = angular_separation(ra, dec, ra_rad, dec_rad)
-        _position_angle = position_angle(ra, dec, ra_rad, dec_rad)
+        _angular_separation = angular_separation(source_ra_rad, source_dec_rad, lc_ra_rad, lc_dec_rad)
+        _position_angle = position_angle(source_ra_rad, source_dec_rad, lc_ra_rad, lc_dec_rad)
 
         # The AllWISE multiframe pipeline detects sources on the deep coadded atlas images and then measures the sources
         # for all available single-exposure images in all bands simultaneously, while the NEOWISE magnitudes are
