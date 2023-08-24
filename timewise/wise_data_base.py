@@ -1603,9 +1603,15 @@ class WISEDataBase(abc.ABC):
 
         # we select the closest cluster within 1 arcsec
         cluster_separations = np.sqrt(np.sum(cluster_res.centroids_ ** 2, axis=1))
+        logger.debug(f"Found {len(cluster_separations)} clusters")
 
-        # if there is no cluster within 1 arcsec, we select all noise datapoints within 1 arcsec if there are any
-        if min(cluster_separations) > np.radians(1 / 3600):
+        # if there is no cluster or no cluster within 1 arcsec,
+        # we select all noise datapoints within 1 arcsec if there are any
+        if (
+                len(cluster_separations) == 0
+                or min(cluster_separations) > np.radians(1 / 3600)
+        ):
+            logger.debug("No cluster found. Selecting all noise datapoints within 1 arcsec.")
             noise_mask = cluster_res.labels_ == -1
             selected_indices = lightcurve.index[data_mask][noise_mask]
 
@@ -1616,6 +1622,7 @@ class WISEDataBase(abc.ABC):
 
             # now we have to trace back the selected datapoints to the original lightcurve
             selected_indices = lightcurve.index[data_mask][selected_cluster_mask]
+            logger.debug(f"Selected {len(selected_indices)} datapoints")
 
             # if the closest allwise source is selected, we also select all other detections belonging to that
             # source in the allwise period
@@ -1625,10 +1632,11 @@ class WISEDataBase(abc.ABC):
             ):
                 closest_allwise_mask_not_first = closest_allwise_mask & ~closest_allwise_mask_first_entry
                 closest_allwise_indices_not_first = lightcurve.index[closest_allwise_mask_not_first]
+                logger.debug(f"Adding remaining {len(closest_allwise_indices_not_first)} from AllWISE period")
                 selected_indices = selected_indices.append(closest_allwise_indices_not_first)
 
         # because in most cases we will have more good indices than bad indices, we store the bad indices instead
-        bad_indices = lightcurve.index.isin(selected_indices)
+        bad_indices = lightcurve.index[~lightcurve.index.isin(selected_indices)]
 
         return list(bad_indices)
 
