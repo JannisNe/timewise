@@ -1468,84 +1468,6 @@ class WISEDataBase(abc.ABC):
     #####################################
 
     @staticmethod
-    def calculate_allwise_mask(lightcurve, ra, dec):
-        """
-        Select the closest datapoints in the AllWISE period by calculating the angular separation and selecting the
-        datapoints which are closest. If there are multiple datapoints with the same angular separation, select all of
-        them. The AllWISE period ends on Feb 1st, 2011.
-
-        :param lightcurve: unstacked lightcurve
-        :type lightcurve: pandas.DataFrame
-        :param ra: RA in degrees of the source
-        :type ra: Sequence[float]
-        :param dec: Dec in degrees of the source
-        :type dec: Sequence[float]
-        :return: indices of the datapoints that are closest to the source
-        :rtype: list[int]
-        """
-        ra_rad = np.deg2rad(lightcurve.ra.values)
-        dec_rad = np.deg2rad(lightcurve.dec.values)
-
-        sep = angular_separation(ra, dec, ra_rad, dec_rad)
-
-        allwise_time_mask = lightcurve["mjd"] < 55594
-        allwise_sep_min = np.min(np.unique(sep[allwise_time_mask]))
-        allwise_not_closest_mask = (sep != allwise_sep_min) & allwise_time_mask
-
-        bad_indices = lightcurve.index[allwise_not_closest_mask]
-
-        return list(bad_indices)
-
-    def get_allwise_mask(self, service, chunk_number):
-        """
-        Get the AllWISE mask for a chunk
-
-        :param service: The service that was used to download the data, either of `gator` or `tap`
-        :type service: str
-        :param chunk_number: chunk number
-        :type chunk_number: int
-        :returns: AllWISE masks
-        :rtype: dict
-        """
-
-        logger.info(f"getting AllWISE masks for {service}, chunk {chunk_number}")
-        fn = os.path.join(self.cache_dir, "allwise_masks", f"{service}_chunk{chunk_number}.json")
-
-        if not os.path.isfile(fn):
-            logger.debug(f"No file {fn}. Calculating AllWISE masks.")
-
-            if service == "tap":
-                unbinned_lcs = self.get_unbinned_lightcurves(chunk_number)
-            elif service == "gator":
-                unbinned_lcs = self._get_unbinned_lightcurves_gator(chunk_number)
-            else:
-                raise ValueError(f"Service must be one of 'gator' or 'tap', not {service}!")
-
-            allwise_masks = dict()
-
-            for i in tqdm.tqdm(unbinned_lcs[self._tap_orig_id_key].unique(), "calculating AllWISE masks"):
-                ra = self.parent_sample.df.loc[i, self.parent_sample.default_keymap["ra"]]
-                dec = self.parent_sample.df.loc[i, self.parent_sample.default_keymap["dec"]]
-                lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == i]
-                bad_indices = self.calculate_allwise_mask(lightcurve, ra, dec)
-                if len(bad_indices) > 0:
-                    allwise_masks[str(i)] = bad_indices
-
-            d = os.path.dirname(fn)
-            if not os.path.isdir(d):
-                os.makedirs(d, exist_ok=True)
-
-            with open(fn, "w") as f:
-                json.dump(allwise_masks, f)
-
-        else:
-            logger.debug(f"loading {fn}")
-            with open(fn, "r") as f:
-                allwise_masks = json.load(f)
-
-        return allwise_masks
-
-    @staticmethod
     def calculate_position_mask(lightcurve, ra, dec):
         """
         Estimated the 90th percentile of the angular separations from the given position.
@@ -1669,17 +1591,12 @@ class WISEDataBase(abc.ABC):
             else:
                 raise ValueError(f"Service must be one of 'gator' or 'tap', not {service}!")
 
-            allwise_masks = self.get_allwise_mask(service, chunk_number) if do_allwise_association else None
             position_masks = dict()
 
             for i in tqdm.tqdm(unbinned_lcs[self._tap_orig_id_key].unique(), "calculating position masks"):
                 ra = self.parent_sample.df.loc[i, self.parent_sample.default_keymap["ra"]]
                 dec = self.parent_sample.df.loc[i, self.parent_sample.default_keymap["dec"]]
                 lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == i]
-
-                if do_allwise_association:
-                    bad_allwise_indices = allwise_masks[str(i)]
-                    lightcurve = lightcurve[~lightcurve.index.isin(bad_allwise_indices)]
 
                 bad_indices = self.calculate_position_mask(lightcurve, ra, dec)
                 if len(bad_indices) > 0:
