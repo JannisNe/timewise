@@ -1682,7 +1682,10 @@ class WISEDataBase(abc.ABC):
                              save=save, lum_key=lum_key, **kwargs)
 
     def _plot_lc(self, lightcurve=None, unbinned_lc=None, interactive=False, fn=None, ax=None, save=True,
-                 lum_key='flux_density', **kwargs):
+                 lum_key='flux_density', colors=None, **kwargs):
+
+        if not colors:
+            colors = self.band_plot_colors
 
         if not ax:
             fig, ax = plt.subplots(**kwargs)
@@ -1695,10 +1698,10 @@ class WISEDataBase(abc.ABC):
                     ul_mask = np.array(lightcurve[f"{b}_{lum_key}{self.upper_limit_key}"]).astype(bool)
                     ax.errorbar(lightcurve.mean_mjd[~ul_mask], lightcurve[f"{b}{self.mean_key}_{lum_key}"][~ul_mask],
                                 yerr=lightcurve[f"{b}_{lum_key}{self.rms_key}"][~ul_mask],
-                                label=b, ls='', marker='s', c=self.band_plot_colors[b], markersize=4,
+                                label=b, ls='', marker='s', c=colors[b], markersize=4,
                                 markeredgecolor='k', ecolor='k', capsize=2)
                     ax.scatter(lightcurve.mean_mjd[ul_mask], lightcurve[f"{b}{self.mean_key}_{lum_key}"][ul_mask],
-                               marker='v', c=self.band_plot_colors[b], alpha=0.7, s=2)
+                               marker='v', c=colors[b], alpha=0.7, s=2)
 
                 if not isinstance(unbinned_lc, type(None)):
                     m = ~unbinned_lc[f"{b}_{lum_key}"].isna()
@@ -1708,21 +1711,21 @@ class WISEDataBase(abc.ABC):
                     if np.any(tot_m):
                         ax.errorbar(unbinned_lc.mjd[tot_m], unbinned_lc[f"{b}_{lum_key}"][tot_m],
                                     yerr=unbinned_lc[f"{b}_{lum_key}{self.error_key_ext}"][tot_m],
-                                    label=f"{b} unbinned", ls='', marker='o', c=self.band_plot_colors[b], markersize=4,
+                                    label=f"{b} unbinned", ls='', marker='o', c=colors[b], markersize=4,
                                     alpha=0.3)
 
                     single_ul_m = m & ul_mask
                     if np.any(single_ul_m):
                         label = f"{b} unbinned upper limits" if not np.any(tot_m) else ""
                         ax.scatter(unbinned_lc.mjd[single_ul_m], unbinned_lc[f"{b}_{lum_key}"][single_ul_m],
-                                   marker="d", c=self.band_plot_colors[b], alpha=0.3, s=1, label=label)
+                                   marker="d", c=colors[b], alpha=0.3, s=1, label=label)
 
             except KeyError as e:
                 raise KeyError(f"Could not find brightness key {e}!")
 
         if lum_key == 'mag':
             ylim = ax.get_ylim()
-            ax.set_ylim([ylim[-1], ylim[0]])
+            ax.set_ylim(max(ylim), min(ylim))
 
         ax.set_xlabel('MJD')
         ax.set_ylabel(lum_key)
