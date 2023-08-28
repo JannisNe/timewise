@@ -584,50 +584,6 @@ class WiseDataByVisit(WISEDataBase):
         circle = plt.Circle((0, 0), 1, color='g', fill=False, ls=":")
         axs[0].add_artist(circle)
 
-        # # indicate outliers in allwise period with open, blue diamonds
-        # if np.any(~allwise_mask):
-        #     allwise_outlier_scatter_style = {
-        #         "marker": '$\u25C6$',
-        #         "facecolors": "none",
-        #         "edgecolors": "blue",
-        #         "s": 60,
-        #         "lw": 2
-        #     }
-        #     axs[0].scatter(
-        #         ra[~allwise_mask],
-        #         dec[~allwise_mask],
-        #         label="outlier in allwise period",
-        #         **allwise_outlier_scatter_style
-        #     )
-        #     for b in self.bands:
-        #         axs[1].scatter(
-        #             lightcurve.mjd[~allwise_mask],
-        #             lightcurve[f"{b}_{lum_key}"][~allwise_mask],
-        #             **allwise_outlier_scatter_style
-        #         )
-
-        # # indicate the outliers by position with squares
-        # if np.any(~position_mask):
-        #     position_outlier_scatter_style = {
-        #         "marker": '$\u25A2$',
-        #         "facecolors": "orange",
-        #         "edgecolors": "orange",
-        #         "s": 60,
-        #         "lw": 2
-        #     }
-        #     axs[0].scatter(
-        #         ra[~position_mask],
-        #         dec[~position_mask],
-        #         label="outlier by position",
-        #         **position_outlier_scatter_style
-        #     )
-        #     for b in self.bands:
-        #         axs[1].scatter(
-        #             lightcurve.mjd[~position_mask],
-        #             lightcurve[f"{b}_{lum_key}"][~position_mask],
-        #             **position_outlier_scatter_style
-        #         )
-
         # formatting
         title = axs[0].get_title()
         axs[-1].set_ylabel("Apparent Vega Magnitude")
