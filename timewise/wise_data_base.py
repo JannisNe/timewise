@@ -1568,7 +1568,11 @@ class WISEDataBase(abc.ABC):
         # because in most cases we will have more good indices than bad indices, we store the bad indices instead
         bad_indices = lightcurve.index[~lightcurve.index.isin(selected_indices)]
 
-        return list(bad_indices)
+        if return_all:
+            return_closest_allwise_mask = list(closest_allwise_mask) if closest_allwise_mask is not None else None
+            return list(bad_indices), cluster_res, return_closest_allwise_mask
+        else:
+            return list(bad_indices)
 
     def get_position_mask(self, service, chunk_number):
         """
