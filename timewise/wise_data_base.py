@@ -1604,8 +1604,10 @@ class WISEDataBase(abc.ABC):
             for i in tqdm.tqdm(unbinned_lcs[self._tap_orig_id_key].unique(), "calculating position masks"):
                 ra = self.parent_sample.df.loc[i, self.parent_sample.default_keymap["ra"]]
                 dec = self.parent_sample.df.loc[i, self.parent_sample.default_keymap["dec"]]
+                id = self.parent_sample.df.loc[i, self.parent_sample.default_keymap["id"]]
                 lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == i]
 
+                logger.debug(f"calculating position mask for {id} ({ra}, {dec})")
                 bad_indices = self.calculate_position_mask(lightcurve, ra, dec)
                 if len(bad_indices) > 0:
                     position_masks[str(i)] = bad_indices

@@ -237,7 +237,7 @@ class WiseDataByVisit(WISEDataBase):
                 n_outliers = np.sum(outlier_mask)
 
                 if (n_outliers > 0):
-                    logger.info(f"removed {n_outliers} outliers")
+                    logger.debug(f"removed {n_outliers} outliers by brightness for {b} {lum_ext}")
 
                 binned_data[f'{b}{self.mean_key}{lum_ext}'] = mean
                 binned_data[f'{b}{lum_ext}{self.rms_key}'] = u
