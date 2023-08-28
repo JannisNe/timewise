@@ -461,16 +461,8 @@ class WiseDataByVisit(WISEDataBase):
             if np.any(outlier_mask):
                 outlier_masks[b] = outlier_mask
 
-        # # get a mask indicating the closest source in the allwise period
-        ra, dec = pos.astype(float)
-        # bad_indices_allwise = self.calculate_allwise_mask(lightcurve, ra=ra, dec=dec)
-        # allwise_mask = (
-        #     ~lightcurve.index.isin(bad_indices_allwise)
-        #     if len(bad_indices_allwise) > 0
-        #     else np.array([True] * len(lightcurve))
-        # )
-
         # get a mask indicating outliers based on position
+        ra, dec = pos.astype(float)
         bad_indices_position, cluster_res, allwise_mask = self.calculate_position_mask(
             lightcurve, ra=ra, dec=dec, return_all=True
         )
