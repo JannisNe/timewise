@@ -4,6 +4,7 @@ import numpy as np
 import logging
 from scipy import stats
 import matplotlib.pyplot as plt
+import warnings
 
 from timewise.wise_data_base import WISEDataBase
 from timewise.utils import get_excess_variance
@@ -144,7 +145,7 @@ class WiseDataByVisit(WISEDataBase):
 
             # calculate 90% confidence interval
             u70 = np.zeros_like(counts, dtype=float)
-            u70[one_points_mask] = 0
+            u70[one_points_mask] = 1e-10
             visits_at_least_two_point = np.unique(visit_mask[~one_points_mask[visit_mask]])
             u70[visits_at_least_two_point] = np.array([
                 np.quantile(abs(f[(visit_mask == i) & use_mask] - median[i]), .7, method="interpolated_inverted_cdf")
