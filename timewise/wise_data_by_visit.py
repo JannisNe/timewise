@@ -442,14 +442,12 @@ class WiseDataByVisit(WISEDataBase):
 
         # select the datapoints corresponding to our object
         lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == ind]
-        # calculate the stacked lightcurve
-        binned_lightcurve = self.bin_lightcurve(lightcurve)
 
         # get visit map
         visit_map = self.get_visit_map(lightcurve)
         counts = np.bincount(visit_map)
 
-        # get the masks indicating outliers per visit based on brightnes
+        # get the masks indicating outliers per visit based on brightness
         outlier_masks = dict()
         for b in self.bands:
             f = lightcurve[f"{b}{self.flux_key_ext}"]
@@ -463,14 +461,27 @@ class WiseDataByVisit(WISEDataBase):
             if np.any(outlier_mask):
                 outlier_masks[b] = outlier_mask
 
+        # # get a mask indicating the closest source in the allwise period
+        ra, dec = pos.astype(float)
+        # bad_indices_allwise = self.calculate_allwise_mask(lightcurve, ra=ra, dec=dec)
+        # allwise_mask = (
+        #     ~lightcurve.index.isin(bad_indices_allwise)
+        #     if len(bad_indices_allwise) > 0
+        #     else np.array([True] * len(lightcurve))
+        # )
+
         # get a mask indicating outliers based on position
-        ra_rad, dec_rad = np.radians(pos.astype(float))
-        bad_indices = self.calculate_position_mask(lightcurve, ra=ra_rad, dec=dec_rad)
+        bad_indices_position, cluster_res, allwise_mask = self.calculate_position_mask(
+            lightcurve, ra=ra, dec=dec, return_all=True
+        )
         position_mask = (
-            ~lightcurve.index.isin(bad_indices)
-            if len(bad_indices) > 0
+            ~lightcurve.index.isin(bad_indices_position)
+            if len(bad_indices_position) > 0
             else np.array([True] * len(lightcurve))
         )
+
+        # calculate the stacked lightcurve
+        binned_lightcurve = self.bin_lightcurve(lightcurve[position_mask])
 
         # -----------------   create the plot   ----------------- #
 
@@ -481,7 +492,20 @@ class WiseDataByVisit(WISEDataBase):
         self.parent_sample.plot_cutout(ind=ind, ax=axs[0], which=which, arcsec=arcsec, **kwargs)
 
         # plot the lightcurve
-        self._plot_lc(lightcurve=binned_lightcurve, unbinned_lc=lightcurve, lum_key=lum_key, ax=axs[-1], save=False)
+        self._plot_lc(
+            lightcurve=binned_lightcurve,
+            unbinned_lc=lightcurve[position_mask],
+            lum_key=lum_key,
+            ax=axs[-1],
+            save=False
+        )
+        self._plot_lc(
+            unbinned_lc=lightcurve[~position_mask],
+            lum_key=lum_key,
+            ax=axs[-1],
+            save=False,
+            colors={"W1": "gray", "W2": "lightgray"}
+        )
 
         # set markers for visits
         markers = ['o', 'v', '^', '<', '>', '1', '2', '3', '4', '8', 's', 'p', '*', 'h', 'H', '+', 'x', 'D', 'd', '|',
@@ -494,32 +518,41 @@ class WiseDataByVisit(WISEDataBase):
         # for each visit plot the datapoints on the cutout
         for visit in np.unique(visit_map):
             m = visit_map == visit
-            datapoints = lightcurve[m]
 
             label = str(visit)
             marker = markers[visit]
             color = f"C{visit}"
 
-            if ("sigra" in datapoints.columns) and ("sigdec" in datapoints.columns):
-                has_sig = ~datapoints.sigra.isna() & ~datapoints.sigdec.isna()
-                axs[0].errorbar(
-                    ra[m][has_sig],
-                    dec[m][has_sig],
-                    xerr=datapoints.sigra[has_sig] / 3600,
-                    yerr=datapoints.sigdec[has_sig] / 3600,
-                    label=label,
-                    marker=marker,
-                    ls="",
-                    color=color
-                )
-                axs[0].scatter(
-                    ra[m][~has_sig],
-                    dec[m][~has_sig],
-                    marker=marker,
-                    color=color
-                )
-            else:
-                axs[0].scatter(ra[m], dec[m], label=label, marker=marker, color=color)
+            for im, _color, _label, zorder in zip(
+                    [position_mask, ~position_mask],
+                    [color, "gray"],
+                    [label, ""],
+                    [1, 0]
+            ):
+                mask = m & im
+                datapoints = lightcurve[mask]
+                if ("sigra" in datapoints.columns) and ("sigdec" in datapoints.columns):
+                    has_sig = ~datapoints.sigra.isna() & ~datapoints.sigdec.isna()
+                    axs[0].errorbar(
+                        ra[mask][has_sig],
+                        dec[mask][has_sig],
+                        xerr=datapoints.sigra[has_sig] / 3600,
+                        yerr=datapoints.sigdec[has_sig] / 3600,
+                        label=_label,
+                        marker=marker,
+                        ls="",
+                        color=_color,
+                        zorder=zorder
+                    )
+                    axs[0].scatter(
+                        ra[mask][~has_sig],
+                        dec[mask][~has_sig],
+                        marker=marker,
+                        color=_color,
+                        zorder=zorder
+                    )
+                else:
+                    axs[0].scatter(ra[mask], dec[mask], label=_label, marker=marker, color=_color, zorder=zorder)
 
         # for each band indicate the outliers based on brightness with circles
         for b, outlier_mask in outlier_masks.items():
@@ -544,27 +577,56 @@ class WiseDataByVisit(WISEDataBase):
                 **brightness_outlier_scatter_style
             )
 
-        # indicate the outliers by position with triangles
-        if np.any(~position_mask):
-            position_outlier_scatter_style = {
-                "marker": '$\u25A2$',
-                "facecolors": "orange",
-                "edgecolors": "orange",
-                "s": 60,
-                "lw": 2
-            }
-            axs[0].scatter(
-                ra[~position_mask],
-                dec[~position_mask],
-                label="outlier by position",
-                **position_outlier_scatter_style
-            )
-            for b in self.bands:
-                axs[1].scatter(
-                    lightcurve.mjd[~position_mask],
-                    lightcurve[f"{b}_{lum_key}"][~position_mask],
-                    **position_outlier_scatter_style
-                )
+        # indicate the query region with a circle
+        circle = plt.Circle((0, 0), self.min_sep.to("arcsec").value, color='r', fill=False, ls=":")
+        axs[0].add_artist(circle)
+        # indicate the whitelist region of 1 arcsec with a circle
+        circle = plt.Circle((0, 0), 1, color='g', fill=False, ls=":")
+        axs[0].add_artist(circle)
+
+        # # indicate outliers in allwise period with open, blue diamonds
+        # if np.any(~allwise_mask):
+        #     allwise_outlier_scatter_style = {
+        #         "marker": '$\u25C6$',
+        #         "facecolors": "none",
+        #         "edgecolors": "blue",
+        #         "s": 60,
+        #         "lw": 2
+        #     }
+        #     axs[0].scatter(
+        #         ra[~allwise_mask],
+        #         dec[~allwise_mask],
+        #         label="outlier in allwise period",
+        #         **allwise_outlier_scatter_style
+        #     )
+        #     for b in self.bands:
+        #         axs[1].scatter(
+        #             lightcurve.mjd[~allwise_mask],
+        #             lightcurve[f"{b}_{lum_key}"][~allwise_mask],
+        #             **allwise_outlier_scatter_style
+        #         )
+
+        # # indicate the outliers by position with squares
+        # if np.any(~position_mask):
+        #     position_outlier_scatter_style = {
+        #         "marker": '$\u25A2$',
+        #         "facecolors": "orange",
+        #         "edgecolors": "orange",
+        #         "s": 60,
+        #         "lw": 2
+        #     }
+        #     axs[0].scatter(
+        #         ra[~position_mask],
+        #         dec[~position_mask],
+        #         label="outlier by position",
+        #         **position_outlier_scatter_style
+        #     )
+        #     for b in self.bands:
+        #         axs[1].scatter(
+        #             lightcurve.mjd[~position_mask],
+        #             lightcurve[f"{b}_{lum_key}"][~position_mask],
+        #             **position_outlier_scatter_style
+        #         )
 
         # formatting
         title = axs[0].get_title()
