@@ -1468,7 +1468,7 @@ class WISEDataBase(abc.ABC):
     #####################################
 
     @staticmethod
-    def calculate_position_mask(lightcurve, ra, dec):
+    def calculate_position_mask(lightcurve, ra, dec, return_all=False):
         """
         Estimated the 90th percentile of the angular separations from the given position.
         Assuming a 2D-Gaussian, calculate the standard deviation for the 90th percentile.
@@ -1480,8 +1480,12 @@ class WISEDataBase(abc.ABC):
         :type ra: Sequence[float]
         :param dec: Dec in degrees of the source
         :type dec: Sequence[float]
-        :return: positional mask
-        :rtype: list
+        :param return_all: if True, return all info collected in the selection process
+        :type return_all: bool, optional
+        :return:
+            positional mask (and result of the clustering algorithm and the mask for the closest allwise data
+            if `return_all` is True)
+        :rtype: list (`return_all` is False) or tuple (list, sklearn.cluster.HDBSCAN, list) (`return_all` is True)
         """
         lc_ra_rad = np.deg2rad(lightcurve.ra.values)
         lc_dec_rad = np.deg2rad(lightcurve.dec.values)
