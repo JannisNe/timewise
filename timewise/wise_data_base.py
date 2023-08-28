@@ -1509,7 +1509,7 @@ class WISEDataBase(abc.ABC):
             # the data we want to use is then the selected AllWISE datapoint and the NEOWISE-R data
             data_mask = closest_allwise_mask_first_entry | ~allwise_time_mask
         else:
-            closest_allwise_mask_first_entry = None
+            closest_allwise_mask_first_entry = closest_allwise_mask = None
             data_mask = np.ones_like(_angular_separation, dtype=bool)
 
         # instead of the polar coordinates separation and position angle we use cartesian coordinates because the
