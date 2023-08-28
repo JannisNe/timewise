@@ -291,9 +291,7 @@ class WiseDataByVisit(WISEDataBase):
                 flux_densities_e,
                 visit_map, counts,
                 remove_outliers=False,
-                outlier_mask=
-                outlier_masks[
-                    self.flux_key_ext]
+                outlier_mask=outlier_masks[self.flux_key_ext]
             )
             binned_data[f'{b}{self.mean_key}{self.flux_density_key_ext}'] = mean_fd
             binned_data[f'{b}{self.flux_density_key_ext}{self.rms_key}'] = u_fd
