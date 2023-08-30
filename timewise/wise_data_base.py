@@ -1512,58 +1512,66 @@ class WISEDataBase(abc.ABC):
             closest_allwise_mask_first_entry = closest_allwise_mask = None
             data_mask = np.ones_like(_angular_separation, dtype=bool)
 
-        # instead of the polar coordinates separation and position angle we use cartesian coordinates because the
-        # clustering algorithm works better with them
-        cartesian_full = np.array([
-            _angular_separation * np.cos(_position_angle),
-            _angular_separation * np.sin(_position_angle)
-        ]).T
-        cartesian = cartesian_full[data_mask]
+        # no matter which cluster they belong to, we want to keep all datapoints within 1 arcsec
+        one_arcsec_mask = _angular_separation < np.radians(1 / 3600)
+        selected_indices = set(lightcurve.index[data_mask & one_arcsec_mask])
 
-        # we are now ready to do the clustering
-        cluster_distance_arcsec = 0.5  # distance of clusters to be considered as one [arcsec]
-        cluster_res = HDBSCAN(
-            store_centers="centroid",
-            min_cluster_size=min(20, len(cartesian)),
-            allow_single_cluster=True,
-            cluster_selection_epsilon=np.radians(cluster_distance_arcsec / 3600)
-        ).fit(cartesian)
+        # if there are more than one datapoints, we use a clustering algorithm to potentially find a cluster with
+        # its center within 1 arcsec
+        cluster_res = None
+        if data_mask.sum() > 1:
+            # instead of the polar coordinates separation and position angle we use cartesian coordinates because the
+            # clustering algorithm works better with them
+            cartesian_full = np.array([
+                _angular_separation * np.cos(_position_angle),
+                _angular_separation * np.sin(_position_angle)
+            ]).T
+            cartesian = cartesian_full[data_mask]
 
-        # we select the closest cluster within 1 arcsec
-        cluster_separations = np.sqrt(np.sum(cluster_res.centroids_ ** 2, axis=1))
-        logger.debug(f"Found {len(cluster_separations)} clusters")
+            # we are now ready to do the clustering
+            cluster_distance_arcsec = 0.5  # distance of clusters to be considered as one [arcsec]
+            cluster_res = HDBSCAN(
+                store_centers="centroid",
+                min_cluster_size=max(min(20, len(cartesian)), 2),
+                allow_single_cluster=True,
+                cluster_selection_epsilon=np.radians(cluster_distance_arcsec / 3600)
+            ).fit(cartesian)
 
-        # if there is no cluster or no cluster within 1 arcsec,
-        # we select all noise datapoints within 1 arcsec if there are any
-        if (
-                len(cluster_separations) == 0
-                or min(cluster_separations) > np.radians(1 / 3600)
-        ):
-            logger.debug("No cluster found. Selecting all noise datapoints within 1 arcsec.")
-            if len(cluster_separations) > 0:
-                logger.debug(f"Closest cluster is at {cluster_separations} arcsec")
-            noise_mask = cluster_res.labels_ == -1
-            selected_indices = lightcurve.index[data_mask][noise_mask]
+            # we select the closest cluster within 1 arcsec
+            cluster_separations = np.sqrt(np.sum(cluster_res.centroids_ ** 2, axis=1))
+            logger.debug(f"Found {len(cluster_separations)} clusters")
 
-        # if there is a cluster within 1 arcsec, we select all datapoints belonging to that cluster
-        else:
-            closest_label = cluster_separations.argmin()
-            selected_cluster_mask = cluster_res.labels_ == closest_label
-
-            # now we have to trace back the selected datapoints to the original lightcurve
-            selected_indices = lightcurve.index[data_mask][selected_cluster_mask]
-            logger.debug(f"Selected {len(selected_indices)} datapoints")
-
-            # if the closest allwise source is selected, we also select all other detections belonging to that
-            # source in the allwise period
+            # if there is no cluster or no cluster within 1 arcsec,
+            # we select all noise datapoints within 1 arcsec if there are any
             if (
-                    closest_allwise_mask_first_entry is not None
-                    and lightcurve.index[closest_allwise_mask_first_entry][0] in selected_indices
+                    len(cluster_separations) == 0
+                    or min(cluster_separations) > np.radians(1 / 3600)
             ):
-                closest_allwise_mask_not_first = closest_allwise_mask & ~closest_allwise_mask_first_entry
-                closest_allwise_indices_not_first = lightcurve.index[closest_allwise_mask_not_first]
-                logger.debug(f"Adding remaining {len(closest_allwise_indices_not_first)} from AllWISE period")
-                selected_indices = selected_indices.append(closest_allwise_indices_not_first)
+                logger.debug("No cluster found. Selecting all noise datapoints within 1 arcsec.")
+                if len(cluster_separations) > 0:
+                    logger.debug(f"Closest cluster is at {cluster_separations} arcsec")
+                noise_mask = cluster_res.labels_ == -1
+                selected_indices |= set(lightcurve.index[data_mask][noise_mask])
+
+            # if there is a cluster within 1 arcsec, we select all datapoints belonging to that cluster
+            else:
+                closest_label = cluster_separations.argmin()
+                selected_cluster_mask = cluster_res.labels_ == closest_label
+
+                # now we have to trace back the selected datapoints to the original lightcurve
+                selected_indices |= set(lightcurve.index[data_mask][selected_cluster_mask])
+                logger.debug(f"Selected {len(selected_indices)} datapoints")
+
+                # if the closest allwise source is selected, we also select all other detections belonging to that
+                # source in the allwise period
+                if (
+                        closest_allwise_mask_first_entry is not None
+                        and lightcurve.index[closest_allwise_mask_first_entry][0] in selected_indices
+                ):
+                    closest_allwise_mask_not_first = closest_allwise_mask & ~closest_allwise_mask_first_entry
+                    closest_allwise_indices_not_first = lightcurve.index[closest_allwise_mask_not_first]
+                    logger.debug(f"Adding remaining {len(closest_allwise_indices_not_first)} from AllWISE period")
+                    selected_indices |= set(closest_allwise_indices_not_first)
 
         # because in most cases we will have more good indices than bad indices, we store the bad indices instead
         bad_indices = lightcurve.index[~lightcurve.index.isin(selected_indices)]
