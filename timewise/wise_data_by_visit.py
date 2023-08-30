@@ -571,10 +571,10 @@ class WiseDataByVisit(WISEDataBase):
             )
 
         # indicate the query region with a circle
-        circle = plt.Circle((0, 0), self.min_sep.to("arcsec").value, color='r', fill=False, ls=":")
+        circle = plt.Circle((0, 0), self.min_sep.to("arcsec").value, color='r', fill=False, ls="-", lw=3, zorder=0)
         axs[0].add_artist(circle)
         # indicate the whitelist region of 1 arcsec with a circle
-        circle = plt.Circle((0, 0), 1, color='g', fill=False, ls=":")
+        circle = plt.Circle((0, 0), 1, color='g', fill=False, ls="-", lw=3, zorder=0)
         axs[0].add_artist(circle)
 
         # formatting
