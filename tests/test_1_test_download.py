@@ -99,7 +99,7 @@ class WISEBigDataLocal(WISEDataDESYCluster):
     #     shutil.rmtree(self.cache_dir)
 
 
-class WISEBigDataTestVersion(WISEDataDESYCluster):
+class WISEBigDataTestVersion(WISEBigDataLocal):
 
     base_name = "test/test_mock_desy_bigdata"
 
