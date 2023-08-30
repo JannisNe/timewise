@@ -36,6 +36,82 @@ class WISEDataBase(abc.ABC):
     Base class for WISE Data
 
 
+    :param parent_sample_class: class for parent sample
+    :type parent_sample_class: `ParentSample` class
+    :param base_name: unique name to determine storage directories
+    :type base_name: str
+    :param min_sep: query region around source for positional query
+    :type min_sep: astropy.units.Quantity
+    :param whitelist_region: region around source where all datapoints are accepted in positional query
+    :type whitelist_region: astropy.units.Quantity
+    :param n_chunks: number of chunks in declination
+    :type n_chunks: int
+    :param parent_wise_source_id_key: key for the WISE source ID in the parent sample
+    :type parent_wise_source_id_key: str
+    :param parent_sample_wise_skysep_key: key for the angular separation to the WISE source in the parent sample
+    :type parent_sample_wise_skysep_key: str
+    :param parent_sample_default_entries: default entries for the parent sample
+    :type parent_sample_default_entries: dict
+    :param cache_dir: directory for cached data
+    :type cache_dir: str
+    :param cluster_dir: directory for cluster data
+    :param cluster_log_dir: directory for cluster logs
+    :type cluster_dir: str
+    :param output_dir: directory for output data
+    :type output_dir: str
+    :param lightcurve_dir: directory for lightcurve data
+    :type lightcurve_dir: str
+    :param plots_dir: directory for plots
+    :type plots_dir: str
+    :param submit_file: file for cluster submission
+    :type submit_file: str
+    :param tap_jobs: TAP jobs
+    :type tap_jobs: list[pyvo.dal.tap.TAPJob]
+    :param queue: queue for cluster jobs
+    :type queue: multiprocessing.Queue
+    :param clear_unbinned_photometry_when_binning: whether to clear unbinned photometry when binning
+    :type clear_unbinned_photometry_when_binning: bool
+    :param chunk_map: map of chunks
+    :type chunk_map: np.ndarray
+    :param service_url: URL of the TAP service
+    :type service_url: str
+    :param service: custom  TAP service, making sure that the TAP jobs are stable
+    :type service: `timewise.utils.StableTAPService`
+    :param active_tap_phases: phases of TAP jobs that are still active
+    :type active_tap_phases: set
+    :param running_tap_phases: phases of TAP jobs that are still running
+    :type running_tap_phases: list
+    :param done_tap_phases: phases of TAP jobs that are done
+    :type done_tap_phases: set
+    :param query_types: query types
+    :type query_types: list
+    :param table_names: map nice and program table names of WISE data tables
+    :type table_names: pd.DataFrame
+    :param bands: WISE bands
+    :type bands: list
+    :param flux_key_ext: key extension for flux keys
+    :type flux_key_ext: str
+    :param flux_density_key_ext: key extension for flux density keys
+    :type flux_density_key_ext: str
+    :param mag_key_ext: key extension for magnitude keys
+    :type mag_key_ext: str
+    :param luminosity_key_ext: key extension for luminosity keys
+    :type luminosity_key_ext: str
+    :param error_key_ext: key extension for error keys
+    :type error_key_ext: str
+    :param band_plot_colors: plot colors for bands
+    :type band_plot_colors: dict
+    :param photometry_table_keymap:
+        keymap for photometry tables, listing the column names for flux, mag etc for the different WISE data tables
+    :type photometry_table_keymap: dict
+    :param magnitude_zeropoints: magnitude zeropoints from `here <https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#conv2flux>`_
+    :type magnitude_zeropoints: dict
+    :param constraints: constraints for TAP queries selecting good datapoints as explained in the explanatory supplements
+    :type constraints: list
+    :param parent_wise_source_id_key: key for the WISE source ID in the parent sample
+    :type parent_wise_source_id_key: str
+    :param parent_sample_wise_skysep_key: key for the angular separation to the WISE source in the parent sample
+    :type parent_sample_wise_skysep_key: str
     """
 
     service_url = 'https://irsa.ipac.caltech.edu/TAP'
@@ -45,7 +121,6 @@ class WISEDataBase(abc.ABC):
     done_tap_phases = {"COMPLETED", "ABORTED", "ERROR"}
 
     query_types = ['positional', 'by_allwise_id']
-
 
     table_names = pd.DataFrame([
         ('AllWISE Multiepoch Photometry Table', 'allwise_p3as_mep'),
