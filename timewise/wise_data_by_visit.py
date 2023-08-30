@@ -4,7 +4,6 @@ import numpy as np
 import logging
 from scipy import stats
 import matplotlib.pyplot as plt
-import warnings
 
 from timewise.wise_data_base import WISEDataBase
 from timewise.utils import get_excess_variance
@@ -14,7 +13,26 @@ logger = logging.getLogger(__name__)
 
 class WiseDataByVisit(WISEDataBase):
     """
-    WISEData class to bin lightcurve by visit
+    WISEData class to bin lightcurve by visits. The visits typically consist of some tens of observations.
+    The individual visits are separated by about six months. The mean flux for one visit is calculated by the
+    weighted mean of the data. The error on that mean is calculated by the root-mean-squared and corrected by the
+    t-value. Outliers per visit are identified if they are more than 20 times the rms away from the mean.
+    In addition to the attributes of :class:`timewise.WISEDataBase` this class has the following attributes:
+
+    :param clean_outliers_when_binning: whether to remove outliers by brightness when binning
+    :type clean_outliers_when_binning: bool
+    :param mean_key: the key for the mean
+    :type mean_key: str
+    :param median_key: the key for the median
+    :type median_key: str
+    :param rms_key: the key for the rms
+    :type rms_key: str
+    :param upper_limit_key: the key for the upper limit
+    :type upper_limit_key: str
+    :param Npoints_key: the key for the number of points
+    :type Npoints_key: str
+    :param zeropoint_key_ext: the key for the zeropoint
+    :type zeropoint_key_ext: str
     """
 
     mean_key = '_mean'
@@ -38,7 +56,20 @@ class WiseDataByVisit(WISEDataBase):
             clean_outliers_when_binning=True,
             multiply_flux_error=True
     ):
-        # TODO: add doc
+        """
+        Constructor of the WISEDataByVisit class.
+
+        :param base_name: the base name of the data directory
+        :type base_name: str
+        :param parent_sample_class: the parent sample class
+        :type parent_sample_class: ParentSampleBase
+        :param min_sep_arcsec: query region around source for positional query
+        :type min_sep_arcsec: float
+        :param n_chunks: number of chunks to split the sample into
+        :type n_chunks: int
+        :param clean_outliers_when_binning: if True, clean outliers when binning
+        :type clean_outliers_when_binning: bool
+        """
         super().__init__(base_name, parent_sample_class, min_sep_arcsec, n_chunks)
         self.clean_outliers_when_binning = clean_outliers_when_binning
         self.multiply_flux_error = multiply_flux_error
