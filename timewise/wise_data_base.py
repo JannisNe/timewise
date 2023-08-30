@@ -26,7 +26,7 @@ from astropy.coordinates.angle_utilities import angular_separation, position_ang
 from sklearn.cluster import HDBSCAN
 
 from timewise.general import cache_dir, plots_dir, output_dir, logger_format, backoff_hndlr
-from timewise.utils import StableTAPService, get_2d_gaussian_correction
+from timewise.utils import StableTAPService
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +35,7 @@ class WISEDataBase(abc.ABC):
     """
     Base class for WISE Data
 
-    :param base_name: unique name to determine storage directories
-    :type base_name: str
-    :param parent_sample_class: class for parent sample
-    :type parent_sample_class: `ParentSample` class
-    :param min_sep_arcsec: minimum separation required to the parent sample sources
-    :type min_sep_arcsec: float
-    :param n_chunks: number of chunks in declination
-    :type n_chunks: int
+
     """
 
     service_url = 'https://irsa.ipac.caltech.edu/TAP'
@@ -149,6 +142,19 @@ class WISEDataBase(abc.ABC):
                  parent_sample_class,
                  min_sep_arcsec,
                  n_chunks):
+        """
+        Base class for WISE Data
+
+        :param base_name: unique name to determine storage directories
+        :type base_name: str
+        :param parent_sample_class: class for parent sample
+        :type parent_sample_class: `ParentSample` class
+        :param min_sep_arcsec: query region around source for positional query
+        :type min_sep_arcsec: float
+        :param n_chunks: number of chunks in declination
+        :type n_chunks: int
+        """
+
         #######################################################################################
         # START SET-UP          #
         #########################
@@ -156,6 +162,7 @@ class WISEDataBase(abc.ABC):
         self.parent_sample_class = parent_sample_class
         self.base_name = base_name
         self.min_sep = min_sep_arcsec * u.arcsec
+        self.whitelist_region = 1 * u.arcsec
         self._n_chunks = n_chunks
 
         # --------------------------- vvvv set up parent sample vvvv --------------------------- #
@@ -1468,7 +1475,7 @@ class WISEDataBase(abc.ABC):
     #####################################
 
     @staticmethod
-    def calculate_position_mask(lightcurve, ra, dec, return_all=False):
+    def calculate_position_mask(lightcurve, ra, dec, whitelist_region, return_all=False):
         """
         Estimated the 90th percentile of the angular separations from the given position.
         Assuming a 2D-Gaussian, calculate the standard deviation for the 90th percentile.
@@ -1481,6 +1488,8 @@ class WISEDataBase(abc.ABC):
         :param dec: Dec in degrees of the source
         :type dec: Sequence[float]
         :param return_all: if True, return all info collected in the selection process
+        :param whitelist_region: region in which to keep all datapoints [arcsec]
+        :type whitelist_region: float
         :type return_all: bool, optional
         :return:
             positional mask (and result of the clustering algorithm and the mask for the closest allwise data
@@ -1513,7 +1522,7 @@ class WISEDataBase(abc.ABC):
             data_mask = np.ones_like(_angular_separation, dtype=bool)
 
         # no matter which cluster they belong to, we want to keep all datapoints within 1 arcsec
-        one_arcsec_mask = _angular_separation < np.radians(1 / 3600)
+        one_arcsec_mask = _angular_separation < np.radians(whitelist_region / 3600)
         selected_indices = set(lightcurve.index[data_mask & one_arcsec_mask])
 
         # if there are more than one datapoints, we use a clustering algorithm to potentially find a cluster with
@@ -1545,7 +1554,7 @@ class WISEDataBase(abc.ABC):
             # we select all noise datapoints within 1 arcsec if there are any
             if (
                     len(cluster_separations) == 0
-                    or min(cluster_separations) > np.radians(1 / 3600)
+                    or min(cluster_separations) > np.radians(whitelist_region / 3600)
             ):
                 logger.debug("No cluster found. Selecting all noise datapoints within 1 arcsec.")
                 if len(cluster_separations) > 0:
@@ -1617,7 +1626,12 @@ class WISEDataBase(abc.ABC):
                 lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == i]
 
                 logger.debug(f"calculating position mask for {id} ({ra}, {dec})")
-                bad_indices = self.calculate_position_mask(lightcurve, ra, dec)
+                bad_indices = self.calculate_position_mask(
+                    lightcurve,
+                    ra,
+                    dec,
+                    self.whitelist_region.to("arcsec").value
+                )
                 if len(bad_indices) > 0:
                     position_masks[str(i)] = bad_indices
 
