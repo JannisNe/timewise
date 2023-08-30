@@ -1275,8 +1275,8 @@ class WISEDataBase(abc.ABC):
             m = lightcurves[self._tap_orig_id_key] == parent_sample_entry_id
             lightcurve = lightcurves[m]
 
-            if (bad_indices is not None) and (parent_sample_entry_id in bad_indices):
-                pos_m = ~lightcurve.index.isin(bad_indices)
+            if (bad_indices is not None) and (str(parent_sample_entry_id) in bad_indices):
+                pos_m = ~lightcurve.index.isin(bad_indices[str(parent_sample_entry_id)])
                 lightcurve = lightcurve[pos_m]
 
             if len(lightcurve) < 1:
