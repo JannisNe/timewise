@@ -496,7 +496,7 @@ class WiseDataByVisit(WISEDataBase):
         # get a mask indicating outliers based on position
         ra, dec = pos.astype(float)
         bad_indices_position, cluster_res, allwise_mask = self.calculate_position_mask(
-            lightcurve, ra=ra, dec=dec, return_all=True
+            lightcurve, ra=ra, dec=dec, return_all=True, whitelist_region=self.whitelist_region.to("arcsec").value
         )
         position_mask = (
             ~lightcurve.index.isin(bad_indices_position)
