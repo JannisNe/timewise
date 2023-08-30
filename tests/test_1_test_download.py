@@ -54,14 +54,7 @@ class WISEDataTestVersion(WiseDataByVisit):
         shutil.rmtree(self.cache_dir)
 
 
-class WISEBigDataTestVersion(WISEDataDESYCluster):
-    base_name = "test/test_mock_desy_bigdata"
-
-    def __init__(self, base_name=base_name):
-        super().__init__(base_name=base_name,
-                         parent_sample_class=MirongParentSample,
-                         min_sep_arcsec=8,
-                         n_chunks=2)
+class WISEBigDataLocal(WISEDataDESYCluster):
 
     def submit_to_cluster(
             self,
@@ -104,6 +97,17 @@ class WISEBigDataTestVersion(WISEDataDESYCluster):
     # def clean_up(self):
     #     logger.info(f"removing {self.cache_dir}")
     #     shutil.rmtree(self.cache_dir)
+
+
+class WISEBigDataTestVersion(WISEBigDataLocal):
+
+    base_name = "test/test_mock_desy_bigdata"
+
+    def __init__(self, base_name=base_name):
+        super().__init__(base_name=base_name,
+                         parent_sample_class=MirongParentSample,
+                         min_sep_arcsec=8,
+                         n_chunks=2)
 
 
 ####################################

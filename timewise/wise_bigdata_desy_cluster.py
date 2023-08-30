@@ -36,6 +36,25 @@ logger = logging.getLogger(__name__)
 
 
 class WISEDataDESYCluster(WiseDataByVisit):
+    """
+    A class to download WISE data with multiple threads and do the binning on the DESY cluster.
+    In addition to the attributes of `WiseDataByVisit` this class has the following attributes:
+
+    :param executable_filename: the filename of the executable that will be submitted to the cluster
+    :type executable_filename: str
+    :param submit_file_filename: the filename of the submit file that will be submitted to the cluster
+    :type submit_file_filename: str
+    :param job_id: the job id of the submitted job
+    :type job_id: str
+    :param cluster_jobID_map: a dictionary mapping the chunk number to the cluster job id
+    :type cluster_jobID_map: dict
+    :param clusterJob_chunk_map: a dictionary mapping the cluster job id to the chunk number
+    :type clusterJob_chunk_map: dict
+    :param cluster_info_file: the filename of the file that stores the cluster info, loaded by the cluster jobs
+    :type cluster_info_file: str
+    :param start_time: the time when the download started
+    :type start_time: float
+    """
     status_cmd = f'qstat -u {getpass.getuser()}'
     # finding the file that contains the setup function
     BASHFILE = os.getenv('TIMEWISE_DESY_CLUSTER_BASHFILE', os.path.expanduser('~/.bashrc'))
@@ -49,6 +68,20 @@ class WISEDataDESYCluster(WiseDataByVisit):
             clean_outliers_when_binning=True,
             multiply_flux_error=True
     ):
+        """
+        Constructor of the class.
+
+        :param base_name: the base name of the data directory
+        :type base_name: str
+        :param parent_sample_class: the parent sample class
+        :type parent_sample_class: ParentSampleBase
+        :param min_sep_arcsec: query region around source for positional query
+        :type min_sep_arcsec: float
+        :param n_chunks: number of chunks to split the sample into
+        :type n_chunks: int
+        :param clean_outliers_when_binning: if True, clean outliers when binning
+        :type clean_outliers_when_binning: bool
+        """
 
         super().__init__(base_name=base_name, parent_sample_class=parent_sample_class, min_sep_arcsec=min_sep_arcsec,
                          n_chunks=n_chunks, clean_outliers_when_binning=clean_outliers_when_binning,

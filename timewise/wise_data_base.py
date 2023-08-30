@@ -17,11 +17,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pyvo as vo
+from collections.abc import Sequence
 from astropy import constants
 from astropy.cosmology import Planck18
 from astropy.io import ascii
 from astropy.table import Table
-from astropy.coordinates import SkyCoord
+from astropy.coordinates.angle_utilities import angular_separation, position_angle
+from sklearn.cluster import HDBSCAN
 
 from timewise.general import cache_dir, plots_dir, output_dir, logger_format, backoff_hndlr
 from timewise.utils import StableTAPService
@@ -33,14 +35,83 @@ class WISEDataBase(abc.ABC):
     """
     Base class for WISE Data
 
-    :param base_name: unique name to determine storage directories
-    :type base_name: str
+
     :param parent_sample_class: class for parent sample
     :type parent_sample_class: `ParentSample` class
-    :param min_sep_arcsec: minimum separation required to the parent sample sources
-    :type min_sep_arcsec: float
+    :param base_name: unique name to determine storage directories
+    :type base_name: str
+    :param min_sep: query region around source for positional query
+    :type min_sep: astropy.units.Quantity
+    :param whitelist_region: region around source where all datapoints are accepted in positional query
+    :type whitelist_region: astropy.units.Quantity
     :param n_chunks: number of chunks in declination
     :type n_chunks: int
+    :param parent_wise_source_id_key: key for the WISE source ID in the parent sample
+    :type parent_wise_source_id_key: str
+    :param parent_sample_wise_skysep_key: key for the angular separation to the WISE source in the parent sample
+    :type parent_sample_wise_skysep_key: str
+    :param parent_sample_default_entries: default entries for the parent sample
+    :type parent_sample_default_entries: dict
+    :param cache_dir: directory for cached data
+    :type cache_dir: str
+    :param cluster_dir: directory for cluster data
+    :param cluster_log_dir: directory for cluster logs
+    :type cluster_dir: str
+    :param output_dir: directory for output data
+    :type output_dir: str
+    :param lightcurve_dir: directory for lightcurve data
+    :type lightcurve_dir: str
+    :param plots_dir: directory for plots
+    :type plots_dir: str
+    :param submit_file: file for cluster submission
+    :type submit_file: str
+    :param tap_jobs: TAP jobs
+    :type tap_jobs: list[pyvo.dal.tap.TAPJob]
+    :param queue: queue for cluster jobs
+    :type queue: multiprocessing.Queue
+    :param clear_unbinned_photometry_when_binning: whether to clear unbinned photometry when binning
+    :type clear_unbinned_photometry_when_binning: bool
+    :param chunk_map: map of chunks
+    :type chunk_map: np.ndarray
+    :param service_url: URL of the TAP service
+    :type service_url: str
+    :param service: custom  TAP service, making sure that the TAP jobs are stable
+    :type service: `timewise.utils.StableTAPService`
+    :param active_tap_phases: phases of TAP jobs that are still active
+    :type active_tap_phases: set
+    :param running_tap_phases: phases of TAP jobs that are still running
+    :type running_tap_phases: list
+    :param done_tap_phases: phases of TAP jobs that are done
+    :type done_tap_phases: set
+    :param query_types: query types
+    :type query_types: list
+    :param table_names: map nice and program table names of WISE data tables
+    :type table_names: pd.DataFrame
+    :param bands: WISE bands
+    :type bands: list
+    :param flux_key_ext: key extension for flux keys
+    :type flux_key_ext: str
+    :param flux_density_key_ext: key extension for flux density keys
+    :type flux_density_key_ext: str
+    :param mag_key_ext: key extension for magnitude keys
+    :type mag_key_ext: str
+    :param luminosity_key_ext: key extension for luminosity keys
+    :type luminosity_key_ext: str
+    :param error_key_ext: key extension for error keys
+    :type error_key_ext: str
+    :param band_plot_colors: plot colors for bands
+    :type band_plot_colors: dict
+    :param photometry_table_keymap:
+        keymap for photometry tables, listing the column names for flux, mag etc for the different WISE data tables
+    :type photometry_table_keymap: dict
+    :param magnitude_zeropoints: magnitude zeropoints from `here <https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#conv2flux>`_
+    :type magnitude_zeropoints: dict
+    :param constraints: constraints for TAP queries selecting good datapoints as explained in the explanatory supplements
+    :type constraints: list
+    :param parent_wise_source_id_key: key for the WISE source ID in the parent sample
+    :type parent_wise_source_id_key: str
+    :param parent_sample_wise_skysep_key: key for the angular separation to the WISE source in the parent sample
+    :type parent_sample_wise_skysep_key: str
     """
 
     service_url = 'https://irsa.ipac.caltech.edu/TAP'
@@ -50,7 +121,6 @@ class WISEDataBase(abc.ABC):
     done_tap_phases = {"COMPLETED", "ABORTED", "ERROR"}
 
     query_types = ['positional', 'by_allwise_id']
-
 
     table_names = pd.DataFrame([
         ('AllWISE Multiepoch Photometry Table', 'allwise_p3as_mep'),
@@ -147,6 +217,19 @@ class WISEDataBase(abc.ABC):
                  parent_sample_class,
                  min_sep_arcsec,
                  n_chunks):
+        """
+        Base class for WISE Data
+
+        :param base_name: unique name to determine storage directories
+        :type base_name: str
+        :param parent_sample_class: class for parent sample
+        :type parent_sample_class: `ParentSample` class
+        :param min_sep_arcsec: query region around source for positional query
+        :type min_sep_arcsec: float
+        :param n_chunks: number of chunks in declination
+        :type n_chunks: int
+        """
+
         #######################################################################################
         # START SET-UP          #
         #########################
@@ -154,6 +237,7 @@ class WISEDataBase(abc.ABC):
         self.parent_sample_class = parent_sample_class
         self.base_name = base_name
         self.min_sep = min_sep_arcsec * u.arcsec
+        self.whitelist_region = 1 * u.arcsec
         self._n_chunks = n_chunks
 
         # --------------------------- vvvv set up parent sample vvvv --------------------------- #
@@ -1191,8 +1275,8 @@ class WISEDataBase(abc.ABC):
             m = lightcurves[self._tap_orig_id_key] == parent_sample_entry_id
             lightcurve = lightcurves[m]
 
-            if (bad_indices is not None) and (parent_sample_entry_id in bad_indices):
-                pos_m = ~lightcurve.index.isin(bad_indices)
+            if (bad_indices is not None) and (str(parent_sample_entry_id) in bad_indices):
+                pos_m = ~lightcurve.index.isin(bad_indices[str(parent_sample_entry_id)])
                 lightcurve = lightcurve[pos_m]
 
             if len(lightcurve) < 1:
@@ -1466,40 +1550,121 @@ class WISEDataBase(abc.ABC):
     #####################################
 
     @staticmethod
-    def calculate_position_mask(lightcurve):
+    def calculate_position_mask(lightcurve, ra, dec, whitelist_region, return_all=False):
         """
-        Create a mask that based on the position of the single exposures.
-        Find the median position and find the 90%-quantile of datapoints from that.
-        Then, calculate the standard deviation of the separation from the median position and keep
-        all datapoints within five times that.
+        Estimated the 90th percentile of the angular separations from the given position.
+        Assuming a 2D-Gaussian, calculate the standard deviation for the 90th percentile.
+        Keeps all datapoints within five times the standard deviation.
 
         :param lightcurve: unstacked lightcurve
         :type lightcurve: pd.DataFrame
-        :return: positional mask
-        :rtype: np.ndarray
+        :param ra: RA in degrees of the source
+        :type ra: Sequence[float]
+        :param dec: Dec in degrees of the source
+        :type dec: Sequence[float]
+        :param return_all: if True, return all info collected in the selection process
+        :param whitelist_region: region in which to keep all datapoints [arcsec]
+        :type whitelist_region: float
+        :type return_all: bool, optional
+        :return:
+            positional mask (and result of the clustering algorithm and the mask for the closest allwise data
+            if `return_all` is True)
+        :rtype: list (`return_all` is False) or tuple (list, sklearn.cluster.HDBSCAN, list) (`return_all` is True)
         """
-        coords = SkyCoord(lightcurve.ra, lightcurve.dec, unit="deg")
+        lc_ra_rad = np.deg2rad(lightcurve.ra.values)
+        lc_dec_rad = np.deg2rad(lightcurve.dec.values)
+        source_ra_rad = np.deg2rad(ra)
+        source_dec_rad = np.deg2rad(dec)
 
-        # we can use the standard median for Dec
-        med_offset_dec = np.median(coords.dec)
-        # We have to do a weighted median for RA
-        w = np.sin(np.deg2rad(coords.dec)) ** 2
-        sort_inds = np.argsort(coords.ra)
-        cum_w = np.cumsum(w[sort_inds])
-        cutoff = np.sum(w) / 2
-        med_offset_ra = coords.ra[sort_inds][cum_w >= cutoff][0]
-        med_pos = SkyCoord(med_offset_ra, med_offset_dec)
+        # calculate separation and position angle
+        _angular_separation = angular_separation(source_ra_rad, source_dec_rad, lc_ra_rad, lc_dec_rad)
+        _position_angle = position_angle(source_ra_rad, source_dec_rad, lc_ra_rad, lc_dec_rad)
 
-        # find the 90% closest datapoints
-        sep = coords.separation(med_pos)
-        sep90 = np.quantile(sep, 0.9)
-        sep_mask = sep < sep90
+        # The AllWISE multiframe pipeline detects sources on the deep coadded atlas images and then measures the sources
+        # for all available single-exposure images in all bands simultaneously, while the NEOWISE magnitudes are
+        # obtained by PSF fit to individual exposures directly. Effect: all allwise data points that belong to the same
+        # object have the same position. We take only the closest one and treat it as one datapoint in the clustering.
+        allwise_time_mask = lightcurve["mjd"] < 55594
+        if any(allwise_time_mask):
+            allwise_sep_min = np.min(_angular_separation[allwise_time_mask])
+            closest_allwise_mask = (_angular_separation == allwise_sep_min) & allwise_time_mask
+            closest_allwise_mask_first_entry = ~closest_allwise_mask.duplicated() & closest_allwise_mask
 
-        # keep datapoints within 3 sigma
-        sig = max([np.std(sep[sep_mask]), 0.2*u.arcsec])
-        keep_mask = pd.Series(sep <= 5 * sig)
-        bad_indices = lightcurve.index[~keep_mask]
-        return list(bad_indices)
+            # the data we want to use is then the selected AllWISE datapoint and the NEOWISE-R data
+            data_mask = closest_allwise_mask_first_entry | ~allwise_time_mask
+        else:
+            closest_allwise_mask_first_entry = closest_allwise_mask = None
+            data_mask = np.ones_like(_angular_separation, dtype=bool)
+
+        # no matter which cluster they belong to, we want to keep all datapoints within 1 arcsec
+        one_arcsec_mask = _angular_separation < np.radians(whitelist_region / 3600)
+        selected_indices = set(lightcurve.index[data_mask & one_arcsec_mask])
+
+        # if there are more than one datapoints, we use a clustering algorithm to potentially find a cluster with
+        # its center within 1 arcsec
+        cluster_res = None
+        if data_mask.sum() > 1:
+            # instead of the polar coordinates separation and position angle we use cartesian coordinates because the
+            # clustering algorithm works better with them
+            cartesian_full = np.array([
+                _angular_separation * np.cos(_position_angle),
+                _angular_separation * np.sin(_position_angle)
+            ]).T
+            cartesian = cartesian_full[data_mask]
+
+            # we are now ready to do the clustering
+            cluster_distance_arcsec = 0.5  # distance of clusters to be considered as one [arcsec]
+            cluster_res = HDBSCAN(
+                store_centers="centroid",
+                min_cluster_size=max(min(20, len(cartesian)), 2),
+                allow_single_cluster=True,
+                cluster_selection_epsilon=np.radians(cluster_distance_arcsec / 3600)
+            ).fit(cartesian)
+
+            # we select the closest cluster within 1 arcsec
+            cluster_separations = np.sqrt(np.sum(cluster_res.centroids_ ** 2, axis=1))
+            logger.debug(f"Found {len(cluster_separations)} clusters")
+
+            # if there is no cluster or no cluster within 1 arcsec,
+            # we select all noise datapoints within 1 arcsec if there are any
+            if (
+                    len(cluster_separations) == 0
+                    or min(cluster_separations) > np.radians(whitelist_region / 3600)
+            ):
+                logger.debug("No cluster found. Selecting all noise datapoints within 1 arcsec.")
+                if len(cluster_separations) > 0:
+                    logger.debug(f"Closest cluster is at {cluster_separations} arcsec")
+                noise_mask = cluster_res.labels_ == -1
+                selected_indices |= set(lightcurve.index[data_mask][noise_mask])
+
+            # if there is a cluster within 1 arcsec, we select all datapoints belonging to that cluster
+            else:
+                closest_label = cluster_separations.argmin()
+                selected_cluster_mask = cluster_res.labels_ == closest_label
+
+                # now we have to trace back the selected datapoints to the original lightcurve
+                selected_indices |= set(lightcurve.index[data_mask][selected_cluster_mask])
+                logger.debug(f"Selected {len(selected_indices)} datapoints")
+
+                # if the closest allwise source is selected, we also select all other detections belonging to that
+                # source in the allwise period
+                if (
+                        closest_allwise_mask_first_entry is not None
+                        and lightcurve.index[closest_allwise_mask_first_entry][0] in selected_indices
+                ):
+                    closest_allwise_mask_not_first = closest_allwise_mask & ~closest_allwise_mask_first_entry
+                    closest_allwise_indices_not_first = lightcurve.index[closest_allwise_mask_not_first]
+                    logger.debug(f"Adding remaining {len(closest_allwise_indices_not_first)} from AllWISE period")
+                    selected_indices |= set(closest_allwise_indices_not_first)
+
+        # because in most cases we will have more good indices than bad indices, we store the bad indices instead
+        bad_indices = lightcurve.index[~lightcurve.index.isin(selected_indices)]
+
+        if return_all:
+            return_closest_allwise_mask = list(closest_allwise_mask) if closest_allwise_mask is not None else None
+            return list(bad_indices), cluster_res, return_closest_allwise_mask
+        else:
+            return list(bad_indices)
 
     def get_position_mask(self, service, chunk_number):
         """
@@ -1528,9 +1693,20 @@ class WISEDataBase(abc.ABC):
 
             position_masks = dict()
 
-            for i in unbinned_lcs[self._tap_orig_id_key].unique():
+            for i in tqdm.tqdm(unbinned_lcs[self._tap_orig_id_key].unique(), "calculating position masks"):
+                idt = self.parent_sample.df.index.dtype.type(i)
+                ra = self.parent_sample.df.loc[idt, self.parent_sample.default_keymap["ra"]]
+                dec = self.parent_sample.df.loc[idt, self.parent_sample.default_keymap["dec"]]
+                id = self.parent_sample.df.loc[idt, self.parent_sample.default_keymap["id"]]
                 lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == i]
-                bad_indices = self.calculate_position_mask(lightcurve)
+
+                logger.debug(f"calculating position mask for {id} ({ra}, {dec})")
+                bad_indices = self.calculate_position_mask(
+                    lightcurve,
+                    ra,
+                    dec,
+                    self.whitelist_region.to("arcsec").value
+                )
                 if len(bad_indices) > 0:
                     position_masks[str(i)] = bad_indices
 
@@ -1614,7 +1790,10 @@ class WISEDataBase(abc.ABC):
                              save=save, lum_key=lum_key, **kwargs)
 
     def _plot_lc(self, lightcurve=None, unbinned_lc=None, interactive=False, fn=None, ax=None, save=True,
-                 lum_key='flux_density', **kwargs):
+                 lum_key='flux_density', colors=None, **kwargs):
+
+        if not colors:
+            colors = self.band_plot_colors
 
         if not ax:
             fig, ax = plt.subplots(**kwargs)
@@ -1627,10 +1806,10 @@ class WISEDataBase(abc.ABC):
                     ul_mask = np.array(lightcurve[f"{b}_{lum_key}{self.upper_limit_key}"]).astype(bool)
                     ax.errorbar(lightcurve.mean_mjd[~ul_mask], lightcurve[f"{b}{self.mean_key}_{lum_key}"][~ul_mask],
                                 yerr=lightcurve[f"{b}_{lum_key}{self.rms_key}"][~ul_mask],
-                                label=b, ls='', marker='s', c=self.band_plot_colors[b], markersize=4,
+                                label=b, ls='', marker='s', c=colors[b], markersize=4,
                                 markeredgecolor='k', ecolor='k', capsize=2)
                     ax.scatter(lightcurve.mean_mjd[ul_mask], lightcurve[f"{b}{self.mean_key}_{lum_key}"][ul_mask],
-                               marker='v', c=self.band_plot_colors[b], alpha=0.7, s=2)
+                               marker='v', c=colors[b], alpha=0.7, s=2)
 
                 if not isinstance(unbinned_lc, type(None)):
                     m = ~unbinned_lc[f"{b}_{lum_key}"].isna()
@@ -1640,21 +1819,21 @@ class WISEDataBase(abc.ABC):
                     if np.any(tot_m):
                         ax.errorbar(unbinned_lc.mjd[tot_m], unbinned_lc[f"{b}_{lum_key}"][tot_m],
                                     yerr=unbinned_lc[f"{b}_{lum_key}{self.error_key_ext}"][tot_m],
-                                    label=f"{b} unbinned", ls='', marker='o', c=self.band_plot_colors[b], markersize=4,
+                                    label=f"{b} unbinned", ls='', marker='o', c=colors[b], markersize=4,
                                     alpha=0.3)
 
                     single_ul_m = m & ul_mask
                     if np.any(single_ul_m):
                         label = f"{b} unbinned upper limits" if not np.any(tot_m) else ""
                         ax.scatter(unbinned_lc.mjd[single_ul_m], unbinned_lc[f"{b}_{lum_key}"][single_ul_m],
-                                   marker="d", c=self.band_plot_colors[b], alpha=0.3, s=1, label=label)
+                                   marker="d", c=colors[b], alpha=0.3, s=1, label=label)
 
             except KeyError as e:
                 raise KeyError(f"Could not find brightness key {e}!")
 
         if lum_key == 'mag':
             ylim = ax.get_ylim()
-            ax.set_ylim([ylim[-1], ylim[0]])
+            ax.set_ylim(max(ylim), min(ylim))
 
         ax.set_xlabel('MJD')
         ax.set_ylabel(lum_key)

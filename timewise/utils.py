@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import pyvo as vo
 import backoff
 import numpy
+from scipy.stats import chi2
+from functools import cache
 from astropy.table import Table
 from PIL import Image
 from io import BytesIO
@@ -18,6 +20,11 @@ from timewise.general import cache_dir, backoff_hndlr
 logger = logging.getLogger(__name__)
 mirong_url = 'http://staff.ustc.edu.cn/~jnac/data_public/wisevar.txt'
 local_copy = os.path.join(cache_dir, 'mirong_sample.csv')
+
+
+@cache
+def get_2d_gaussian_correction(cl):
+    return numpy.sqrt(chi2.ppf(cl, 2))
 
 
 def get_mirong_sample():

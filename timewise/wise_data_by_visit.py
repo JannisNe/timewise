@@ -13,7 +13,26 @@ logger = logging.getLogger(__name__)
 
 class WiseDataByVisit(WISEDataBase):
     """
-    WISEData class to bin lightcurve by visit
+    WISEData class to bin lightcurve by visits. The visits typically consist of some tens of observations.
+    The individual visits are separated by about six months. The mean flux for one visit is calculated by the
+    weighted mean of the data. The error on that mean is calculated by the root-mean-squared and corrected by the
+    t-value. Outliers per visit are identified if they are more than 20 times the rms away from the mean.
+    In addition to the attributes of :class:`timewise.WISEDataBase` this class has the following attributes:
+
+    :param clean_outliers_when_binning: whether to remove outliers by brightness when binning
+    :type clean_outliers_when_binning: bool
+    :param mean_key: the key for the mean
+    :type mean_key: str
+    :param median_key: the key for the median
+    :type median_key: str
+    :param rms_key: the key for the rms
+    :type rms_key: str
+    :param upper_limit_key: the key for the upper limit
+    :type upper_limit_key: str
+    :param Npoints_key: the key for the number of points
+    :type Npoints_key: str
+    :param zeropoint_key_ext: the key for the zeropoint
+    :type zeropoint_key_ext: str
     """
 
     mean_key = '_mean'
@@ -37,7 +56,20 @@ class WiseDataByVisit(WISEDataBase):
             clean_outliers_when_binning=True,
             multiply_flux_error=True
     ):
-        # TODO: add doc
+        """
+        Constructor of the WISEDataByVisit class.
+
+        :param base_name: the base name of the data directory
+        :type base_name: str
+        :param parent_sample_class: the parent sample class
+        :type parent_sample_class: ParentSampleBase
+        :param min_sep_arcsec: query region around source for positional query
+        :type min_sep_arcsec: float
+        :param n_chunks: number of chunks to split the sample into
+        :type n_chunks: int
+        :param clean_outliers_when_binning: if True, clean outliers when binning
+        :type clean_outliers_when_binning: bool
+        """
         super().__init__(base_name, parent_sample_class, min_sep_arcsec, n_chunks)
         self.clean_outliers_when_binning = clean_outliers_when_binning
         self.multiply_flux_error = multiply_flux_error
@@ -144,7 +176,7 @@ class WiseDataByVisit(WISEDataBase):
 
             # calculate 90% confidence interval
             u70 = np.zeros_like(counts, dtype=float)
-            u70[one_points_mask] = 0
+            u70[one_points_mask] = 1e-10
             visits_at_least_two_point = np.unique(visit_mask[~one_points_mask[visit_mask]])
             u70[visits_at_least_two_point] = np.array([
                 np.quantile(abs(f[(visit_mask == i) & use_mask] - median[i]), .7, method="interpolated_inverted_cdf")
@@ -237,7 +269,7 @@ class WiseDataByVisit(WISEDataBase):
                 n_outliers = np.sum(outlier_mask)
 
                 if (n_outliers > 0):
-                    logger.info(f"removed {n_outliers} outliers")
+                    logger.debug(f"removed {n_outliers} outliers by brightness for {b} {lum_ext}")
 
                 binned_data[f'{b}{self.mean_key}{lum_ext}'] = mean
                 binned_data[f'{b}{lum_ext}{self.rms_key}'] = u
@@ -291,9 +323,7 @@ class WiseDataByVisit(WISEDataBase):
                 flux_densities_e,
                 visit_map, counts,
                 remove_outliers=False,
-                outlier_mask=
-                outlier_masks[
-                    self.flux_key_ext]
+                outlier_mask=outlier_masks[self.flux_key_ext]
             )
             binned_data[f'{b}{self.mean_key}{self.flux_density_key_ext}'] = mean_fd
             binned_data[f'{b}{self.flux_density_key_ext}{self.rms_key}'] = u_fd
@@ -444,14 +474,12 @@ class WiseDataByVisit(WISEDataBase):
 
         # select the datapoints corresponding to our object
         lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == ind]
-        # calculate the stacked lightcurve
-        binned_lightcurve = self.bin_lightcurve(lightcurve)
 
         # get visit map
         visit_map = self.get_visit_map(lightcurve)
         counts = np.bincount(visit_map)
 
-        # get the masks indicating outliers per visit based on brightnes
+        # get the masks indicating outliers per visit based on brightness
         outlier_masks = dict()
         for b in self.bands:
             f = lightcurve[f"{b}{self.flux_key_ext}"]
@@ -466,12 +494,18 @@ class WiseDataByVisit(WISEDataBase):
                 outlier_masks[b] = outlier_mask
 
         # get a mask indicating outliers based on position
-        bad_indices = self.calculate_position_mask(lightcurve)
+        ra, dec = pos.astype(float)
+        bad_indices_position, cluster_res, allwise_mask = self.calculate_position_mask(
+            lightcurve, ra=ra, dec=dec, return_all=True, whitelist_region=self.whitelist_region.to("arcsec").value
+        )
         position_mask = (
-            ~lightcurve.index.isin(bad_indices)
-            if len(bad_indices) > 0
+            ~lightcurve.index.isin(bad_indices_position)
+            if len(bad_indices_position) > 0
             else np.array([True] * len(lightcurve))
         )
+
+        # calculate the stacked lightcurve
+        binned_lightcurve = self.bin_lightcurve(lightcurve[position_mask])
 
         # -----------------   create the plot   ----------------- #
 
@@ -482,7 +516,20 @@ class WiseDataByVisit(WISEDataBase):
         self.parent_sample.plot_cutout(ind=ind, ax=axs[0], which=which, arcsec=arcsec, **kwargs)
 
         # plot the lightcurve
-        self._plot_lc(lightcurve=binned_lightcurve, unbinned_lc=lightcurve, lum_key=lum_key, ax=axs[-1], save=False)
+        self._plot_lc(
+            lightcurve=binned_lightcurve,
+            unbinned_lc=lightcurve[position_mask],
+            lum_key=lum_key,
+            ax=axs[-1],
+            save=False
+        )
+        self._plot_lc(
+            unbinned_lc=lightcurve[~position_mask],
+            lum_key=lum_key,
+            ax=axs[-1],
+            save=False,
+            colors={"W1": "gray", "W2": "lightgray"}
+        )
 
         # set markers for visits
         markers = ['o', 'v', '^', '<', '>', '1', '2', '3', '4', '8', 's', 'p', '*', 'h', 'H', '+', 'x', 'D', 'd', '|',
@@ -495,32 +542,41 @@ class WiseDataByVisit(WISEDataBase):
         # for each visit plot the datapoints on the cutout
         for visit in np.unique(visit_map):
             m = visit_map == visit
-            datapoints = lightcurve[m]
 
             label = str(visit)
             marker = markers[visit]
             color = f"C{visit}"
 
-            if ("sigra" in datapoints.columns) and ("sigdec" in datapoints.columns):
-                has_sig = ~datapoints.sigra.isna() & ~datapoints.sigdec.isna()
-                axs[0].errorbar(
-                    ra[m][has_sig],
-                    dec[m][has_sig],
-                    xerr=datapoints.sigra[has_sig] / 3600,
-                    yerr=datapoints.sigdec[has_sig] / 3600,
-                    label=label,
-                    marker=marker,
-                    ls="",
-                    color=color
-                )
-                axs[0].scatter(
-                    ra[m][~has_sig],
-                    dec[m][~has_sig],
-                    marker=marker,
-                    color=color
-                )
-            else:
-                axs[0].scatter(ra[m], dec[m], label=label, marker=marker, color=color)
+            for im, _color, _label, zorder in zip(
+                    [position_mask, ~position_mask],
+                    [color, "gray"],
+                    [label, ""],
+                    [1, 0]
+            ):
+                mask = m & im
+                datapoints = lightcurve[mask]
+                if ("sigra" in datapoints.columns) and ("sigdec" in datapoints.columns):
+                    has_sig = ~datapoints.sigra.isna() & ~datapoints.sigdec.isna()
+                    axs[0].errorbar(
+                        ra[mask][has_sig],
+                        dec[mask][has_sig],
+                        xerr=datapoints.sigra[has_sig] / 3600,
+                        yerr=datapoints.sigdec[has_sig] / 3600,
+                        label=_label,
+                        marker=marker,
+                        ls="",
+                        color=_color,
+                        zorder=zorder
+                    )
+                    axs[0].scatter(
+                        ra[mask][~has_sig],
+                        dec[mask][~has_sig],
+                        marker=marker,
+                        color=_color,
+                        zorder=zorder
+                    )
+                else:
+                    axs[0].scatter(ra[mask], dec[mask], label=_label, marker=marker, color=_color, zorder=zorder)
 
         # for each band indicate the outliers based on brightness with circles
         for b, outlier_mask in outlier_masks.items():
@@ -545,27 +601,20 @@ class WiseDataByVisit(WISEDataBase):
                 **brightness_outlier_scatter_style
             )
 
-        # indicate the outliers by position with triangles
-        if np.any(~position_mask):
-            position_outlier_scatter_style = {
-                "marker": '$\u25A2$',
-                "facecolors": "orange",
-                "edgecolors": "orange",
-                "s": 60,
-                "lw": 2
-            }
-            axs[0].scatter(
-                ra[~position_mask],
-                dec[~position_mask],
-                label="outlier by position",
-                **position_outlier_scatter_style
-            )
-            for b in self.bands:
-                axs[1].scatter(
-                    lightcurve.mjd[~position_mask],
-                    lightcurve[f"{b}_{lum_key}"][~position_mask],
-                    **position_outlier_scatter_style
-                )
+        # indicate the query region with a circle
+        circle = plt.Circle((0, 0), self.min_sep.to("arcsec").value, color='r', fill=False, ls="-", lw=3, zorder=0)
+        axs[0].add_artist(circle)
+        # indicate the whitelist region of 1 arcsec with a circle
+        circle = plt.Circle(
+            (0, 0),
+            self.whitelist_region.to("arcsec").value,
+            color='g',
+            fill=False,
+            ls="-",
+            lw=3,
+            zorder=0
+        )
+        axs[0].add_artist(circle)
 
         # formatting
         title = axs[0].get_title()
