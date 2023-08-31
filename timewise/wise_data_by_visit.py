@@ -520,13 +520,14 @@ class WiseDataByVisit(WISEDataBase):
         self.parent_sample.plot_cutout(ind=ind, ax=axs[0], which=which, arcsec=arcsec, **kwargs)
 
         # plot the lightcurve
-        self._plot_lc(
-            lightcurve=binned_lightcurve,
-            unbinned_lc=lightcurve[position_mask],
-            lum_key=lum_key,
-            ax=axs[-1],
-            save=False
-        )
+        if len(binned_lightcurve) > 0:
+            self._plot_lc(
+                lightcurve=binned_lightcurve,
+                unbinned_lc=lightcurve[position_mask],
+                lum_key=lum_key,
+                ax=axs[-1],
+                save=False
+            )
         self._plot_lc(
             unbinned_lc=lightcurve[~position_mask],
             lum_key=lum_key,
