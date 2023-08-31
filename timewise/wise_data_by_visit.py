@@ -93,6 +93,10 @@ class WiseDataByVisit(WISEDataBase):
         :return: the epoch
         :rtype: float
         """
+
+        if len(f) == 0:
+            return [], [], [], [], [], []
+
         u_lims = pd.isna(e)
         nan_mask = pd.isna(f)
 
