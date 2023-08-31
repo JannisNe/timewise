@@ -1626,18 +1626,14 @@ class WISEDataBase(abc.ABC):
             logger.debug(f"Found {len(cluster_separations)} clusters")
 
             # if there is no cluster or no cluster within 1 arcsec,
-            # we select all noise datapoints within 1 arcsec if there are any
-            if (
-                    len(cluster_separations) == 0
-                    or min(cluster_separations) > np.radians(whitelist_region / 3600)
-            ):
+            # only the datapoints within 1 arcsec are selected as we did above
+            if len(cluster_separations) == 0:
                 logger.debug("No cluster found. Selecting all noise datapoints within 1 arcsec.")
-                if len(cluster_separations) > 0:
-                    logger.debug(f"Closest cluster is at {cluster_separations} arcsec")
-                noise_mask = cluster_res.labels_ == -1
-                selected_indices |= set(lightcurve.index[data_mask][noise_mask])
+            elif min(cluster_separations) > np.radians(whitelist_region / 3600):
+                logger.debug(f"Closest cluster is at {cluster_separations} arcsec")
 
             # if there is a cluster within 1 arcsec, we select all datapoints belonging to that cluster
+            # in addition to the datapoints within 1 arcsec
             else:
                 closest_label = cluster_separations.argmin()
                 selected_cluster_mask = cluster_res.labels_ == closest_label
