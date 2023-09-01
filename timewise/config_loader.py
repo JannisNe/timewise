@@ -88,16 +88,18 @@ class TimewiseConfigLoader(BaseModel):
     def validate_class_module(cls, v: str):
         try:
             importlib.import_module(v)
-        except ImportError:
-            raise ValueError(f"Could not import module {v}!")
+        except (ImportError, ModuleNotFoundError):
+            raise ValueError(f"Could not import {v}")
         return v
 
     @validator("class_name")
     def validate_class_name(cls, v: str, values: dict):
+        if "class_module" not in values:
+            raise ValueError("class_module must be given before class_name!")
         class_module = values["class_module"]
         try:
             getattr(importlib.import_module(class_module), v)
-        except ImportError:
+        except (ImportError, AttributeError):
             raise ValueError(f"Could not find {v} in {class_module}")
         return v
 
