@@ -325,9 +325,10 @@ class WISEDataBase(abc.ABC):
     @n_chunks.setter
     def n_chunks(self, value):
         """Sets the private variable _n_chunks"""
+        self._n_chunks = value
         # if a new value is set, set _chunk_map to None to trigger re-evaluation
         if self._n_chunks != value:
-            self._n_chunks = None
+            self._chunk_map = None
 
     @property
     def chunk_map(self):
