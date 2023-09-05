@@ -12,6 +12,7 @@ import threading
 import time
 import tqdm
 
+import multiprocessing as mp
 import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
@@ -1551,7 +1552,7 @@ class WISEDataBase(abc.ABC):
     #####################################
 
     @staticmethod
-    def calculate_position_mask(lightcurve, ra, dec, whitelist_region, return_all=False):
+    def calculate_position_mask(index, lightcurve, ra, dec, whitelist_region, return_all=False):
         """
         Estimated the 90th percentile of the angular separations from the given position.
         Assuming a 2D-Gaussian, calculate the standard deviation for the 90th percentile.
@@ -1659,9 +1660,9 @@ class WISEDataBase(abc.ABC):
 
         if return_all:
             return_closest_allwise_mask = list(closest_allwise_mask) if closest_allwise_mask is not None else None
-            return list(bad_indices), cluster_res, return_closest_allwise_mask
+            return {index: (list(bad_indices), cluster_res, return_closest_allwise_mask)}
         else:
-            return list(bad_indices)
+            return {index: (list(bad_indices))}
 
     def get_position_mask(self, service, chunk_number):
         """
@@ -1678,7 +1679,7 @@ class WISEDataBase(abc.ABC):
         logger.info(f"getting position masks for {service}, chunk {chunk_number}")
         fn = os.path.join(self.cache_dir, "position_masks", f"{service}_chunk{chunk_number}.json")
 
-        if not os.path.isfile(fn):
+        if not os.path.isfile(fn) or True:
             logger.debug(f"No file {fn}. Calculating position masks.")
 
             if service == "tap":
@@ -1688,24 +1689,23 @@ class WISEDataBase(abc.ABC):
             else:
                 raise ValueError(f"Service must be one of 'gator' or 'tap', not {service}!")
 
-            position_masks = dict()
+            def arguments():
+                for i in tqdm.tqdm(unbinned_lcs[self._tap_orig_id_key].unique(), "calculating position masks"):
+                    idt = self.parent_sample.df.index.dtype.type(i)
+                    ra = self.parent_sample.df.loc[idt, self.parent_sample.default_keymap["ra"]]
+                    dec = self.parent_sample.df.loc[idt, self.parent_sample.default_keymap["dec"]]
+                    id = self.parent_sample.df.loc[idt, self.parent_sample.default_keymap["id"]]
+                    logger.debug(f"calculating position mask for {id} ({ra}, {dec})")
+                    lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == i]
+                    yield i, lightcurve, ra, dec, self.whitelist_region.to("arcsec").value
 
-            for i in tqdm.tqdm(unbinned_lcs[self._tap_orig_id_key].unique(), "calculating position masks"):
-                idt = self.parent_sample.df.index.dtype.type(i)
-                ra = self.parent_sample.df.loc[idt, self.parent_sample.default_keymap["ra"]]
-                dec = self.parent_sample.df.loc[idt, self.parent_sample.default_keymap["dec"]]
-                id = self.parent_sample.df.loc[idt, self.parent_sample.default_keymap["id"]]
-                lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == i]
-
-                logger.debug(f"calculating position mask for {id} ({ra}, {dec})")
-                bad_indices = self.calculate_position_mask(
-                    lightcurve,
-                    ra,
-                    dec,
-                    self.whitelist_region.to("arcsec").value
-                )
-                if len(bad_indices) > 0:
-                    position_masks[str(i)] = bad_indices
+            position_masks = {}
+            with mp.Pool(3) as p:
+                pos_mask_res = p.starmap(self.calculate_position_mask, arguments())
+                for pm in pos_mask_res:
+                    for i, bad_indices in pm.items():
+                        if len(bad_indices) > 0:
+                            position_masks[int(i)] = bad_indices
 
             d = os.path.dirname(fn)
             if not os.path.isdir(d):
