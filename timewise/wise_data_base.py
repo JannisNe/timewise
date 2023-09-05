@@ -1664,7 +1664,7 @@ class WISEDataBase(abc.ABC):
         else:
             return {index: (list(bad_indices))}
 
-    def get_position_mask(self, service, chunk_number):
+    def get_position_mask(self, service, chunk_number, n_cpu=1):
         """
         Get the position mask for a chunk
 
@@ -1700,12 +1700,16 @@ class WISEDataBase(abc.ABC):
                     yield i, lightcurve, ra, dec, self.whitelist_region.to("arcsec").value
 
             position_masks = {}
-            with mp.Pool(3) as p:
-                pos_mask_res = p.starmap(self.calculate_position_mask, arguments())
-                for pm in pos_mask_res:
-                    for i, bad_indices in pm.items():
-                        if len(bad_indices) > 0:
-                            position_masks[int(i)] = bad_indices
+            if n_cpu > 1:
+                with mp.Pool(10) as p:
+                    pos_mask_res = p.starmap(self.calculate_position_mask, arguments())
+            else:
+                pos_mask_res = [self.calculate_position_mask(*_arguments) for _arguments in arguments()]
+
+            for pm in pos_mask_res:
+                for i, bad_indices in pm.items():
+                    if len(bad_indices) > 0:
+                        position_masks[int(i)] = bad_indices
 
             d = os.path.dirname(fn)
             if not os.path.isdir(d):
