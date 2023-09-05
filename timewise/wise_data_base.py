@@ -1679,7 +1679,7 @@ class WISEDataBase(abc.ABC):
         logger.info(f"getting position masks for {service}, chunk {chunk_number}")
         fn = os.path.join(self.cache_dir, "position_masks", f"{service}_chunk{chunk_number}.json")
 
-        if not os.path.isfile(fn) or True:
+        if not os.path.isfile(fn):
             logger.debug(f"No file {fn}. Calculating position masks.")
 
             if service == "tap":
