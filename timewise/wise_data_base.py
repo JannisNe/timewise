@@ -1700,9 +1700,20 @@ class WISEDataBase(abc.ABC):
                     yield i, lightcurve, ra, dec, self.whitelist_region.to("arcsec").value
 
             position_masks = {}
+            n_cpu = min(n_cpu, mp.cpu_count() - 1)
+
+            while n_cpu > 1:
+                try:
+                    logger.debug(f"trying to use {n_cpu} CPUs")
+                    p = mp.Pool(n_cpu)
+                    p.close()
+                except OSError:
+                    n_cpu -= 1
+
             if n_cpu > 1:
-                with mp.Pool(10) as p:
+                with mp.Pool(n_cpu) as p:
                     pos_mask_res = p.starmap(self.calculate_position_mask, arguments())
+
             else:
                 pos_mask_res = [self.calculate_position_mask(*_arguments) for _arguments in arguments()]
 
