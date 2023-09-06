@@ -4,10 +4,9 @@ import json
 import os
 import inspect
 from pydantic import BaseModel, validator
-import pandas as pd
 import importlib
 
-from timewise.parent_sample_base import ParentSampleBase
+from timewise.parent_sample_base import DynamicParentSample
 from timewise.wise_data_base import WISEDataBase
 
 
@@ -120,16 +119,9 @@ class TimewiseConfigLoader(BaseModel):
         _filename = self.filename
         _class_name = self.class_name
 
-        class DynamicParentSample(ParentSampleBase):
-            default_keymap = _default_keymap
-
-            def __init__(self):
-                super().__init__(_base_name)
-                self.df = pd.read_csv(_filename)
-
-                for k, v in self.default_keymap.items():
-                    if v not in self.df.columns:
-                        raise KeyError(f"Can not map '{v}' to '{k}': '{v}' not in table columns! Adjust keymap")
+        DynamicParentSample.default_keymap = _default_keymap
+        DynamicParentSample.base_name = _base_name
+        DynamicParentSample.filename = _filename
 
         wise_data_config = {
             "base_name": _base_name,

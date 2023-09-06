@@ -85,3 +85,21 @@ class ParentSampleBase(abc.ABC):
     def save_local(self):
         logger.debug(f"saving under {self.local_sample_copy}")
         self.df.to_csv(self.local_sample_copy)
+
+
+class DynamicParentSample(ParentSampleBase):
+
+    base_name: str
+    filename: str
+
+    def __init__(self):
+        self.default_keymap = self.__class__.default_keymap
+        self.base_name = self.__class__.base_name
+        self.filename = self.__class__.filename
+
+        super().__init__(self.base_name)
+        self.df = pd.read_csv(self.filename)
+
+        for k, v in self.default_keymap.items():
+            if v not in self.df.columns:
+                raise KeyError(f"Can not map '{v}' to '{k}': '{v}' not in table columns! Adjust keymap")
