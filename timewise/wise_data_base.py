@@ -706,6 +706,10 @@ class WISEDataBase(abc.ABC):
         else:
             logger.info("skipping download, assume data is already downloaded.")
 
+        if mask_by_position:
+            for c in chunks:
+                self.get_position_mask(service=service, chunk_number=c)
+
         self._select_individual_lightcurves_and_bin(service=service, chunks=chunks, mask_by_position=mask_by_position)
         for c in chunks:
             self.calculate_metadata(service=service, chunk_number=c, overwrite=True)
