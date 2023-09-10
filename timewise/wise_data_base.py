@@ -802,14 +802,15 @@ class WISEDataBase(abc.ABC):
 
         lcs = None
         fns = list()
-        missing_files = 0
+        missing_files = False
+        erroneous_files = False
         for i in itr[1]:
             kw = dict(kwargs)
             kw[itr[0]] = i
             kw['return_filename'] = True
-            res = self.load_data_product(**kw)
 
-            if not isinstance(res, type(None)):
+            try:
+                res = self.load_data_product(**kw)
                 ilcs, ifn = res
                 fns.append(ifn)
                 if isinstance(lcs, type(None)):
@@ -817,18 +818,26 @@ class WISEDataBase(abc.ABC):
                 else:
                     lcs.update(ilcs)
 
-            else:
-                missing_files += 1
+            except FileNotFoundError as e:
+                logger.error(e)
+                missing_files = True
 
-            if missing_files > 0:
-                msg = f"Missing {missing_files} for {service}"
-                if chunk_number is not None:
-                    msg += f" chunk {chunk_number}"
-                msg += "! Not saving data product"
-                logger.warning(msg)
+            except KeyError as e:
+                logger.error(e)
+                erroneous_files = True
+
+            if missing_files:
+                logger.warning(f"Missing files for {service}")
+
+            if erroneous_files:
+                logger.warning(f"Erroneous files for {service}")
+
+            if erroneous_files or missing_files:
+                _chunk_str = f" for chunk {chunk_number}" if chunk_number is not None else ""
+                logger.warning(f"Not saving combined data product{_chunk_str}")
                 break
 
-        if missing_files == 0:
+        if not (erroneous_files or missing_files):
             self._save_data_product(lcs, service=service, chunk_number=chunk_number, overwrite=overwrite)
 
             if remove:
