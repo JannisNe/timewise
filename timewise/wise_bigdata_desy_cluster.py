@@ -131,7 +131,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
             chunk_number=None,
             jobID=None,
             return_filename=False,
-            use_bigdata_dir=False
+            use_bigdata_dir=False,
+            verify_contains_lightcurves=False
     ):
         fn = self._data_product_filename(
             service,
@@ -144,6 +145,12 @@ class WISEDataDESYCluster(WiseDataByVisit):
         try:
             with gzip.open(fn, 'rt', encoding="utf-8") as fzip:
                 data_product = json.load(fzip)
+
+            if verify_contains_lightcurves:
+                mask = ["timewise_lightcurve" in data.keys() for data in data_product.values()]
+                if not any(mask):
+                    raise AttributeError(f"No lightcurves found! Cluster job probably did not finish. {fn}")
+
             if return_filename:
                 return data_product, fn
             return data_product
