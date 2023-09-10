@@ -811,16 +811,16 @@ class WISEDataBase(abc.ABC):
 
             try:
                 res = self.load_data_product(**kw)
-                ilcs, ifn = res
-                fns.append(ifn)
-                if isinstance(lcs, type(None)):
-                    lcs = dict(ilcs)
-                else:
-                    lcs.update(ilcs)
+                if res is not None:
+                    ilcs, ifn = res
+                    fns.append(ifn)
+                    if isinstance(lcs, type(None)):
+                        lcs = dict(ilcs)
+                    else:
+                        lcs.update(ilcs)
 
-            except FileNotFoundError as e:
-                logger.error(e)
-                missing_files = True
+                else:
+                    missing_files = True
 
             except KeyError as e:
                 logger.error(e)
