@@ -749,6 +749,10 @@ class WISEDataBase(abc.ABC):
         try:
             with open(fn, "r") as f:
                 lcs = json.load(f)
+            try:
+                self._verify_contains_lightcurves(lcs)
+            except KeyError as e:
+                raise KeyError(f"{fn}: {e}")
             if return_filename:
                 return lcs, fn
             return lcs

@@ -146,10 +146,10 @@ class WISEDataDESYCluster(WiseDataByVisit):
             with gzip.open(fn, 'rt', encoding="utf-8") as fzip:
                 data_product = json.load(fzip)
 
-            if verify_contains_lightcurves:
-                mask = ["timewise_lightcurve" in data.keys() for data in data_product.values()]
-                if not any(mask):
-                    raise AttributeError(f"No lightcurves found! Cluster job probably did not finish. {fn}")
+            try:
+                self._verify_contains_lightcurves(data_product)
+            except KeyError as e:
+                raise KeyError(f"{fn}: {e}")
 
             if return_filename:
                 return data_product, fn
