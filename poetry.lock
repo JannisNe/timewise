@@ -1312,13 +1312,13 @@ files = [
 
 [[package]]
 name = "pyvo"
-version = "1.4.1"
+version = "1.4.2"
 description = "Astropy affiliated package for accessing Virtual Observatory data and services"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pyvo-1.4.1-py3-none-any.whl", hash = "sha256:408ca0c06dc4e013ed0e0e236cb7c8362c958365746f762e7513b03c1d7e67dc"},
-    {file = "pyvo-1.4.1.tar.gz", hash = "sha256:07a4e7ddfe4b995b271e44440277542b9a23de0ed996e152d759860f7dd84c9d"},
+    {file = "pyvo-1.4.2-py3-none-any.whl", hash = "sha256:74142901862b2c70b2eb0505355fe4ce4cf6907d290bb2a67b4f80c087b7a217"},
+    {file = "pyvo-1.4.2.tar.gz", hash = "sha256:66fe298865acfd725bc5f18750772d7f1b8899b8e5bb1775721520bed57d95cb"},
 ]
 
 [package.dependencies]
@@ -1328,7 +1328,7 @@ requests = "*"
 [package.extras]
 all = ["pillow"]
 docs = ["sphinx-astropy"]
-test = ["pytest-astropy", "requests-mock"]
+test = ["pytest-astropy", "pytest-doctestplus (>=0.13)", "requests-mock"]
 
 [[package]]
 name = "pywavelets"
