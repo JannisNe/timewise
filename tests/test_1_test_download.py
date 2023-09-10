@@ -91,7 +91,7 @@ class WISEBigDataLocal(WISEDataDESYCluster):
             logger.debug(f"Job {job_id}")
             chunk_number = self._get_chunk_number_for_job(job_id)
 
-            if job_id in self.fails:
+            if (self.fails is not None) and (job_id in self.fails):
                 logger.debug(f"Job {job_id} failed")
                 continue
 
