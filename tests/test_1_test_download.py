@@ -250,11 +250,17 @@ class TestMIRFlareCatalogue(unittest.TestCase):
 
         bigdata_phot_dir = Path(wise_data._cache_photometry_dir.replace(data_dir, bigdata_dir))
         phot_dir = Path(wise_data._cache_photometry_dir)
+
         for f in bigdata_phot_dir.glob("raw_photometry*"):
             if f.is_file():
                 dst = phot_dir / f.name
                 logger.debug(f"copying {f} back to {dst}")
                 shutil.copy(f, dst)
+
+        for f in bigdata_phot_dir.glob("timewise_data_product*"):
+            if f.is_file():
+                logger.debug(f"removing {f}")
+                os.remove(f)
 
         wise_data.get_sample_photometric_data(
             max_nTAPjobs=2,
