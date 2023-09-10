@@ -4,9 +4,10 @@ import os
 import socket
 import numpy as np
 import logging
+from pathlib import Path
 
 from timewise import WiseDataByVisit, WISEDataDESYCluster, ParentSampleBase
-from timewise.general import main_logger
+from timewise.general import main_logger, data_dir, bigdata_dir
 from timewise.utils import get_mirong_sample
 
 
@@ -119,7 +120,7 @@ class WISEBigDataTestVersion(WISEBigDataLocal):
 
     base_name = "test/test_mock_desy_bigdata"
 
-    def __init__(self, base_name=base_name, fails=0):
+    def __init__(self, base_name=base_name, fails=None):
         super().__init__(base_name=base_name,
                          parent_sample_class=MirongParentSample,
                          min_sep_arcsec=8,
@@ -245,7 +246,15 @@ class TestMIRFlareCatalogue(unittest.TestCase):
 
     def test_d_emulate_wise_bigdata_fail(self):
         logger.info("\n\n Emulating WISEBigDataDESYCluster job fails\n\n")
-        wise_data = WISEBigDataTestVersion(fails=1)
+        wise_data = WISEBigDataTestVersion(fails=[0])
+
+        bigdata_phot_dir = Path(wise_data._cache_photometry_dir.replace(data_dir, bigdata_dir))
+        phot_dir = Path(wise_data._cache_photometry_dir)
+        for f in bigdata_phot_dir.glob("raw_photometry*"):
+            if f.is_file():
+                dst = phot_dir / f.name
+                logger.debug(f"copying {f} back to {dst}")
+                shutil.copy(f, dst)
 
         wise_data.get_sample_photometric_data(
             max_nTAPjobs=2,
@@ -253,7 +262,8 @@ class TestMIRFlareCatalogue(unittest.TestCase):
             query_type="positional",
             skip_input=True,
             wait=0,
-            mask_by_position=True
+            mask_by_position=True,
+            skip_download=True
         )
 
 
