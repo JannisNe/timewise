@@ -78,6 +78,14 @@ class WISEBigDataLocal(WISEDataDESYCluster):
 
         logger.debug(f"Jobs from {_start_id} to {_end_id}")
 
+        # make data_product files, storing essential info from parent_sample
+        for jobID in range(_start_id, _end_id+1):
+            indices = self.parent_sample.df.index[self.cluster_jobID_map == jobID]
+            logger.debug(f"starting data_product for {len(indices)} objects.")
+            data_product = self._start_data_product(parent_sample_indices=indices)
+            chunk_number = self._get_chunk_number_for_job(jobID)
+            self._save_data_product(data_product, service="tap", chunk_number=chunk_number, jobID=jobID)
+
         for job_id in range(_start_id, _end_id+1):
             logger.debug(f"Job {job_id}")
             chunk_number = self._get_chunk_number_for_job(job_id)
