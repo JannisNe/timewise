@@ -146,10 +146,11 @@ class WISEDataDESYCluster(WiseDataByVisit):
             with gzip.open(fn, 'rt', encoding="utf-8") as fzip:
                 data_product = json.load(fzip)
 
-            try:
-                self._verify_contains_lightcurves(data_product)
-            except KeyError as e:
-                raise KeyError(f"{fn}: {e}")
+            if verify_contains_lightcurves:
+                try:
+                    self._verify_contains_lightcurves(data_product)
+                except KeyError as e:
+                    raise KeyError(f"{fn}: {e}")
 
             if return_filename:
                 return data_product, fn

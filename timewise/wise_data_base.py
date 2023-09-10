@@ -732,7 +732,14 @@ class WISEDataBase(abc.ABC):
             raise KeyError(f"'timewise_lightcurves' in none of the results."
                            f"Cluster job probably did not finish.")
 
-    def load_data_product(self, service, chunk_number=None, jobID=None, return_filename=False):
+    def load_data_product(
+            self,
+            service,
+            chunk_number=None,
+            jobID=None,
+            return_filename=False,
+            verify_contains_lightcurves=False
+    ):
         """
         Load data product from disk
 
@@ -749,10 +756,13 @@ class WISEDataBase(abc.ABC):
         try:
             with open(fn, "r") as f:
                 lcs = json.load(f)
-            try:
-                self._verify_contains_lightcurves(lcs)
-            except KeyError as e:
-                raise KeyError(f"{fn}: {e}")
+
+            if verify_contains_lightcurves:
+                try:
+                    self._verify_contains_lightcurves(lcs)
+                except KeyError as e:
+                    raise KeyError(f"{fn}: {e}")
+
             if return_filename:
                 return lcs, fn
             return lcs
@@ -808,6 +818,7 @@ class WISEDataBase(abc.ABC):
             kw = dict(kwargs)
             kw[itr[0]] = i
             kw['return_filename'] = True
+            kw["verify_contains_lightcurves"] = True
 
             try:
                 res = self.load_data_product(**kw)
