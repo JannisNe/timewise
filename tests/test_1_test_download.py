@@ -246,7 +246,8 @@ class TestMIRFlareCatalogue(unittest.TestCase):
 
     def test_d_emulate_wise_bigdata_fail(self):
         logger.info("\n\n Emulating WISEBigDataDESYCluster job fails\n\n")
-        wise_data = WISEBigDataTestVersion(fails=[0])
+        fail_job = 1
+        wise_data = WISEBigDataTestVersion(fails=[fail_job])
 
         bigdata_phot_dir = Path(wise_data._cache_photometry_dir.replace(data_dir, bigdata_dir))
         phot_dir = Path(wise_data._cache_photometry_dir)
@@ -272,7 +273,17 @@ class TestMIRFlareCatalogue(unittest.TestCase):
             skip_download=True
         )
 
-
+        # verify that the failed job is not in the data product
+        self.assertRaises(KeyError, wise_data.load_data_product("tap", 0, fail_job, verify_contains_lightcurves=True))
+        # verify that the combined chunk file has not been produced nor moved to the big data directory
+        chunk_0_data_product_filename = wise_data._data_product_filename("tap", 0, use_bigdata_dir=False)
+        self.assertFalse(os.path.isfile(chunk_0_data_product_filename))
+        self.assertFalse(os.path.isfile(chunk_0_data_product_filename.replace(data_dir, bigdata_dir)))
+        # verify that chunk 1 was processed normally
+        chunk1_data_product = wise_data.load_data_product("tap", 1,
+                                                          use_bigdata_dir=True,
+                                                          verify_contains_lightcurves=True)
+        self.assertIsInstance(chunk1_data_product, dict)
 
     def test_e_wise_bigdata_desy_cluster(self):
         host = socket.gethostname()
