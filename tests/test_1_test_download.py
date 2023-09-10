@@ -56,7 +56,7 @@ class WISEDataTestVersion(WiseDataByVisit):
 
 class WISEBigDataLocal(WISEDataDESYCluster):
 
-    def __init__(self, base_name, parent_sample_class, min_sep_arcsec, n_chunks, fails=0):
+    def __init__(self, base_name, parent_sample_class, min_sep_arcsec, n_chunks, fails=None):
         super().__init__(base_name, parent_sample_class, min_sep_arcsec, n_chunks)
         self.fails = fails
 
@@ -78,14 +78,11 @@ class WISEBigDataLocal(WISEDataDESYCluster):
 
         logger.debug(f"Jobs from {_start_id} to {_end_id}")
 
-        fails = np.random.randint(_start_id, _end_id, self.fails)
-        logger.debug(f"failing jobs {fails}")
-
         for job_id in range(_start_id, _end_id+1):
             logger.debug(f"Job {job_id}")
             chunk_number = self._get_chunk_number_for_job(job_id)
 
-            if job_id in fails:
+            if job_id in self.fails:
                 logger.debug(f"Job {job_id} failed")
                 continue
 
@@ -238,7 +235,22 @@ class TestMIRFlareCatalogue(unittest.TestCase):
                 load_from_bigdata_dir=True
             )
 
-    def test_d_wise_bigdata_desy_cluster(self):
+    def test_d_emulate_wise_bigdata_fail(self):
+        logger.info("\n\n Emulating WISEBigDataDESYCluster job fails\n\n")
+        wise_data = WISEBigDataTestVersion(fails=1)
+
+        wise_data.get_sample_photometric_data(
+            max_nTAPjobs=2,
+            cluster_jobs_per_chunk=2,
+            query_type="positional",
+            skip_input=True,
+            wait=0,
+            mask_by_position=True
+        )
+
+
+
+    def test_e_wise_bigdata_desy_cluster(self):
         host = socket.gethostname()
         if np.logical_or("ifh.de" in host, ("zeuthen.desy.de" in host) and ("wgs" in host)):
             host_server = "DESY"
