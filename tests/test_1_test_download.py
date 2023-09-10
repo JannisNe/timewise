@@ -274,11 +274,14 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         )
 
         # verify that the failed job is not in the data product
-        self.assertRaises(KeyError, wise_data.load_data_product("tap", 0, fail_job, verify_contains_lightcurves=True))
+        with self.assertRaises(KeyError):
+            wise_data.load_data_product("tap", 0, fail_job, verify_contains_lightcurves=True)
+
         # verify that the combined chunk file has not been produced nor moved to the big data directory
         chunk_0_data_product_filename = wise_data._data_product_filename("tap", 0, use_bigdata_dir=False)
         self.assertFalse(os.path.isfile(chunk_0_data_product_filename))
         self.assertFalse(os.path.isfile(chunk_0_data_product_filename.replace(data_dir, bigdata_dir)))
+
         # verify that chunk 1 was processed normally
         chunk1_data_product = wise_data.load_data_product("tap", 1,
                                                           use_bigdata_dir=True,
