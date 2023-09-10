@@ -4,9 +4,10 @@ import os
 import socket
 import numpy as np
 import logging
+from pathlib import Path
 
 from timewise import WiseDataByVisit, WISEDataDESYCluster, ParentSampleBase
-from timewise.general import main_logger
+from timewise.general import main_logger, data_dir, bigdata_dir
 from timewise.utils import get_mirong_sample
 
 
@@ -56,6 +57,10 @@ class WISEDataTestVersion(WiseDataByVisit):
 
 class WISEBigDataLocal(WISEDataDESYCluster):
 
+    def __init__(self, base_name, parent_sample_class, min_sep_arcsec, n_chunks, fails=None):
+        super().__init__(base_name, parent_sample_class, min_sep_arcsec, n_chunks)
+        self.fails = fails
+
     def submit_to_cluster(
             self,
             node_memory,
@@ -74,9 +79,21 @@ class WISEBigDataLocal(WISEDataDESYCluster):
 
         logger.debug(f"Jobs from {_start_id} to {_end_id}")
 
+        # make data_product files, storing essential info from parent_sample
+        for jobID in range(_start_id, _end_id+1):
+            indices = self.parent_sample.df.index[self.cluster_jobID_map == jobID]
+            logger.debug(f"starting data_product for {len(indices)} objects.")
+            data_product = self._start_data_product(parent_sample_indices=indices)
+            chunk_number = self._get_chunk_number_for_job(jobID)
+            self._save_data_product(data_product, service="tap", chunk_number=chunk_number, jobID=jobID)
+
         for job_id in range(_start_id, _end_id+1):
             logger.debug(f"Job {job_id}")
             chunk_number = self._get_chunk_number_for_job(job_id)
+
+            if (self.fails is not None) and (job_id in self.fails):
+                logger.debug(f"Job {job_id} failed")
+                continue
 
             try:
                 self._subprocess_select_and_bin(
@@ -103,11 +120,12 @@ class WISEBigDataTestVersion(WISEBigDataLocal):
 
     base_name = "test/test_mock_desy_bigdata"
 
-    def __init__(self, base_name=base_name):
+    def __init__(self, base_name=base_name, fails=None):
         super().__init__(base_name=base_name,
                          parent_sample_class=MirongParentSample,
                          min_sep_arcsec=8,
-                         n_chunks=2)
+                         n_chunks=2,
+                         fails=fails)
 
 
 ####################################
@@ -226,7 +244,51 @@ class TestMIRFlareCatalogue(unittest.TestCase):
                 load_from_bigdata_dir=True
             )
 
-    def test_d_wise_bigdata_desy_cluster(self):
+    def test_d_emulate_wise_bigdata_fail(self):
+        logger.info("\n\n Emulating WISEBigDataDESYCluster job fails\n\n")
+        fail_job = 1
+        wise_data = WISEBigDataTestVersion(fails=[fail_job])
+
+        bigdata_phot_dir = Path(wise_data._cache_photometry_dir.replace(data_dir, bigdata_dir))
+        phot_dir = Path(wise_data._cache_photometry_dir)
+
+        for f in bigdata_phot_dir.glob("raw_photometry*"):
+            if f.is_file():
+                dst = phot_dir / f.name
+                logger.debug(f"copying {f} back to {dst}")
+                shutil.copy(f, dst)
+
+        for f in bigdata_phot_dir.glob("timewise_data_product*"):
+            if f.is_file():
+                logger.debug(f"removing {f}")
+                os.remove(f)
+
+        wise_data.get_sample_photometric_data(
+            max_nTAPjobs=2,
+            cluster_jobs_per_chunk=2,
+            query_type="positional",
+            skip_input=True,
+            wait=0,
+            mask_by_position=True,
+            skip_download=True
+        )
+
+        # verify that the failed job is not in the data product
+        with self.assertRaises(KeyError):
+            wise_data.load_data_product("tap", 0, fail_job, verify_contains_lightcurves=True)
+
+        # verify that the combined chunk file has not been produced nor moved to the big data directory
+        chunk_0_data_product_filename = wise_data._data_product_filename("tap", 0, use_bigdata_dir=False)
+        self.assertFalse(os.path.isfile(chunk_0_data_product_filename))
+        self.assertFalse(os.path.isfile(chunk_0_data_product_filename.replace(data_dir, bigdata_dir)))
+
+        # verify that chunk 1 was processed normally
+        chunk1_data_product = wise_data.load_data_product("tap", 1,
+                                                          use_bigdata_dir=True,
+                                                          verify_contains_lightcurves=True)
+        self.assertIsInstance(chunk1_data_product, dict)
+
+    def test_e_wise_bigdata_desy_cluster(self):
         host = socket.gethostname()
         if np.logical_or("ifh.de" in host, ("zeuthen.desy.de" in host) and ("wgs" in host)):
             host_server = "DESY"

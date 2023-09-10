@@ -131,7 +131,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
             chunk_number=None,
             jobID=None,
             return_filename=False,
-            use_bigdata_dir=False
+            use_bigdata_dir=False,
+            verify_contains_lightcurves=False
     ):
         fn = self._data_product_filename(
             service,
@@ -144,6 +145,13 @@ class WISEDataDESYCluster(WiseDataByVisit):
         try:
             with gzip.open(fn, 'rt', encoding="utf-8") as fzip:
                 data_product = json.load(fzip)
+
+            if verify_contains_lightcurves:
+                try:
+                    self._verify_contains_lightcurves(data_product)
+                except KeyError as e:
+                    raise KeyError(f"{fn}: {e}")
+
             if return_filename:
                 return data_product, fn
             return data_product

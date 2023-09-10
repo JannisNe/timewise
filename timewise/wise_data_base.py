@@ -725,7 +725,21 @@ class WISEDataBase(abc.ABC):
             else:
                 return os.path.join(self._cache_photometry_dir, fn + f"_{jobID}.json")
 
-    def load_data_product(self, service, chunk_number=None, jobID=None, return_filename=False):
+    @staticmethod
+    def _verify_contains_lightcurves(data_product):
+        mask = ["timewise_lightcurve" in data.keys() for data in data_product.values()]
+        if not any(mask):
+            raise KeyError(f"'timewise_lightcurves' in none of the results."
+                           f"Cluster job probably did not finish.")
+
+    def load_data_product(
+            self,
+            service,
+            chunk_number=None,
+            jobID=None,
+            return_filename=False,
+            verify_contains_lightcurves=False
+    ):
         """
         Load data product from disk
 
@@ -736,12 +750,22 @@ class WISEDataBase(abc.ABC):
         :param jobID: jobID to load, if None load the combined file for this chunk
         :type jobID: int, optional
         :param return_filename: return filename of data product, defaults to False
+        :type return_filename: bool, optional
+        :param verify_contains_lightcurves: verify that the data product contains lightcurves, defaults to False
+        :type verify_contains_lightcurves: bool, optional
         """
         fn = self._data_product_filename(service, chunk_number, jobID)
         logger.debug(f"loading {fn}")
         try:
             with open(fn, "r") as f:
                 lcs = json.load(f)
+
+            if verify_contains_lightcurves:
+                try:
+                    self._verify_contains_lightcurves(lcs)
+                except KeyError as e:
+                    raise KeyError(f"{fn}: {e}")
+
             if return_filename:
                 return lcs, fn
             return lcs
@@ -791,33 +815,43 @@ class WISEDataBase(abc.ABC):
 
         lcs = None
         fns = list()
-        missing_files = 0
+        missing_files = False
+        erroneous_files = False
         for i in itr[1]:
             kw = dict(kwargs)
             kw[itr[0]] = i
             kw['return_filename'] = True
-            res = self.load_data_product(**kw)
+            kw["verify_contains_lightcurves"] = True
 
-            if not isinstance(res, type(None)):
-                ilcs, ifn = res
-                fns.append(ifn)
-                if isinstance(lcs, type(None)):
-                    lcs = dict(ilcs)
+            try:
+                res = self.load_data_product(**kw)
+                if res is not None:
+                    ilcs, ifn = res
+                    fns.append(ifn)
+                    if isinstance(lcs, type(None)):
+                        lcs = dict(ilcs)
+                    else:
+                        lcs.update(ilcs)
+
                 else:
-                    lcs.update(ilcs)
+                    missing_files = True
 
-            else:
-                missing_files += 1
+            except KeyError as e:
+                logger.error(e)
+                erroneous_files = True
 
-            if missing_files > 0:
-                msg = f"Missing {missing_files} for {service}"
-                if chunk_number is not None:
-                    msg += f" chunk {chunk_number}"
-                msg += "! Not saving data product"
-                logger.warning(msg)
+            if missing_files:
+                logger.warning(f"Missing files for {service}")
+
+            if erroneous_files:
+                logger.warning(f"Erroneous files for {service}")
+
+            if erroneous_files or missing_files:
+                _chunk_str = f" for chunk {chunk_number}" if chunk_number is not None else ""
+                logger.warning(f"Not saving combined data product{_chunk_str}")
                 break
 
-        if missing_files == 0:
+        if not (erroneous_files or missing_files):
             self._save_data_product(lcs, service=service, chunk_number=chunk_number, overwrite=overwrite)
 
             if remove:
