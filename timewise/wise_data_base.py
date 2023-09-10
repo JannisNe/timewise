@@ -750,6 +750,9 @@ class WISEDataBase(abc.ABC):
         :param jobID: jobID to load, if None load the combined file for this chunk
         :type jobID: int, optional
         :param return_filename: return filename of data product, defaults to False
+        :type return_filename: bool, optional
+        :param verify_contains_lightcurves: verify that the data product contains lightcurves, defaults to False
+        :type verify_contains_lightcurves: bool, optional
         """
         fn = self._data_product_filename(service, chunk_number, jobID)
         logger.debug(f"loading {fn}")
