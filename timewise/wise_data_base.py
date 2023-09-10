@@ -725,6 +725,13 @@ class WISEDataBase(abc.ABC):
             else:
                 return os.path.join(self._cache_photometry_dir, fn + f"_{jobID}.json")
 
+    @staticmethod
+    def _verify_contains_lightcurves(data_product):
+        mask = ["timewise_lightcurve" in data.keys() for data in data_product.values()]
+        if not any(mask):
+            raise KeyError(f"'timewise_lightcurves' in none of the results."
+                           f"Cluster job probably did not finish.")
+
     def load_data_product(self, service, chunk_number=None, jobID=None, return_filename=False):
         """
         Load data product from disk
