@@ -633,12 +633,15 @@ class WiseDataByVisit(WISEDataBase):
         axs[0].set_title("")
         axs[0].legend(ncol=5, bbox_to_anchor=(0, 1, 1, 0), loc="lower left", mode="expand", title=title)
         axs[0].set_aspect(1, adjustable="box")
+        lim = arcsec / 2
+        axs[0].set_xlim(-lim, lim)
+        axs[0].set_ylim(-lim, lim)
         fig.tight_layout()
 
         if save:
             if fn is None:
                 fn = os.path.join(self.plots_dir, f"{ind}_binning_diag_{which}cutout.pdf")
-            logger.debug(f"saving under {fn}")
+            logger.info(f"saving under {fn}")
             fig.savefig(fn)
 
         if interactive:
