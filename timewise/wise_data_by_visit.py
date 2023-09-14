@@ -436,7 +436,8 @@ class WiseDataByVisit(WISEDataBase):
             fn=None,
             save=True,
             which="panstarrs",
-            arcsec=20
+            arcsec=20,
+            unbinned_lightcurves=None
     ):
         """
         Show a skymap of the single detections and which bin they belong to next to the binned lightcurve
@@ -457,6 +458,9 @@ class WiseDataByVisit(WISEDataBase):
         :type which: str
         :param arcsec: size of cutout
         :type arcsec: float
+        :param unbinned_lightcurves:
+            unbinned lightcurves, useful when plotting multiple objects and loading the data
+            multiple times is not desired
         :returns: Figure and axes if `interactive=True`
         :rtype: mpl.Figure, mpl.Axes
         """
@@ -470,14 +474,15 @@ class WiseDataByVisit(WISEDataBase):
         # get chunk number to be able to load the unstacked lightcurve
         chunk_number = self._get_chunk_number(parent_sample_index=ind)
 
-        # load the unstacked lightcurves
-        if service == "tap":
-            unbinned_lcs = self.get_unbinned_lightcurves(chunk_number=chunk_number)
-        else:
-            unbinned_lcs = self._get_unbinned_lightcurves_gator(chunk_number=chunk_number)
+        # load the unstacked lightcurves if not given
+        if unbinned_lightcurves is None:
+            if service == "tap":
+                unbinned_lightcurves = self.get_unbinned_lightcurves(chunk_number=chunk_number)
+            else:
+                unbinned_lightcurves = self._get_unbinned_lightcurves_gator(chunk_number=chunk_number)
 
         # select the datapoints corresponding to our object
-        lightcurve = unbinned_lcs[unbinned_lcs[self._tap_orig_id_key] == ind]
+        lightcurve = unbinned_lightcurves[unbinned_lightcurves[self._tap_orig_id_key] == ind]
 
         # get visit map
         visit_map = self.get_visit_map(lightcurve)
