@@ -4,6 +4,8 @@ import numpy as np
 import logging
 from scipy import stats
 import matplotlib.pyplot as plt
+from matplotlib.text import TextPath
+from matplotlib.font_manager import FontProperties
 
 from timewise.wise_data_base import WISEDataBase
 from timewise.utils import get_excess_variance
@@ -499,7 +501,7 @@ class WiseDataByVisit(WISEDataBase):
 
         # get a mask indicating outliers based on position
         ra, dec = pos.astype(float)
-        bad_indices_position, cluster_res, allwise_mask = self.calculate_position_mask(
+        bad_indices_position, cluster_res, data_mask, allwise_mask = self.calculate_position_mask(
             lightcurve, ra=ra, dec=dec, return_all=True, whitelist_region=self.whitelist_region.to("arcsec").value
         )
         position_mask = (
@@ -549,39 +551,49 @@ class WiseDataByVisit(WISEDataBase):
             m = visit_map == visit
 
             label = str(visit)
-            marker = markers[visit]
-            color = f"C{visit}"
 
-            for im, _color, _label, zorder in zip(
+            for im, weight, _label, zorder in zip(
                     [position_mask, ~position_mask],
-                    [color, "gray"],
+                    ["bold", "light"],
                     [label, ""],
                     [1, 0]
             ):
                 mask = m & im
                 datapoints = lightcurve[mask]
+
+                # make a marker for the visit and colored by cluster
+                prop = FontProperties(weight=weight, family="monospace")
+                marker = TextPath((0, 0), label, size=1, prop=prop)
+                logger.debug(mask[data_mask])
+                colors = pd.Series(
+                    [f"C{i}" if i > 0 else "grey" for i in cluster_res.labels_[mask[data_mask]]],
+                    index=lightcurve.index[data_mask & mask]
+                )
+                logger.debug(f"colors: {colors}")
+
                 if ("sigra" in datapoints.columns) and ("sigdec" in datapoints.columns):
                     has_sig = ~datapoints.sigra.isna() & ~datapoints.sigdec.isna()
+                    c = list(colors[has_sig])
                     axs[0].errorbar(
                         ra[mask][has_sig],
                         dec[mask][has_sig],
                         xerr=datapoints.sigra[has_sig] / 3600,
                         yerr=datapoints.sigdec[has_sig] / 3600,
                         label=_label,
-                        marker=marker,
+                        marker=str(visit),
                         ls="",
-                        color=_color,
+                        color=c,
                         zorder=zorder
                     )
                     axs[0].scatter(
                         ra[mask][~has_sig],
                         dec[mask][~has_sig],
                         marker=marker,
-                        color=_color,
+                        color=c,
                         zorder=zorder
                     )
                 else:
-                    axs[0].scatter(ra[mask], dec[mask], label=_label, marker=marker, color=_color, zorder=zorder)
+                    axs[0].scatter(ra[mask], dec[mask], label=_label, marker=marker, color=colors, zorder=zorder)
 
         # for each band indicate the outliers based on brightness with circles
         for b, outlier_mask in outlier_masks.items():
