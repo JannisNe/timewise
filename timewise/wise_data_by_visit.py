@@ -550,50 +550,59 @@ class WiseDataByVisit(WISEDataBase):
         for visit in np.unique(visit_map):
             m = visit_map == visit
 
-            label = str(visit)
-
-            for im, weight, _label, zorder in zip(
+            for im, weight, zorder in zip(
                     [position_mask, ~position_mask],
                     ["bold", "light"],
-                    [label, ""],
                     [1, 0]
             ):
                 mask = m & im
-                datapoints = lightcurve[mask]
 
-                # make a marker for the visit and colored by cluster
-                prop = FontProperties(weight=weight, family="monospace")
-                marker = TextPath((0, 0), label, size=1, prop=prop)
-                logger.debug(mask[data_mask])
-                colors = pd.Series(
-                    [f"C{i}" if i > 0 else "grey" for i in cluster_res.labels_[mask[data_mask]]],
-                    index=lightcurve.index[data_mask & mask]
-                )
-                logger.debug(f"colors: {colors}")
+                for i_data_mask, i_data in zip([data_mask, ~data_mask], ["data", "other_allwise"]):
+                    datapoints = lightcurve[mask & i_data_mask]
+                    cluster_labels = (
+                        cluster_res.labels_[mask[i_data_mask]] if i_data == "data"
+                        else np.array([-1] * len(datapoints))
+                    )
 
-                if ("sigra" in datapoints.columns) and ("sigdec" in datapoints.columns):
-                    has_sig = ~datapoints.sigra.isna() & ~datapoints.sigdec.isna()
-                    c = list(colors[has_sig])
-                    axs[0].errorbar(
-                        ra[mask][has_sig],
-                        dec[mask][has_sig],
-                        xerr=datapoints.sigra[has_sig] / 3600,
-                        yerr=datapoints.sigdec[has_sig] / 3600,
-                        label=_label,
-                        marker=str(visit),
-                        ls="",
-                        color=c,
-                        zorder=zorder
-                    )
-                    axs[0].scatter(
-                        ra[mask][~has_sig],
-                        dec[mask][~has_sig],
-                        marker=marker,
-                        color=c,
-                        zorder=zorder
-                    )
-                else:
-                    axs[0].scatter(ra[mask], dec[mask], label=_label, marker=marker, color=colors, zorder=zorder)
+                    # only plot legend for position mask
+                    label = str(visit) if i_data == "data" else chr(ord('`') + visit + 1)
+                    legend_label = label if zorder == 1 else ""
+
+                    # make a marker for the visit and thickness according to position mask
+                    prop = FontProperties(weight=weight, family="monospace")
+                    marker = TextPath((0, 0), label, size=50, prop=prop)
+
+                    for cluster_label in np.unique(cluster_labels):
+                        cluster_label_mask = cluster_labels == cluster_label
+                        datapoints_cluster = datapoints[cluster_label_mask]
+                        # make a marker for the visit and colored by cluster
+                        color = f"C{cluster_label}" if cluster_label != -1 else "grey"
+
+                        if ("sigra" in datapoints_cluster.columns) and ("sigdec" in datapoints_cluster.columns):
+                            has_sig = ~datapoints_cluster.sigra.isna() & ~datapoints_cluster.sigdec.isna()
+                            _ra = ra[mask & i_data_mask][cluster_label_mask]
+                            _dec = dec[mask & i_data_mask][cluster_label_mask]
+
+                            axs[0].errorbar(
+                                _ra[has_sig],
+                                _dec[has_sig],
+                                xerr=datapoints_cluster.sigra[has_sig] / 3600,
+                                yerr=datapoints_cluster.sigdec[has_sig] / 3600,
+                                label=legend_label,
+                                marker=marker,
+                                ls="",
+                                color=color,
+                                zorder=zorder
+                            )
+                            axs[0].scatter(
+                                _ra[~has_sig],
+                                _dec[~has_sig],
+                                marker=marker,
+                                color=color,
+                                zorder=zorder
+                            )
+                        else:
+                            axs[0].scatter(ra[mask], dec[mask], label=legend_label, marker=marker, color=color, zorder=zorder)
 
         # for each band indicate the outliers based on brightness with circles
         for b, outlier_mask in outlier_masks.items():
