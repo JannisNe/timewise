@@ -4,8 +4,7 @@ import numpy as np
 import logging
 from scipy import stats
 import matplotlib.pyplot as plt
-from matplotlib.text import TextPath
-from matplotlib.font_manager import FontProperties
+from matplotlib.lines import Line2D
 
 from timewise.wise_data_base import WISEDataBase
 from timewise.utils import get_excess_variance
@@ -539,8 +538,7 @@ class WiseDataByVisit(WISEDataBase):
         )
 
         # set markers for visits
-        markers = ['o', 'v', '^', '<', '>', '1', '2', '3', '4', '8', 's', 'p', '*', 'h', 'H', '+', 'x', 'D', 'd', '|',
-                   '_', 'P', 'X']
+        markers = list(Line2D.filled_markers) + ["$1$", "$2$", "$3$", "$4$", "$5$", "$6$", "$7$", "$8$", "$9$"]
 
         # calculate ra and dec relative to center of cutout
         ra = (lightcurve.ra - pos[self.parent_sample.default_keymap["ra"]]) * 3600
@@ -549,10 +547,12 @@ class WiseDataByVisit(WISEDataBase):
         # for each visit plot the datapoints on the cutout
         for visit in np.unique(visit_map):
             m = visit_map == visit
+            label = str(visit)
+            axs[0].plot([], [], marker=markers[visit], label=label, mec="k", mew=1, mfc="none", ls="")
 
-            for im, weight, zorder in zip(
+            for im, mec, zorder in zip(
                     [position_mask, ~position_mask],
-                    ["bold", "light"],
+                    ["k", "none"],
                     [1, 0]
             ):
                 mask = m & im
@@ -563,14 +563,6 @@ class WiseDataByVisit(WISEDataBase):
                         cluster_res.labels_[mask[i_data_mask]] if i_data == "data"
                         else np.array([-1] * len(datapoints))
                     )
-
-                    # only plot legend for position mask
-                    label = str(visit) if i_data == "data" else chr(ord('`') + visit + 1)
-                    legend_label = label if zorder == 1 else ""
-
-                    # make a marker for the visit and thickness according to position mask
-                    prop = FontProperties(weight=weight, family="monospace")
-                    marker = TextPath((0, 0), label, size=50, prop=prop)
 
                     for cluster_label in np.unique(cluster_labels):
                         cluster_label_mask = cluster_labels == cluster_label
@@ -588,21 +580,32 @@ class WiseDataByVisit(WISEDataBase):
                                 _dec[has_sig],
                                 xerr=datapoints_cluster.sigra[has_sig] / 3600,
                                 yerr=datapoints_cluster.sigdec[has_sig] / 3600,
-                                label=legend_label,
-                                marker=marker,
+                                marker=markers[visit],
                                 ls="",
                                 color=color,
-                                zorder=zorder
+                                zorder=zorder,
+                                ms=10,
+                                mec=mec,
+                                mew=0.1
                             )
                             axs[0].scatter(
                                 _ra[~has_sig],
                                 _dec[~has_sig],
-                                marker=marker,
+                                marker=markers[visit],
                                 color=color,
-                                zorder=zorder
+                                zorder=zorder,
+                                edgecolors=mec,
+                                linewidths=0.1,
                             )
                         else:
-                            axs[0].scatter(ra[mask], dec[mask], label=legend_label, marker=marker, color=color, zorder=zorder)
+                            axs[0].scatter(
+                                ra[mask], dec[mask],
+                                marker=markers[visit],
+                                color=color,
+                                zorder=zorder,
+                                edgecolors=mec,
+                                linewidths=0.1,
+                            )
 
         # for each band indicate the outliers based on brightness with circles
         for b, outlier_mask in outlier_masks.items():
