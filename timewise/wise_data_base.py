@@ -1693,7 +1693,7 @@ class WISEDataBase(abc.ABC):
 
         if return_all:
             return_closest_allwise_mask = list(closest_allwise_mask) if closest_allwise_mask is not None else None
-            return list(bad_indices), cluster_res, return_closest_allwise_mask
+            return list(bad_indices), cluster_res, data_mask, return_closest_allwise_mask
         else:
             return list(bad_indices)
 

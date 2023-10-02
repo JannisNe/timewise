@@ -4,6 +4,7 @@ import numpy as np
 import logging
 from scipy import stats
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 
 from timewise.wise_data_base import WISEDataBase
 from timewise.utils import get_excess_variance
@@ -499,7 +500,7 @@ class WiseDataByVisit(WISEDataBase):
 
         # get a mask indicating outliers based on position
         ra, dec = pos.astype(float)
-        bad_indices_position, cluster_res, allwise_mask = self.calculate_position_mask(
+        bad_indices_position, cluster_res, data_mask, allwise_mask = self.calculate_position_mask(
             lightcurve, ra=ra, dec=dec, return_all=True, whitelist_region=self.whitelist_region.to("arcsec").value
         )
         position_mask = (
@@ -537,8 +538,7 @@ class WiseDataByVisit(WISEDataBase):
         )
 
         # set markers for visits
-        markers = ['o', 'v', '^', '<', '>', '1', '2', '3', '4', '8', 's', 'p', '*', 'h', 'H', '+', 'x', 'D', 'd', '|',
-                   '_', 'P', 'X']
+        markers = list(Line2D.filled_markers) + ["$1$", "$2$", "$3$", "$4$", "$5$", "$6$", "$7$", "$8$", "$9$"]
 
         # calculate ra and dec relative to center of cutout
         ra = (lightcurve.ra - pos[self.parent_sample.default_keymap["ra"]]) * 3600
@@ -547,41 +547,65 @@ class WiseDataByVisit(WISEDataBase):
         # for each visit plot the datapoints on the cutout
         for visit in np.unique(visit_map):
             m = visit_map == visit
-
             label = str(visit)
-            marker = markers[visit]
-            color = f"C{visit}"
+            axs[0].plot([], [], marker=markers[visit], label=label, mec="k", mew=1, mfc="none", ls="")
 
-            for im, _color, _label, zorder in zip(
+            for im, mec, zorder in zip(
                     [position_mask, ~position_mask],
-                    [color, "gray"],
-                    [label, ""],
+                    ["k", "none"],
                     [1, 0]
             ):
                 mask = m & im
-                datapoints = lightcurve[mask]
-                if ("sigra" in datapoints.columns) and ("sigdec" in datapoints.columns):
-                    has_sig = ~datapoints.sigra.isna() & ~datapoints.sigdec.isna()
-                    axs[0].errorbar(
-                        ra[mask][has_sig],
-                        dec[mask][has_sig],
-                        xerr=datapoints.sigra[has_sig] / 3600,
-                        yerr=datapoints.sigdec[has_sig] / 3600,
-                        label=_label,
-                        marker=marker,
-                        ls="",
-                        color=_color,
-                        zorder=zorder
+
+                for i_data_mask, i_data in zip([data_mask, ~data_mask], ["data", "other_allwise"]):
+                    datapoints = lightcurve[mask & i_data_mask]
+                    cluster_labels = (
+                        cluster_res.labels_[mask[i_data_mask]] if i_data == "data"
+                        else np.array([-1] * len(datapoints))
                     )
-                    axs[0].scatter(
-                        ra[mask][~has_sig],
-                        dec[mask][~has_sig],
-                        marker=marker,
-                        color=_color,
-                        zorder=zorder
-                    )
-                else:
-                    axs[0].scatter(ra[mask], dec[mask], label=_label, marker=marker, color=_color, zorder=zorder)
+
+                    for cluster_label in np.unique(cluster_labels):
+                        cluster_label_mask = cluster_labels == cluster_label
+                        datapoints_cluster = datapoints[cluster_label_mask]
+                        # make a marker for the visit and colored by cluster
+                        color = f"C{cluster_label}" if cluster_label != -1 else "grey"
+
+                        if ("sigra" in datapoints_cluster.columns) and ("sigdec" in datapoints_cluster.columns):
+                            has_sig = ~datapoints_cluster.sigra.isna() & ~datapoints_cluster.sigdec.isna()
+                            _ra = ra[mask & i_data_mask][cluster_label_mask]
+                            _dec = dec[mask & i_data_mask][cluster_label_mask]
+
+                            axs[0].errorbar(
+                                _ra[has_sig],
+                                _dec[has_sig],
+                                xerr=datapoints_cluster.sigra[has_sig] / 3600,
+                                yerr=datapoints_cluster.sigdec[has_sig] / 3600,
+                                marker=markers[visit],
+                                ls="",
+                                color=color,
+                                zorder=zorder,
+                                ms=10,
+                                mec=mec,
+                                mew=0.1
+                            )
+                            axs[0].scatter(
+                                _ra[~has_sig],
+                                _dec[~has_sig],
+                                marker=markers[visit],
+                                color=color,
+                                zorder=zorder,
+                                edgecolors=mec,
+                                linewidths=0.1,
+                            )
+                        else:
+                            axs[0].scatter(
+                                ra[mask], dec[mask],
+                                marker=markers[visit],
+                                color=color,
+                                zorder=zorder,
+                                edgecolors=mec,
+                                linewidths=0.1,
+                            )
 
         # for each band indicate the outliers based on brightness with circles
         for b, outlier_mask in outlier_masks.items():
