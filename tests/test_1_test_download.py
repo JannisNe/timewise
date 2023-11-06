@@ -176,6 +176,24 @@ class TestMIRFlareCatalogue(unittest.TestCase):
 
             wise_data.plot_diagnostic_binning(service="gator", ind=int(plot_id))
 
+    def test_b_test_match_to_wise_allsky(self):
+        logger.info('\n\n Testing WISE AllSky interface \n')
+        wise_data = WISEDataTestVersion(
+            base_name=WISEDataTestVersion.base_name + '_match_to_allsky'
+        )
+        in_filename = os.path.join(wise_data.cache_dir, "test_allsky_match_in.xml")
+        out_filename = os.path.join(wise_data.cache_dir, "test_allsky_match_out.tbl")
+        mask = [True] * len(wise_data.parent_sample.df)
+        res = wise_data._match_to_wise(
+            table_name=wise_data.get_db_name("WISE All-Sky Source Catalog"),
+            in_filename=in_filename,
+            out_filename=out_filename,
+            mask=mask,
+            one_to_one=True,
+        )
+        logger.info(f"matched {len(res)} objects")
+        self.assertEqual(len(res), len(wise_data.parent_sample.df))
+
     def test_b_test_photometry_download_by_allwise_id(self):
         logger.info('\n\n Testing WISE Data \n')
         wise_data = WISEDataTestVersion(
