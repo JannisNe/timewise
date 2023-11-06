@@ -127,7 +127,7 @@ class WISEDataBase(abc.ABC):
         ('AllWISE Source Catalog', 'allwise_p3as_psd'),
         ('WISE 3-Band Cryo Single Exposure (L1b) Source Table', 'allsky_3band_p1bs_psd'),
         ('NEOWISE-R Single Exposure (L1b) Source Table', 'neowiser_p1bs_psd'),
-
+        ('WISE All-Sky Source Catalog', 'allsky_4band_p3as_psd')
     ], columns=['nice_table_name', 'table_name'])
 
     bands = ['W1', 'W2']
@@ -453,6 +453,11 @@ class WISEDataBase(abc.ABC):
         if _db_name == "allwise_p3as_mep":
             _sigpos = _source_id = _des = ""
             _id_key = "cntr_mf,cntr"
+        elif _db_name == "allsky_4band_p3as_psd":
+            _sigpos = 'sigra,sigdec,'
+            _source_id = "source_id,"
+            _des = 'designation,'
+            _id_key = 'cntr'
         else:
             _sigpos = 'sigra,sigdec,'
             _source_id = "source_id,"
