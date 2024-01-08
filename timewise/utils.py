@@ -155,7 +155,8 @@ def annotate_not_available(ax):
     ylim = ax.get_ylim()
     x = sum(xlim) / 2
     y = sum(ylim) / 2
-    ax.annotate("Outside PanSTARRS Footprint", (x, y), color='red', ha='center', va='center', fontsize=20)
+    logger.debug(f"annotate_not_available at {x}, {y}")
+    ax.annotate("Outside\nPanSTARRS\nFootprint", (x, y), color='red', ha='center', va='center', fontsize=10)
 
 
 def getimages(ra, dec, filters="grizy"):
@@ -295,7 +296,9 @@ def plot_panstarrs_cutout(
                 im = getgrayim(ra, dec, size=ang_px, filter=fil)
                 axs[j].imshow(im, cmap='gray', **imshow_kwargs)
             except PanSTARRSQueryError:
-                annotate_not_available(axss[j])
+                axs[j].set_xlim(-arcsec / 2, arcsec / 2)
+                axs[j].set_ylim(-arcsec / 2, arcsec / 2)
+                annotate_not_available(axs[j])
 
             axs[j].scatter(*scatter_args, **scatter_kwargs)
             axs[j].set_title(fil)
@@ -313,6 +316,8 @@ def plot_panstarrs_cutout(
             im = getcolorim(ra, dec, size=ang_px)
             axss.imshow(im, **imshow_kwargs)
         except PanSTARRSQueryError:
+            axss.set_xlim(-arcsec / 2, arcsec / 2)
+            axss.set_ylim(-arcsec / 2, arcsec / 2)
             annotate_not_available(axss)
         axss.scatter(*scatter_args, **scatter_kwargs)
 
