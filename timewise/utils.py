@@ -146,6 +146,19 @@ def plot_sdss_cutout(ra, dec, arcsec=20, arcsec_per_px=0.1, interactive=False, f
 #####################################################
 
 
+class PanSTARRSQueryError(Exception):
+    pass
+
+
+def annotate_not_available(ax):
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    x = sum(xlim) / 2
+    y = sum(ylim) / 2
+    logger.debug(f"annotate_not_available at {x}, {y}")
+    ax.annotate("Outside\nPanSTARRS\nFootprint", (x, y), color='red', ha='center', va='center', fontsize=10)
+
+
 def getimages(ra, dec, filters="grizy"):
     """Query ps1filenames.py service to get a list of images
 
@@ -180,6 +193,8 @@ def geturl(ra, dec, size=240, output_size=None, filters="grizy", format="jpg", c
     if format not in ("jpg", "png", "fits"):
         raise ValueError("format must be one of jpg, png, fits")
     table = getimages(ra, dec, filters=filters)
+    if len(table) == 0:
+        raise PanSTARRSQueryError("No images available")
     url = (f"https://ps1images.stsci.edu/cgi-bin/fitscut.cgi?"
            f"ra={ra}&dec={dec}&size={size}&format={format}")
     if output_size:
@@ -276,9 +291,14 @@ def plot_panstarrs_cutout(
             axss = ax
 
         for j, fil in enumerate(list(filters)):
-            im = getgrayim(ra, dec, size=ang_px, filter=fil)
             axs = axss[1]
-            axs[j].imshow(im, cmap='gray', **imshow_kwargs)
+            try:
+                im = getgrayim(ra, dec, size=ang_px, filter=fil)
+                axs[j].imshow(im, cmap='gray', **imshow_kwargs)
+            except PanSTARRSQueryError:
+                axs[j].set_xlim(-arcsec / 2, arcsec / 2)
+                axs[j].set_ylim(-arcsec / 2, arcsec / 2)
+                annotate_not_available(axs[j])
 
             axs[j].scatter(*scatter_args, **scatter_kwargs)
             axs[j].set_title(fil)
@@ -292,8 +312,13 @@ def plot_panstarrs_cutout(
             fig = plt.gcf()
             axss = ax
 
-        im = getcolorim(ra, dec, size=ang_px)
-        axss.imshow(im, **imshow_kwargs)
+        try:
+            im = getcolorim(ra, dec, size=ang_px)
+            axss.imshow(im, **imshow_kwargs)
+        except PanSTARRSQueryError:
+            axss.set_xlim(-arcsec / 2, arcsec / 2)
+            axss.set_ylim(-arcsec / 2, arcsec / 2)
+            annotate_not_available(axss)
         axss.scatter(*scatter_args, **scatter_kwargs)
 
     _this_title = title if title else f"{ra}_{dec}"
