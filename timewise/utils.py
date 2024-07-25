@@ -12,6 +12,7 @@ from functools import cache
 from astropy.table import Table
 from PIL import Image
 from io import BytesIO
+import hashlib
 
 
 from timewise.general import cache_dir, backoff_hndlr
@@ -150,6 +151,23 @@ class PanSTARRSQueryError(Exception):
     pass
 
 
+def load_cache_or_download(url):
+    logger.debug(f"loading or downloading {url}")
+    h = hashlib.md5(url.encode()).hexdigest()
+    cache_file = os.path.join(cache_dir, h + ".cache")
+    logger.debug(f"cache file is {cache_file}")
+    if not os.path.isfile(cache_file):
+        logger.debug(f"downloading {url}")
+        r = requests.get(url)
+        with open(cache_file, 'wb') as f:
+            f.write(r.content)
+        return r.content
+    else:
+        logger.debug(f"loading {cache_file}")
+        with open(cache_file, 'rb') as f:
+            return f.read()
+
+
 def annotate_not_available(ax):
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
@@ -170,7 +188,8 @@ def getimages(ra, dec, filters="grizy"):
 
     service = "https://ps1images.stsci.edu/cgi-bin/ps1filenames.py"
     url = f"{service}?ra={ra}&dec={dec}&filters={filters}"
-    table = Table.read(url, format='ascii')
+    content = load_cache_or_download(url)
+    table = Table.read(content.decode(), format='ascii')
     return table
 
 
@@ -231,8 +250,8 @@ def getcolorim(ra, dec, size=240, output_size=None, filters="grizy", format="jpg
     if format not in ("jpg", "png"):
         raise ValueError("format must be jpg or png")
     url = geturl(ra, dec, size=size, filters=filters, output_size=output_size, format=format, color=True)
-    r = requests.get(url)
-    im = Image.open(BytesIO(r.content))
+    content = load_cache_or_download(url)
+    im = Image.open(BytesIO(content))
     return im
 
 
@@ -253,8 +272,8 @@ def getgrayim(ra, dec, size=240, output_size=None, filter="g", format="jpg"):
     if filter not in list("grizy"):
         raise ValueError("filter must be one of grizy")
     url = geturl(ra, dec, size=size, filters=filter, output_size=output_size, format=format)
-    r = requests.get(url[0])
-    im = Image.open(BytesIO(r.content))
+    content = load_cache_or_download(url[0])
+    im = Image.open(BytesIO(content))
     return im
 
 
