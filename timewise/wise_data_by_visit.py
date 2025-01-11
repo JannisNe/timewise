@@ -5,6 +5,8 @@ import logging
 from scipy import stats
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+from matplotlib.markers import MarkerStyle
+from matplotlib.transforms import Affine2D
 
 from timewise.wise_data_base import WISEDataBase
 from timewise.utils import get_excess_variance
@@ -538,7 +540,11 @@ class WiseDataByVisit(WISEDataBase):
         )
 
         # set markers for visits
-        markers = list(Line2D.filled_markers) + ["$1$", "$2$", "$3$", "$4$", "$5$", "$6$", "$7$", "$8$", "$9$"]
+        markers_strings = list(Line2D.filled_markers) + ["$1$", "$2$", "$3$", "$4$", "$5$", "$6$", "$7$", "$8$", "$9$"]
+        markers_straight = [MarkerStyle(im) for im in markers_strings]
+        rot = Affine2D().rotate_deg(180)
+        markers_rotated = [MarkerStyle(im, transform=rot) for im in markers_strings]
+        markers = markers_straight + markers_rotated
 
         # calculate ra and dec relative to center of cutout
         ra = (lightcurve.ra - pos[self.parent_sample.default_keymap["ra"]]) * 3600
