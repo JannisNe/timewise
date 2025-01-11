@@ -23,7 +23,7 @@ copyright = '2022, Jannis Necker'
 author = 'Jannis Necker'
 
 # The full version, including alpha/beta/rc tags
-release = 'v0.4.11'
+release = 'v0.4.12'
 
 
 # -- General configuration ---------------------------------------------------
