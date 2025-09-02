@@ -160,7 +160,7 @@ def load_cache_or_download(url):
     cache_dir = get_directories()['cache_dir']
     cache_file = cache_dir / (h + ".cache")
     logger.debug(f"cache file is {cache_file}")
-    if not cache_file.is_file:
+    if not cache_file.is_file():
         logger.debug(f"downloading {url}")
         r = requests.get(url)
         with open(cache_file, 'wb') as f:
