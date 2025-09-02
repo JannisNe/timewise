@@ -11,6 +11,7 @@ import subprocess
 import threading
 import time
 import tqdm
+from pathlib import Path
 
 import astropy.units as u
 import matplotlib.pyplot as plt
@@ -25,8 +26,8 @@ from astropy.table import Table
 from astropy.coordinates.angle_utilities import angular_separation, position_angle
 from sklearn.cluster import HDBSCAN
 
-from timewise.general import cache_dir, plots_dir, output_dir, logger_format, backoff_hndlr
-from timewise.utils import StableTAPService
+from timewise.general import get_directories, logger_format, backoff_hndlr
+from timewise.utils import StableAsyncTAPJob, StableTAPService
 
 logger = logging.getLogger(__name__)
 
@@ -53,20 +54,20 @@ class WISEDataBase(abc.ABC):
     :param parent_sample_default_entries: default entries for the parent sample
     :type parent_sample_default_entries: dict
     :param cache_dir: directory for cached data
-    :type cache_dir: str
+    :type cache_dir: Path
     :param cluster_dir: directory for cluster data
     :param cluster_log_dir: directory for cluster logs
-    :type cluster_dir: str
+    :type cluster_dir: Path
     :param output_dir: directory for output data
-    :type output_dir: str
+    :type output_dir: Path
     :param lightcurve_dir: directory for lightcurve data
-    :type lightcurve_dir: str
+    :type lightcurve_dir: Path
     :param plots_dir: directory for plots
-    :type plots_dir: str
+    :type plots_dir: Path
     :param submit_file: file for cluster submission
-    :type submit_file: str
-    :param tap_jobs: TAP jobs
-    :type tap_jobs: list[pyvo.dal.tap.TAPJob]
+    :type submit_file: Path
+    :param tap_jobs: TAP job URLs
+    :type tap_jobs: list[str]
     :param queue: queue for cluster jobs
     :type queue: multiprocessing.Queue
     :param clear_unbinned_photometry_when_binning: whether to clear unbinned photometry when binning
@@ -191,9 +192,11 @@ class WISEDataBase(abc.ABC):
         'W2': 0.280
     }
 
-    _this_dir = os.path.abspath(os.path.dirname(__file__))
-    magnitude_zeropoints_corrections = ascii.read(f'{_this_dir}/wise_flux_conversion_correction.dat',
-                                                  delimiter='\t').to_pandas()
+    _this_dir = Path(__file__).absolute().parent
+    magnitude_zeropoints_corrections = ascii.read(
+        _this_dir / 'wise_flux_conversion_correction.dat',
+        delimiter='\t'
+    ).to_pandas()
 
     band_wavelengths = {
         'W1': 3.368 * 1e-6 * u.m,
@@ -213,7 +216,7 @@ class WISEDataBase(abc.ABC):
     parent_sample_wise_skysep_key = 'sep_to_WISE_source'
 
     def __init__(self,
-                 base_name,
+                 base_name: str,
                  parent_sample_class,
                  min_sep_arcsec,
                  n_chunks):
@@ -253,26 +256,26 @@ class WISEDataBase(abc.ABC):
         # --------------------------- ^^^^ set up parent sample ^^^^ --------------------------- #
 
         # set up directories
-        self.cache_dir = os.path.join(cache_dir, base_name)
-        self._cache_photometry_dir = os.path.join(self.cache_dir, "photometry")
-        self.cluster_dir = os.path.join(self.cache_dir, 'cluster')
-        self.cluster_log_dir = os.path.join(self.cluster_dir, 'logs')
-        self.output_dir = os.path.join(output_dir, base_name)
-        self.lightcurve_dir = os.path.join(self.output_dir, "lightcurves")
-        self.plots_dir = os.path.join(plots_dir, base_name)
+        directories = get_directories()  # type: dict[str, Path]
+        self.cache_dir = directories['cache_dir'] / base_name
+        self._cache_photometry_dir = self.cache_dir / "photometry"
+        self.cluster_dir = self.cache_dir / 'cluster'
+        self.cluster_log_dir = self.cluster_dir / 'logs'
+        self.output_dir = directories["output_dir"] / base_name
+        self.lightcurve_dir = self.output_dir / "lightcurves"
+        self.plots_dir = directories["plots_dir"] / base_name
+        self.tap_jobs_cache_dir = self.cache_dir / 'tap_jobs'
 
         for d in [self.cache_dir, self._cache_photometry_dir, self.cluster_dir, self.cluster_log_dir,
                   self.output_dir, self.lightcurve_dir, self.plots_dir]:
-            if not os.path.isdir(d):
-                logger.debug(f"making directory {d}")
-                os.makedirs(d)
+            d.mkdir(parents=True, exist_ok=True)
 
-        file_handler = logging.FileHandler(filename=self.cache_dir + '/log.err', mode="a")
+        file_handler = logging.FileHandler(filename=self.cache_dir / 'log.err', mode="a")
         file_handler.setLevel("WARNING")
         file_handler.setFormatter(logger_format)
         logger.addHandler(file_handler)
 
-        self.submit_file = os.path.join(self.cluster_dir, 'submit.txt')
+        self.submit_file = self.cluster_dir / 'submit.txt'
 
         # set up result attributes
         self._split_chunk_key = '__chunk'
@@ -497,7 +500,7 @@ class WISEDataBase(abc.ABC):
         if err_msg:
             logger.error(err_msg.decode())
         process.terminate()
-        if os.path.isfile(out_file):
+        if Path(out_file).is_file():
             return 1
         else:
             return 0
@@ -566,8 +569,8 @@ class WISEDataBase(abc.ABC):
 
         dec_intervall_mask = self.chunk_map == chunk_number
         logger.debug(f"Any selected: {np.any(dec_intervall_mask)}")
-        _parent_sample_declination_band_file = os.path.join(self.cache_dir, f"parent_sample_chunk{chunk_number}.xml")
-        _output_file = os.path.join(self.cache_dir, f"parent_sample_chunk{chunk_number}.tbl")
+        _parent_sample_declination_band_file = self.cache_dir / f"parent_sample_chunk{chunk_number}.xml"
+        _output_file = self.cache_dir / f"parent_sample_chunk{chunk_number}.tbl"
 
         additional_keys = (
             "," + ",".join(additional_columns)
@@ -722,13 +725,13 @@ class WISEDataBase(abc.ABC):
         n = "timewise_data_product_"
 
         if (chunk_number is None) and (jobID is None):
-            return os.path.join(self.lightcurve_dir, f"{n}{service}.json")
+            return self.lightcurve_dir / f"{n}{service}.json"
         else:
             fn = f"{n}{service}{self._split_chunk_key}{chunk_number}"
             if (chunk_number is not None) and (jobID is None):
-                return os.path.join(self._cache_photometry_dir, fn + ".json")
+                return self._cache_photometry_dir / (fn + ".json")
             else:
-                return os.path.join(self._cache_photometry_dir, fn + f"_{jobID}.json")
+                return self._cache_photometry_dir / (fn + f"_{jobID}.json")
 
     @staticmethod
     def _verify_contains_lightcurves(data_product):
@@ -880,7 +883,7 @@ class WISEDataBase(abc.ABC):
         _ending = '.xml' if gator_input else'.tbl'
         fn = f"{self._cached_raw_photometry_prefix}_{table_name}{_additional_neowise_query}{_gator_input}" \
              f"{self._split_chunk_key}{chunk_number}{_ending}"
-        return os.path.join(self._cache_photometry_dir, fn)
+        return self._cache_photometry_dir / fn
 
     def _thread_query_photometry_gator(self, chunk_number, table_name, mag, flux):
         _infile = self._gator_chunk_photometry_cache_filename(table_name, chunk_number, gator_input=True)
@@ -945,7 +948,7 @@ class WISEDataBase(abc.ABC):
 
     def _get_unbinned_lightcurves_gator(self, chunk_number, clear=False):
         # load only the files for this chunk
-        fns = [os.path.join(self._cache_photometry_dir, fn)
+        fns = [self._cache_photometry_dir / fn
                for fn in os.listdir(self._cache_photometry_dir)
                if (fn.startswith(self._cached_raw_photometry_prefix) and
                    fn.endswith(f"{self._split_chunk_key}{chunk_number}.tbl"))
@@ -1091,7 +1094,7 @@ class WISEDataBase(abc.ABC):
         _additional_neowise_query = '_neowise_gator' if additional_neowise_query else ''
         fn = f"{self._cached_raw_photometry_prefix}_{table_name}{_additional_neowise_query}" \
              f"{self._split_chunk_key}{chunk_number}.csv"
-        return os.path.join(self._cache_photometry_dir, fn)
+        return self._cache_photometry_dir / fn
 
     @staticmethod
     def _give_up_tap(e):
@@ -1263,7 +1266,7 @@ class WISEDataBase(abc.ABC):
         :type clear: bool, optional
         """
         # load only the files for this chunk
-        fns = [os.path.join(self._cache_photometry_dir, fn)
+        fns = [self._cache_photometry_dir / fn
                for fn in os.listdir(self._cache_photometry_dir)
                if (fn.startswith(self._cached_raw_photometry_prefix) and fn.endswith(
                 f"{self._split_chunk_key}{chunk_number}.csv"
@@ -1715,9 +1718,9 @@ class WISEDataBase(abc.ABC):
         """
 
         logger.info(f"getting position masks for {service}, chunk {chunk_number}")
-        fn = os.path.join(self.cache_dir, "position_masks", f"{service}_chunk{chunk_number}.json")
+        fn = self.cache_dir / "position_masks" / f"{service}_chunk{chunk_number}.json"
 
-        if not os.path.isfile(fn):
+        if not fn.is_file():
             logger.debug(f"No file {fn}. Calculating position masks.")
 
             if service == "tap":
@@ -1746,10 +1749,7 @@ class WISEDataBase(abc.ABC):
                 if len(bad_indices) > 0:
                     position_masks[str(i)] = bad_indices
 
-            d = os.path.dirname(fn)
-            if not os.path.isdir(d):
-                os.makedirs(d, exist_ok=True)
-
+            fn.parent.mkdir(exist_ok=True, parents=True)
             with open(fn, "w") as f:
                 json.dump(position_masks, f)
 
@@ -1820,7 +1820,7 @@ class WISEDataBase(abc.ABC):
         _lc = lc if plot_binned else None
 
         if not fn:
-            fn = os.path.join(self.plots_dir, f"{parent_sample_idx}_{lum_key}.pdf")
+            fn = self.plots_dir / f"{parent_sample_idx}_{lum_key}.pdf"
 
         return self._plot_lc(lightcurve=_lc, unbinned_lc=unbinned_lc, interactive=interactive, fn=fn, ax=ax,
                              save=save, lum_key=lum_key, **kwargs)

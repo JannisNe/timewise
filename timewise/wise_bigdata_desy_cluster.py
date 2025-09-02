@@ -15,6 +15,7 @@ import shutil
 import gc
 import tqdm
 import sys
+from pathlib import Path
 
 from functools import cache
 from scipy.stats import chi2, f
@@ -28,7 +29,7 @@ import logging
 
 from typing import List
 
-from timewise.general import data_dir, bigdata_dir, backoff_hndlr
+from timewise.general import get_directories, backoff_hndlr
 from timewise.wise_data_by_visit import WiseDataByVisit
 
 
@@ -41,9 +42,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
     In addition to the attributes of `WiseDataByVisit` this class has the following attributes:
 
     :param executable_filename: the filename of the executable that will be submitted to the cluster
-    :type executable_filename: str
+    :type executable_filename: Path
     :param submit_file_filename: the filename of the submit file that will be submitted to the cluster
-    :type submit_file_filename: str
+    :type submit_file_filename: Path
     :param job_id: the job id of the submitted job
     :type job_id: str
     :param cluster_jobID_map: a dictionary mapping the chunk number to the cluster job id
@@ -51,13 +52,16 @@ class WISEDataDESYCluster(WiseDataByVisit):
     :param clusterJob_chunk_map: a dictionary mapping the cluster job id to the chunk number
     :type clusterJob_chunk_map: dict
     :param cluster_info_file: the filename of the file that stores the cluster info, loaded by the cluster jobs
-    :type cluster_info_file: str
+    :type cluster_info_file: Path
     :param start_time: the time when the download started
     :type start_time: float
     """
     status_cmd = f'qstat -u {getpass.getuser()}'
     # finding the file that contains the setup function
-    BASHFILE = os.getenv('TIMEWISE_DESY_CLUSTER_BASHFILE', os.path.expanduser('~/.bashrc'))
+    if (env_file := os.getenv('TIMEWISE_DESY_CLUSTER_BASHFILE')) is not None:
+        BASHFILE = Path(env_file)
+    else:
+        BASHFILE = Path("~/.bashrc").expanduser()
 
     def __init__(
             self,
@@ -89,13 +93,14 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         # set up cluster stuff
         self._status_output = None
-        self.executable_filename = os.path.join(self.cluster_dir, "run_timewise.sh")
-        self.submit_file_filename = os.path.join(self.cluster_dir, "submit_file.submit")
+        directories = get_directories()
+        self.executable_filename = self.cluster_dir / "run_timewise.sh"
+        self.submit_file_filename = self.cluster_dir / "submit_file.submit"
         self.job_id = None
 
         self.cluster_jobID_map = None
         self.clusterJob_chunk_map = None
-        self.cluster_info_file = os.path.join(self.cluster_dir, 'cluster_info.pkl')
+        self.cluster_info_file = self.cluster_dir / 'cluster_info.pkl'
         self._overwrite = True
 
         # these attributes will be set later and are used to pass them to the threads
@@ -121,7 +126,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
         fn = super(WISEDataDESYCluster, self)._data_product_filename(service, chunk_number=chunk_number, jobID=jobID)
 
         if use_bigdata_dir:
-            fn = fn.replace(data_dir, bigdata_dir)
+            d = get_directories()
+            fn = fn.replace(d["data_dir"], d["bigdata_dir"])
 
         return fn + ".gz"
 
@@ -199,7 +205,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
     def get_sample_photometric_data(self, max_nTAPjobs=8, perc=1, tables=None, chunks=None,
                                     cluster_jobs_per_chunk=100, wait=5, remove_chunks=False,
                                     query_type='positional', overwrite=True,
-                                    storage_directory=bigdata_dir,
+                                    storage_directory=None,
                                     node_memory='8G',
                                     skip_download=False,
                                     skip_input=False,
@@ -225,8 +231,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
         :type query_type: str
         :param overwrite: overwrite already existing lightcurves and metadata
         :type overwrite: bool
-        :param storage_directory: move binned files and raw data here after work is done
-        :type storage_directory: str
+        :param storage_directory: move binned files and raw data here after work is done, defaults to TIMEWISE_BIGDATA_DIR
+        :type storage_directory: str | Path
         :param node_memory: memory per node on the cluster, default is 8G
         :type node_memory: str
         :param skip_download: if True, assume data is already downloaded, only do binning in that case
@@ -281,7 +287,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         self.clear_cluster_log_dir()
         self._save_cluster_info()
         self._overwrite = overwrite
-        self._storage_dir = storage_directory
+        self._storage_dir = get_directories()['bigdata_dir'] if storage_directory is None else Path(storage_directory)
 
         # --------------------------- set up queues --------------------------- #
 
@@ -466,19 +472,16 @@ class WISEDataDESYCluster(WiseDataByVisit):
             gc.collect()
 
     def _move_file_to_storage(self, filename):
-        dst_fn = filename.replace(data_dir, self._storage_dir)
-
-        dst_dir = os.path.dirname(dst_fn)
-        if not os.path.isdir(dst_dir):
-            logger.debug(f"making directory {dst_dir}")
-            os.makedirs(dst_dir)
+        data_dir = str(get_directories()['data_dir'])
+        dst_fn = Path(filename.replace(data_dir, self._storage_dir))
+        dst_fn.parent.mkdir(parents=True, exist_ok=True)
 
         logger.debug(f"copy {filename} to {dst_fn}")
 
         try:
             shutil.copy2(filename, dst_fn)
 
-            if os.path.getsize(filename) == os.path.getsize(dst_fn):
+            if Path(filename).stat().st_size == dst_fn.stat().st_size:
                 logger.debug(f"copy successful, removing {filename}")
                 os.remove(filename)
             else:
@@ -509,8 +512,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 self.wait_for_job(job_id)
                 logger.debug(f'cluster done for chunk {chunk} (Cluster job {job_id}).')
 
-                log_files = glob.glob(f"./{job_id}_*")
-                log_files_abs = [os.path.abspath(p) for p in log_files]
+                log_files = Path("./").glob(f"{job_id}_*")
+                log_files_abs = [p.absolute() for p in log_files]
                 logger.debug(f"moving {len(log_files_abs)} log files to {self.cluster_log_dir}")
                 for f in log_files_abs:
                     shutil.move(f, self.cluster_log_dir)
@@ -708,9 +711,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
         """
         Clears the directory where cluster logs are stored
         """
-        fns = os.listdir(self.cluster_log_dir)
+        fns = self.cluster_log_dir.glob()
         for fn in fns:
-            os.remove(os.path.join(self.cluster_log_dir, fn))
+            (self.cluster_log_dir / fn).unlink()
 
     def make_executable_file(self):
         """
@@ -729,8 +732,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
             f'--mask_by_position $2'
         )
 
-        logger.debug("writing executable to " + self.executable_filename)
-        with open(self.executable_filename, "w") as f:
+        logger.debug("writing executable to " + str(self.executable_filename))
+        with self.executable_filename.open("w") as f:
             f.write(txt)
 
     def get_submit_file_filename(self, ids):
@@ -744,7 +747,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         """
         ids = np.atleast_1d(ids)
         ids_string = f"{min(ids)}-{max(ids)}"
-        return os.path.join(self.cluster_dir, f"ids{ids_string}.submit")
+        return self.cluster_dir / f"ids{ids_string}.submit"
 
     def make_submit_file(
             self,
@@ -764,6 +767,9 @@ class WISEDataDESYCluster(WiseDataByVisit):
         """
 
         q = "1 job_id in " + ", ".join(np.atleast_1d(job_ids).astype(str))
+        d = get_directories()
+        data_dir = str(d['data_dir'])
+        bigdata_dir = str(d['bigdata_dir'])
 
         text = (
             f"executable = {self.executable_filename} \n"
@@ -939,7 +945,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         _lc = lc if plot_binned else None
 
         if not fn:
-            fn = os.path.join(self.plots_dir, f"{parent_sample_idx}_{lum_key}.pdf")
+            fn = self.plots_dir / f"{parent_sample_idx}_{lum_key}.pdf"
 
         return self._plot_lc(lightcurve=_lc, unbinned_lc=unbinned_lc, interactive=interactive, fn=fn, ax=ax,
                              save=save, lum_key=lum_key, **kwargs)
@@ -1173,10 +1179,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 chunk_str = "chunks_" + "_".join([str(c) for c in chunks]) \
                     if len(chunks) != self.n_chunks \
                     else "all_chunks"
-                fn = os.path.join(self.plots_dir, f"chi2_plots", lum_key, f"{n}_datapoints_{kind}_{chunk_str}.pdf")
-                d = os.path.dirname(fn)
-                if not os.path.isdir(d):
-                    os.makedirs(d)
+                fn = self.plots_dir / f"chi2_plots" / lum_key / f"{n}_datapoints_{kind}_{chunk_str}.pdf"
+                fn.parent.mkdir(parents=True, exist_ok=True)
                 logger.debug(f"saving under {fn}")
                 fig.savefig(fn)
 
@@ -1337,10 +1341,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
             chunk_str = "chunks_" + "_".join([str(c) for c in chunks]) \
                 if len(chunks) != self.n_chunks \
                 else "all_chunks"
-            fn = os.path.join(self.plots_dir, f"coverage_plots", lum_key, f"{chunk_str}.pdf")
-            d = os.path.dirname(fn)
-            if not os.path.isdir(d):
-                os.makedirs(d)
+            fn = self.plots_dir / f"coverage_plots" / lum_key / f"{chunk_str}.pdf"
+            fn.parent.mkdir(parents=True, exist_ok=True)
             logger.debug(f"saving under {fn}")
             fig.savefig(fn)
 

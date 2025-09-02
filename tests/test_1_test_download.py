@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 
 from timewise import WiseDataByVisit, WISEDataDESYCluster, ParentSampleBase
-from timewise.general import main_logger, data_dir, bigdata_dir
+from timewise.general import main_logger, get_directories
 from timewise.utils import get_mirong_sample
 
 
@@ -164,7 +164,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
             lcs = wise_data.load_data_product(s)
             plot_id = list(lcs.keys())[0].split('_')[0]
             for lumk in ['mag', 'flux_density', 'luminosity']:
-                fn = os.path.join(wise_data.plots_dir, f"{plot_id}_{lumk}.pdf")
+                fn = wise_data.plots_dir / f"{plot_id}_{lumk}.pdf"
                 plot_unbinned = True if lumk == 'mag' else False
                 wise_data.plot_lc(
                     parent_sample_idx=plot_id,
@@ -181,8 +181,8 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         wise_data = WISEDataTestVersion(
             base_name=WISEDataTestVersion.base_name + '_match_to_allsky'
         )
-        in_filename = os.path.join(wise_data.cache_dir, "test_allsky_match_in.xml")
-        out_filename = os.path.join(wise_data.cache_dir, "test_allsky_match_out.tbl")
+        in_filename = wise_data.cache_dir / "test_allsky_match_in.xml"
+        out_filename = wise_data.cache_dir / "test_allsky_match_out.tbl"
         mask = [True] * len(wise_data.parent_sample.df)
         res = wise_data._match_to_wise(
             table_name=wise_data.get_db_name("WISE All-Sky Source Catalog"),
@@ -222,7 +222,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         lcs = wise_data.load_data_product(s)
         plot_id = list(lcs.keys())[0].split('_')[0]
         for lumk in ['mag', 'flux_density', 'luminosity']:
-            fn = os.path.join(wise_data.plots_dir, f"{plot_id}_{lumk}.pdf")
+            fn = wise_data.plots_dir / f"{plot_id}_{lumk}.pdf"
             plot_unbinned = True if lumk == 'mag' else False
             wise_data.plot_lc(
                 parent_sample_idx=plot_id,
@@ -253,7 +253,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         logger.info(f" --- Test plot lightcurves --- ")
         plot_id = "2"
         for lumk in ['mag', 'flux_density']:
-            fn = os.path.join(wise_data.plots_dir, f"{plot_id}_{lumk}.pdf")
+            fn = wise_data.plots_dir / f"{plot_id}_{lumk}.pdf"
             wise_data.plot_lc(
                 parent_sample_idx=plot_id,
                 lum_key=lumk,
@@ -297,8 +297,10 @@ class TestMIRFlareCatalogue(unittest.TestCase):
 
         # verify that the combined chunk file has not been produced nor moved to the big data directory
         chunk_0_data_product_filename = wise_data._data_product_filename("tap", 0, use_bigdata_dir=False)
-        self.assertFalse(os.path.isfile(chunk_0_data_product_filename))
-        self.assertFalse(os.path.isfile(chunk_0_data_product_filename.replace(data_dir, bigdata_dir)))
+        self.assertFalse(chunk_0_data_product_filename.is_file())
+        ds = get_directories()
+        d2 = Path(str(chunk_0_data_product_filename).replace(str(ds["data_dir"]), str(ds["bigdata_dir"])))
+        self.assertFalse(d2.is_file())
 
         # verify that chunk 1 was processed normally
         chunk1_data_product = wise_data.load_data_product("tap", 1,

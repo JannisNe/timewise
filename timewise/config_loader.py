@@ -1,11 +1,11 @@
 import logging
 import yaml
 import json
-import os
 import inspect
 from pydantic import BaseModel, validator
 import pandas as pd
 import importlib
+from pathlib import Path
 
 from timewise.parent_sample_base import ParentSampleBase
 from timewise.wise_data_base import WISEDataBase
@@ -80,7 +80,7 @@ class TimewiseConfigLoader(BaseModel):
     @validator("filename")
     def validate_file(cls, v: str):
         if v is not None:
-            if not os.path.isfile(v):
+            if not Path(v).is_file():
                 raise ValueError(f"No file {v}!")
         return v
 

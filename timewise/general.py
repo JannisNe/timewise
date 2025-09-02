@@ -1,4 +1,6 @@
-import logging, os
+import logging
+import os
+from pathlib import Path
 
 
 # Setting up the Logger
@@ -13,29 +15,35 @@ main_logger.propagate = False  # do not propagate to root logger
 
 logger = logging.getLogger(__name__)
 
-# Setting up data directory
-DATA_DIR_KEY = 'TIMEWISE_DATA'
-if DATA_DIR_KEY in os.environ:
-    data_dir = os.path.expanduser(os.environ[DATA_DIR_KEY])
-else:
-    logger.warning(f'{DATA_DIR_KEY} not set! Using home directory.')
-    data_dir = os.path.expanduser('~/')
 
-BIGDATA_DIR_KEY = 'TIMEWISE_BIGDATA'
-if BIGDATA_DIR_KEY in os.environ:
-    bigdata_dir = os.path.expanduser(os.environ[BIGDATA_DIR_KEY])
-    logger.info(f"Using bigdata directory {bigdata_dir}")
-else:
-    bigdata_dir = None
-    logger.info(f"No bigdata directory set.")
+def get_directories() -> dict[str, Path | None]:
+    # Setting up data directory
+    DATA_DIR_KEY = 'TIMEWISE_DATA'
+    if DATA_DIR_KEY in os.environ:
+        data_dir = Path(os.environ[DATA_DIR_KEY]).expanduser()
+    else:
+        logger.warning(f'{DATA_DIR_KEY} not set! Using home directory.')
+        data_dir = Path('~/').expanduser()
 
-output_dir = os.path.join(data_dir, 'output')
-plots_dir = os.path.join(output_dir, 'plots')
-cache_dir = os.path.join(data_dir, 'cache')
+    BIGDATA_DIR_KEY = 'TIMEWISE_BIGDATA'
+    if BIGDATA_DIR_KEY in os.environ:
+        bigdata_dir = Path(os.environ[BIGDATA_DIR_KEY]).expanduser()
+        logger.info(f"Using bigdata directory {bigdata_dir}")
+    else:
+        bigdata_dir = None
+        logger.info(f"No bigdata directory set.")
 
-for d in [data_dir, output_dir, plots_dir, cache_dir]:
-    if not os.path.isdir(d):
-        os.mkdir(os.path.abspath(d))
+    output_dir = data_dir / 'output'
+    plots_dir = output_dir / 'plots'
+    cache_dir = data_dir / 'cache'
+
+    return {
+        'data_dir': data_dir,
+        'bigdata_dir': bigdata_dir,
+        'output_dir': output_dir,
+        'plots_dir': plots_dir,
+        'cache_dir': cache_dir
+    }
 
 
 def backoff_hndlr(details):
