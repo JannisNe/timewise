@@ -3,8 +3,8 @@ import logging
 import pandas as pd
 from pathlib import Path
 
-from timewise.general import main_logger, cache_dir
-from timewise.utils import get_mirong_sample, local_copy
+from timewise.general import get_directories, main_logger
+from timewise.utils import get_mirong_sample, get_mirong_path
 from timewise.config_loader import TimewiseConfigLoader
 
 
@@ -13,14 +13,14 @@ logger = logging.getLogger("timewise.test")
 
 
 def get_test_yaml_filename():
-    dir_path = Path(cache_dir)
-    return dir_path / "test" / "test_config" / "test.yml"
+    return get_directories()["cache_dir"] / "test" / "test_config" / "test.yml"
 
 
 def make_test_yaml():
+    mirong_path = get_mirong_path()
     txt = (
         f"base_name: mirong_test \n"
-        f"filename: {local_copy} \n"
+        f"filename: {mirong_path} \n"
         f"default_keymap: \n"
         f" ra: RA \n"
         f" dec: DEC \n"
@@ -49,7 +49,7 @@ class TestConfig(unittest.TestCase):
         logger.info("\n\n Testing TimewiseConfig \n")
         TimewiseConfigLoader.run_yaml(get_test_yaml_filename())
         logger.info("checking result")
-        fn = Path(cache_dir) / "mirong_test" / "sample.csv"
+        fn = get_directories()["cache_dir"] / "mirong_test" / "sample.csv"
         df = pd.read_csv(fn)
         self.assertTrue("w1mpro" in df.columns)
         self.assertTrue("w2mpro" in df.columns)
