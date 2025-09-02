@@ -711,7 +711,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
         """
         Clears the directory where cluster logs are stored
         """
-        fns = self.cluster_log_dir.glob()
+        fns = self.cluster_log_dir.glob("*")
         for fn in fns:
             (self.cluster_log_dir / fn).unlink()
 
