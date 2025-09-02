@@ -158,7 +158,7 @@ def load_cache_or_download(url):
     logger.debug(f"loading or downloading {url}")
     h = hashlib.md5(url.encode()).hexdigest()
     cache_dir = get_directories()['cache_dir']
-    cache_file = cache_dir / h + ".cache"
+    cache_file = cache_dir / (h + ".cache")
     logger.debug(f"cache file is {cache_file}")
     if not cache_file.is_file:
         logger.debug(f"downloading {url}")
