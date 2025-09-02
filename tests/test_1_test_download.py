@@ -266,8 +266,9 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         logger.info("\n\n Emulating WISEBigDataDESYCluster job fails\n\n")
         fail_job = 1
         wise_data = WISEBigDataTestVersion(fails=[fail_job])
+        d = get_directories()
 
-        bigdata_phot_dir = Path(wise_data._cache_photometry_dir.replace(data_dir, bigdata_dir))
+        bigdata_phot_dir = Path(wise_data._cache_photometry_dir.replace(d["data_dir"], d["bigdata_dir"]))
         phot_dir = Path(wise_data._cache_photometry_dir)
 
         for f in bigdata_phot_dir.glob("raw_photometry*"):
