@@ -1,7 +1,6 @@
 import unittest
 import logging
 import pandas as pd
-from pathlib import Path
 
 from timewise.general import get_directories, main_logger
 from timewise.utils import get_mirong_sample, get_mirong_path
