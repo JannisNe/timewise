@@ -1,4 +1,6 @@
 import abc
+import sys
+
 import backoff
 import copy
 import json
@@ -219,7 +221,8 @@ class WISEDataBase(abc.ABC):
                  base_name: str,
                  parent_sample_class,
                  min_sep_arcsec,
-                 n_chunks):
+                 n_chunks,
+                 tap_url_cache_name=None):
         """
         Base class for WISE Data
 
@@ -231,6 +234,8 @@ class WISEDataBase(abc.ABC):
         :type min_sep_arcsec: float
         :param n_chunks: number of chunks in declination
         :type n_chunks: int
+        :param tap_url_cache_name: TAP job URLs are stored here to be able to resume them
+        :type tap_url_cache_name: str
         """
 
         #######################################################################################
@@ -264,7 +269,7 @@ class WISEDataBase(abc.ABC):
         self.output_dir = directories["output_dir"] / base_name
         self.lightcurve_dir = self.output_dir / "lightcurves"
         self.plots_dir = directories["plots_dir"] / base_name
-        self.tap_jobs_cache_dir = self.cache_dir / 'tap_jobs'
+        self.tap_jobs_cache_dir = self.cache_dir / tap_url_cache_name
 
         for d in [self.cache_dir, self._cache_photometry_dir, self.cluster_dir, self.cluster_log_dir,
                   self.output_dir, self.lightcurve_dir, self.plots_dir]:
@@ -640,7 +645,7 @@ class WISEDataBase(abc.ABC):
     # START GET PHOTOMETRY DATA       #
     ###################################
 
-    def get_photometric_data(self, tables=None, perc=1, wait=0, service=None, nthreads=100,
+    def get_photometric_data(self, tables=None, perc=1, service=None, nthreads=100,
                              chunks=None, overwrite=True, remove_chunks=False, query_type='positional',
                              skip_download=False, mask_by_position=False):
         """
@@ -660,8 +665,6 @@ class WISEDataBase(abc.ABC):
         :type nthreads: int
         :param service: either of 'gator' or 'tap', selects base on elements per chunk by default
         :type service: str
-        :param wait: time in hours to wait after submitting TAP jobs
-        :type wait: float
         :param chunks: containing indices of chunks to download
         :type chunks: list-like
         :param query_type: 'positional': query photometry based on distance from object, 'by_allwise_id': select all photometry points within a radius of 50 arcsec with the corresponding AllWISE ID
@@ -706,7 +709,7 @@ class WISEDataBase(abc.ABC):
                          f"from {tables}")
 
             if service == 'tap':
-                self._query_for_photometry(tables, chunks, wait, mag, flux, nthreads, query_type)
+                self._query_for_photometry(tables, chunks, mag, flux, nthreads, query_type)
 
             elif service == 'gator':
                 self._query_for_photometry_gator(tables, chunks, mag, flux, nthreads)
@@ -960,12 +963,12 @@ class WISEDataBase(abc.ABC):
         for fn in fns:
             data_table = Table.read(fn, format='ipac').to_pandas()
 
-            t = 'allwise_p3as_mep' if 'allwise' in fn else 'neowiser_p1bs_psd'
+            t = 'allwise_p3as_mep' if 'allwise' in str(fn) else 'neowiser_p1bs_psd'
             nice_name = self.get_db_name(t, nice=True)
             cols = {'index_01': self._tap_orig_id_key}
             cols.update(self.photometry_table_keymap[nice_name]['mag'])
             cols.update(self.photometry_table_keymap[nice_name]['flux'])
-            if 'allwise' in fn:
+            if 'allwise' in str(fn):
                 cols['cntr_mf'] = 'allwise_cntr'
 
             data_table = data_table.rename(columns=cols)
@@ -984,6 +987,53 @@ class WISEDataBase(abc.ABC):
     # ----------------------------------------------------------------------------------- #
     # START using TAP to get photometry        #
     # ---------------------------------------- #
+
+    @property
+    def tap_cache_filenames(self):
+        return (
+            self.tap_jobs_cache_dir / f"tap_jobs_{self.base_name}.json",
+            self.tap_jobs_cache_dir / f"queue_{self.base_name}.json"
+        )
+
+    def dump_tap_cache(self):
+        self.tap_jobs_cache_dir.mkdir(parents=True, exist_ok=True)
+
+        tap_jobs_fn, queue_fn = self.tap_cache_filenames
+        logger.debug(f"saving TAP jobs to {tap_jobs_fn}")
+        with tap_jobs_fn.open("w") as f:
+            json.dump(self.tap_jobs, f, indent=4)
+        tap_jobs_fn.unlink()
+
+        logger.debug(f"saving queue to {queue_fn}")
+        with queue_fn.open("w") as f:
+            json.dump(list(self.queue.queue), f, indent=4)
+        queue_fn.unlink()
+
+    def load_tap_cache(self):
+        tap_jobs_fn, queue_fn = self.tap_cache_filenames
+
+        logger.debug(f"loading TAP jobs from {tap_jobs_fn}")
+        if tap_jobs_fn.is_file():
+            with tap_jobs_fn.open("r") as f:
+                self.tap_jobs = json.load(f)
+        else:
+            logger.warning(f"No file {tap_jobs_fn}")
+            self.tap_jobs = None
+
+        logger.debug(f"loading queue from {queue_fn}")
+        if queue_fn.is_file():
+            with queue_fn.open("r") as f:
+                ql = json.load(f)
+                logger.debug(f"loaded {len(ql)} queue elements")
+                self.queue = queue.Queue()
+                for q in ql:
+                    self.queue.put(q)
+        else:
+            logger.warning(f"No file {queue_fn}")
+            self.queue = None
+
+        cache_exists = (self.tap_jobs is not None) and (self.queue is not None)
+        return cache_exists
 
     def _get_photometry_query_string(self, table_name, mag, flux, query_type):
         """
@@ -1078,7 +1128,7 @@ class WISEDataBase(abc.ABC):
 
                 logger.info(f'submitted job for {t} for chunk {i}: ')
                 logger.debug(f'Job: {job.url}; {job.phase}')
-                self.tap_jobs[t][i] = job
+                self.tap_jobs[t][i] = job.url
                 self.queue.put((t, i))
                 break
 
@@ -1110,7 +1160,7 @@ class WISEDataBase(abc.ABC):
     def _thread_wait_and_get_results(self, t, i):
         logger.info(f"Waiting on {i}th query of {t} ........")
 
-        _job = self.tap_jobs[t][i]
+        _job = StableAsyncTAPJob(url=self.tap_jobs[t][i])
         _job.wait()
         logger.info(f'{i}th query of {t}: Done!')
 
@@ -1139,7 +1189,7 @@ class WISEDataBase(abc.ABC):
                 logger.debug(f"No more queue. exiting")
                 break
 
-            job = self.tap_jobs[t][i]
+            job = StableAsyncTAPJob(url=self.tap_jobs[t][i])
 
             _ntries = 10
             while True:
@@ -1183,7 +1233,7 @@ class WISEDataBase(abc.ABC):
         try:
             self.queue.join()
         except KeyboardInterrupt:
-            pass
+            self.dump_tap_cache()
 
         logger.info('all tap_jobs done!')
         for i, t in enumerate(threads):
@@ -1194,23 +1244,31 @@ class WISEDataBase(abc.ABC):
         self.tap_jobs = None
         del threads
 
-    def _query_for_photometry(self, tables, chunks, wait, mag, flux, nthreads, query_type):
+    def _query_for_photometry(self, tables, chunks, mag, flux, nthreads, query_type):
+        # ----------------------------------------------------------------------
+        #     Load TAP cache if it exists
+        # ----------------------------------------------------------------------
+        cache_exists = self.load_tap_cache()
+
         # ----------------------------------------------------------------------
         #     Do the query
         # ----------------------------------------------------------------------
-        self.tap_jobs = dict()
-        self.queue = queue.Queue()
-        tables = np.atleast_1d(tables)
+        if not cache_exists:
+            self.tap_jobs = dict()
+            self.queue = queue.Queue() if self.queue is None else self.queue
+            tables = np.atleast_1d(tables)
 
-        for t in tables:
-            self.tap_jobs[t] = dict()
-            for i in chunks:
-                self._submit_job_to_TAP(i, t, mag, flux, query_type)
-                time.sleep(5)
+            for t in tables:
+                self.tap_jobs[t] = dict()
+                for i in chunks:
+                    self._submit_job_to_TAP(i, t, mag, flux, query_type)
+                    time.sleep(5)
 
-        logger.info(f'added {self.queue.qsize()} tasks to queue')
-        logger.info(f"wait for {wait} hours to give tap_jobs some time")
-        time.sleep(wait * 3600)
+            logger.info(f'added {self.queue.qsize()} tasks to queue')
+            logger.info(f"wait some time to give tap_jobs some time")
+            sys.exit(0)
+
+        logger.info(f'starting worker threads to retrieve results, {self.queue.qsize()} tasks in queue')
         nthreads = min(len(tables) * len(chunks), nthreads)
         self._run_tap_worker_threads(nthreads)
         self.queue = None
