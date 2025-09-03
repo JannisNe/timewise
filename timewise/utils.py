@@ -48,11 +48,10 @@ def get_mirong_sample():
         mirong_sample = pd.DataFrame(lll[1:-1], columns=lll[0])
         mirong_sample['ra'] = mirong_sample['RA']
         mirong_sample['dec'] = mirong_sample['DEC']
-        logger.debug(f'saving to {mirong_path}')
-
-        mirong_sample.to_csv(mirong_path, index=False)
         logger.info(f'found {len(mirong_sample)} objects in MIRONG Sample')
+
         mirong_sample.drop(columns=['ra', 'dec'], inplace=True)
+        logger.debug(f'saving to {mirong_path}')
         mirong_path.parent.mkdir(parents=True, exist_ok=True)
         mirong_sample.to_csv(mirong_path, index=False)
 
