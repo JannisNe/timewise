@@ -84,4 +84,5 @@ class ParentSampleBase(abc.ABC):
 
     def save_local(self):
         logger.debug(f"saving under {self.local_sample_copy}")
+        self.local_sample_copy.parent.mkdir(parents=True, exist_ok=True)
         self.df.to_csv(self.local_sample_copy)
