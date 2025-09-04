@@ -30,7 +30,7 @@ from typing import List
 
 from timewise.general import get_directories, backoff_hndlr
 from timewise.wise_data_by_visit import WiseDataByVisit
-from timewise.utils import StableAsyncTAPJob
+from timewise.utils import StableAsyncTAPJob, ErrorQueue, ExceptionSafeThread
 
 
 logger = logging.getLogger(__name__)
@@ -292,20 +292,24 @@ class WISEDataDESYCluster(WiseDataByVisit):
         # --------------------------- set up queues --------------------------- #
 
         self.queue = queue.Queue()
-        self._tap_queue = queue.Queue()
-        self._cluster_queue = queue.Queue()
+        self._tap_queue = ErrorQueue()
+        self._cluster_queue = ErrorQueue()
         self._io_queue = queue.PriorityQueue()
         self._io_queue_done = queue.Queue()
-        self._combining_queue = queue.Queue()
+        self._combining_queue = ErrorQueue()
 
         # --------------------------- starting threads --------------------------- #
 
-        tap_threads = [threading.Thread(target=self._tap_thread, daemon=True, name=f"TAPThread{_}")
-                       for _ in range(max_nTAPjobs)]
-        cluster_threads = [threading.Thread(target=self._cluster_thread, daemon=True, name=f"ClusterThread{_}")
-                           for _ in range(max_nTAPjobs)]
+        tap_threads = [
+            ExceptionSafeThread(error_queue=self._tap_queue, target=self._tap_thread, daemon=True, name=f"TAPThread{_}")
+            for _ in range(max_nTAPjobs)
+        ]
+        cluster_threads = [
+            ExceptionSafeThread(error_queue=self._cluster_queue, target=self._cluster_thread, daemon=True, name=f"ClusterThread{_}")
+            for _ in range(max_nTAPjobs)
+        ]
         io_thread = threading.Thread(target=self._io_thread, daemon=True, name="IOThread")
-        combining_thread = threading.Thread(target=self._combining_thread, daemon=True, name="CombiningThread")
+        combining_thread = ExceptionSafeThread(error_queue=self._combining_queue, target=self._combining_thread, daemon=True, name="CombiningThread")
         status_thread = threading.Thread(target=self._status_thread, daemon=True, name='StatusThread')
 
         for t in tap_threads + cluster_threads + [io_thread, combining_thread]:
