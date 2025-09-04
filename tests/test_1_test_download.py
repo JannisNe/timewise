@@ -5,6 +5,7 @@ import socket
 import numpy as np
 import logging
 from pathlib import Path
+import time
 
 from timewise import WiseDataByVisit, WISEDataDESYCluster, ParentSampleBase
 from timewise.general import main_logger, get_directories
@@ -149,7 +150,13 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         for s in ['gator', 'tap']:
 
             logger.info(f"\nTesting {s.upper()}")
-            wise_data.get_photometric_data(service=s, mask_by_position=True)
+            success = wise_data.get_photometric_data(service=s, mask_by_position=True)
+
+            if (s == "tap") and (not success):
+                logger.info("TAP jobs running, waiting 60 seconds and trying again")
+                time.sleep(60)
+                success = wise_data.get_photometric_data(service=s, mask_by_position=True)
+            self.assertTrue(success, f"{s} photometry download failed")
 
             logger.info(f" --- Test adding flux densities --- ")
             wise_data.add_flux_densities_to_saved_lightcurves(s)
