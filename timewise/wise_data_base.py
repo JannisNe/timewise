@@ -652,6 +652,11 @@ class WISEDataBase(abc.ABC):
 
             </path/to/timewise/data/dir>/output/<base_name>/lightcurves/binned_lightcurves_<service>.json
 
+        If service is 'tap' then the process exists on the first call to give the jobs running on the IRSA
+        servers some time. The job infos are cached and loaded on the next function call. `timewise` will
+        then wait on the jobs to finish. If the process is terminated via the keyboard during the waiting
+        the TAP connections will also be cached to be resumed at a later time.
+
         :param remove_chunks: remove single chunk files after binning
         :type remove_chunks: bools
         :param overwrite: overwrite already existing lightcurves and metadata
