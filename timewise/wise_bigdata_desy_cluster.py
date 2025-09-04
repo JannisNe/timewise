@@ -477,7 +477,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
     def _move_file_to_storage(self, filename):
         data_dir = str(get_directories()['data_dir'])
-        dst_fn = Path(filename.replace(data_dir, self._storage_dir))
+        dst_fn = Path(str(filename).replace(str(data_dir), str(self._storage_dir)))
         dst_fn.parent.mkdir(parents=True, exist_ok=True)
 
         logger.debug(f"copy {filename} to {dst_fn}")
