@@ -1,5 +1,4 @@
 import getpass
-import glob
 import os
 import json
 import subprocess
@@ -31,6 +30,7 @@ from typing import List
 
 from timewise.general import get_directories, backoff_hndlr
 from timewise.wise_data_by_visit import WiseDataByVisit
+from timewise.utils import StableAsyncTAPJob
 
 
 logger = logging.getLogger(__name__)
@@ -355,13 +355,13 @@ class WISEDataDESYCluster(WiseDataByVisit):
     )
     def _wait_for_job(self, t, i):
         logger.info(f"Waiting on {i}th query of {t} ........")
-        _job = self.tap_jobs[t][i]
+        _job = StableAsyncTAPJob(url=self.tap_jobs[t][i])
         _job.wait()
         logger.info(f'{i}th query of {t}: Done!')
 
     def _get_results_from_job(self, t, i):
         logger.debug(f"getting results for {i}th query of {t} .........")
-        _job = self.tap_jobs[t][i]
+        _job = StableAsyncTAPJob(url=self.tap_jobs[t][i])
         lightcurve = _job.fetch_result().to_table().to_pandas()
         fn = self._chunk_photometry_cache_filename(t, i)
         table_nice_name = self.get_db_name(t, nice=True)
@@ -437,8 +437,8 @@ class WISEDataDESYCluster(WiseDataByVisit):
                 # --------------  get results of TAP job for chunk i-1 ------------- #
                 if i > 0:
                     t_before = tables[i - 1]
-
-                    if self.tap_jobs[t_before][chunk].phase == "COMPLETED":
+                    phase = StableAsyncTAPJob(url=self.tap_jobs[t_before][chunk]).phase
+                    if phase == "COMPLETED":
                         result_method = "_get_results_from_job"
                         result_args = [t_before, chunk]
                         self._io_queue.put((2, result_method, result_args))
@@ -447,7 +447,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
                     else:
                         logger.warning(
                             f"No completion for {chunk}th query of {t_before}! "
-                            f"Phase is {self.tap_jobs[t_before][chunk].phase}!"
+                            f"Phase is {phase}!"
                         )
                         submit_to_cluster = False
 
