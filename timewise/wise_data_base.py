@@ -1014,13 +1014,11 @@ class WISEDataBase(abc.ABC):
         tap_jobs_fn.parent.mkdir(parents=True, exist_ok=True)
         with tap_jobs_fn.open("w") as f:
             json.dump(self.tap_jobs, f, indent=4)
-        tap_jobs_fn.unlink()
 
         queue_fn.parent.mkdir(parents=True, exist_ok=True)
         logger.debug(f"saving queue to {queue_fn}")
         with queue_fn.open("w") as f:
             json.dump(list(self.queue.queue), f, indent=4)
-        queue_fn.unlink()
 
     def load_tap_cache(self):
         tap_jobs_fn, queue_fn = self.tap_cache_filenames
@@ -1029,6 +1027,8 @@ class WISEDataBase(abc.ABC):
         if tap_jobs_fn.is_file():
             with tap_jobs_fn.open("r") as f:
                 self.tap_jobs = json.load(f)
+            logger.debug(f"removing {tap_jobs_fn}")
+            tap_jobs_fn.unlink()
         else:
             logger.warning(f"No file {tap_jobs_fn}")
             self.tap_jobs = None
@@ -1041,6 +1041,8 @@ class WISEDataBase(abc.ABC):
                 self.queue = queue.Queue()
                 for q in ql:
                     self.queue.put(q)
+                logger.debug(f"removing {queue_fn}")
+                queue_fn.unlink()
         else:
             logger.warning(f"No file {queue_fn}")
             self.queue = None
