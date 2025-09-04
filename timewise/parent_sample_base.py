@@ -57,6 +57,7 @@ class ParentSampleBase(abc.ABC):
             [self.plots_dir / f"{i}_{r[self.default_keymap['id']]}.pdf"
              for i, r in sel.iterrows()]
         )
+        self.plots_dir.mkdir(parents=True, exist_ok=True)
 
         logger.debug(f"\nRA: {ra}\nDEC: {dec}\nTITLE: {title}\nFN: {fn}")
         ou = list()
