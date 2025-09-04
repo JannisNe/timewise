@@ -127,7 +127,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
 
         if use_bigdata_dir:
             d = get_directories()
-            fn = fn.replace(d["data_dir"], d["bigdata_dir"])
+            fn = str(fn).replace(str(d["data_dir"]), str(d["bigdata_dir"]))
 
         return Path(str(fn) + ".gz")
 
