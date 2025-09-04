@@ -672,6 +672,8 @@ class WISEDataBase(abc.ABC):
         :type skip_download: bool
         :param mask_by_position: if `True` mask single exposures that are too far away from the bulk
         :type mask_by_position: bool
+        :return: The status of the processing
+        :rtype: bool
         """
 
         mag = True
@@ -1000,8 +1002,8 @@ class WISEDataBase(abc.ABC):
     @property
     def tap_cache_filenames(self):
         return (
-            self.tap_jobs_cache_dir / f"tap_jobs_{self.base_name}.json",
-            self.tap_jobs_cache_dir / f"queue_{self.base_name}.json"
+            self.tap_jobs_cache_dir / f"tap_jobs.json",
+            self.tap_jobs_cache_dir / f"queue.json"
         )
 
     def dump_tap_cache(self):
