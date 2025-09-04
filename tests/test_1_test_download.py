@@ -283,7 +283,10 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         wise_data = WISEBigDataTestVersion(fails=[fail_job])
         d = get_directories()
 
-        bigdata_phot_dir = Path(wise_data._cache_photometry_dir.replace(d["data_dir"], d["bigdata_dir"]))
+        bigdata_phot_dir = Path(str(wise_data._cache_photometry_dir).replace(
+            str(d["data_dir"]),
+            str(d["bigdata_dir"]))
+        )
         phot_dir = Path(wise_data._cache_photometry_dir)
 
         for f in bigdata_phot_dir.glob("raw_photometry*"):
