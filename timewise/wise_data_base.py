@@ -1031,7 +1031,12 @@ class WISEDataBase(abc.ABC):
         logger.debug(f"loading TAP jobs from {tap_jobs_fn}")
         if tap_jobs_fn.is_file():
             with tap_jobs_fn.open("r") as f:
-                self.tap_jobs = json.load(f)
+                tap_jobs_json = json.load(f)
+            # JSON keys are always strings while we need the chunk numbers
+            # to be integers in the dictionary
+            self.tap_jobs = {
+                t: {int(i): url for i, url in v.items()} for t, v in tap_jobs_json.items()
+            }
             logger.debug(f"removing {tap_jobs_fn}")
             tap_jobs_fn.unlink()
         else:
