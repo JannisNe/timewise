@@ -221,8 +221,7 @@ class WISEDataBase(abc.ABC):
                  base_name: str,
                  parent_sample_class,
                  min_sep_arcsec,
-                 n_chunks,
-                 tap_url_cache_name=None):
+                 n_chunks):
         """
         Base class for WISE Data
 
@@ -269,7 +268,7 @@ class WISEDataBase(abc.ABC):
         self.output_dir = directories["output_dir"] / base_name
         self.lightcurve_dir = self.output_dir / "lightcurves"
         self.plots_dir = directories["plots_dir"] / base_name
-        self.tap_jobs_cache_dir = self.cache_dir / tap_url_cache_name
+        self.tap_jobs_cache_dir = self.cache_dir / 'tap_cache'
 
         for d in [self.cache_dir, self._cache_photometry_dir, self.cluster_dir, self.cluster_log_dir,
                   self.output_dir, self.lightcurve_dir, self.plots_dir]:
@@ -1000,10 +999,12 @@ class WISEDataBase(abc.ABC):
 
         tap_jobs_fn, queue_fn = self.tap_cache_filenames
         logger.debug(f"saving TAP jobs to {tap_jobs_fn}")
+        tap_jobs_fn.parent.mkdir(parents=True, exist_ok=True)
         with tap_jobs_fn.open("w") as f:
             json.dump(self.tap_jobs, f, indent=4)
         tap_jobs_fn.unlink()
 
+        queue_fn.parent.mkdir(parents=True, exist_ok=True)
         logger.debug(f"saving queue to {queue_fn}")
         with queue_fn.open("w") as f:
             json.dump(list(self.queue.queue), f, indent=4)
