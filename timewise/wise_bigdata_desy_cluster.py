@@ -129,7 +129,7 @@ class WISEDataDESYCluster(WiseDataByVisit):
             d = get_directories()
             fn = fn.replace(d["data_dir"], d["bigdata_dir"])
 
-        return fn + ".gz"
+        return Path(str(fn) + ".gz")
 
     def load_data_product(
             self,
