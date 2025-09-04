@@ -154,7 +154,7 @@ class TestMIRFlareCatalogue(unittest.TestCase):
 
             if (s == "tap") and (not success):
                 logger.info("TAP jobs running, waiting 60 seconds and trying again")
-                time.sleep(60)
+                time.sleep(10)
                 success = wise_data.get_photometric_data(service=s, mask_by_position=True)
             self.assertTrue(success, f"{s} photometry download failed")
 
@@ -210,11 +210,19 @@ class TestMIRFlareCatalogue(unittest.TestCase):
         s = 'tap'
 
         logger.info(f"\nTesting {s.upper()} and query type 'by_allwise_id'")
-        wise_data.get_photometric_data(
+        success = wise_data.get_photometric_data(
             service=s,
             query_type='by_allwise_id',
             tables=["AllWISE Multiepoch Photometry Table"]
         )
+        if (s == 'tap') and (not success):
+            logger.info("giving TAP jobs some time")
+            time.sleep(10)
+            wise_data.get_photometric_data(
+                service=s,
+                query_type='by_allwise_id',
+                tables=["AllWISE Multiepoch Photometry Table"]
+            )
 
         logger.info(f" --- Test adding flux densities --- ")
         wise_data.add_flux_densities_to_saved_lightcurves(s)
