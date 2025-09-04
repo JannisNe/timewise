@@ -708,19 +708,27 @@ class WISEDataBase(abc.ABC):
                          f"from {tables}")
 
             if service == 'tap':
-                self._query_for_photometry(tables, chunks, mag, flux, nthreads, query_type)
+                done = self._query_for_photometry(tables, chunks, mag, flux, nthreads, query_type)
+                if not done:
+                    logger.info("Some TAP jobs still running. Exit here and resume later.")
+                    return False
 
             elif service == 'gator':
                 self._query_for_photometry_gator(tables, chunks, mag, flux, nthreads)
+            else:
+                raise ValueError(f"Unknown service {service}! Choose one of 'tap' or 'gator'")
 
         else:
             logger.info("skipping download, assume data is already downloaded.")
 
+        logger.info("Download done, processing lightcurves")
         self._select_individual_lightcurves_and_bin(service=service, chunks=chunks, mask_by_position=mask_by_position)
         for c in chunks:
             self.calculate_metadata(service=service, chunk_number=c, overwrite=True)
 
         self._combine_data_products(service=service, remove=remove_chunks, overwrite=overwrite)
+
+        return True
 
     def _data_product_filename(self, service, chunk_number=None, jobID=None):
 
@@ -947,6 +955,8 @@ class WISEDataBase(abc.ABC):
 
         for t in threads:
             t.join()
+
+        return True
 
     def _get_unbinned_lightcurves_gator(self, chunk_number, clear=False):
         # load only the files for this chunk
@@ -1233,17 +1243,19 @@ class WISEDataBase(abc.ABC):
 
         try:
             self.queue.join()
+            logger.info('all tap_jobs done!')
         except KeyboardInterrupt:
             self.dump_tap_cache()
+            return False
+        finally:
+            for i, t in enumerate(threads):
+                logger.debug(f"{i}th thread alive: {t.is_alive()}")
+            for t in threads:
+                t.join()
+            self.tap_jobs = None
+            del threads
 
-        logger.info('all tap_jobs done!')
-        for i, t in enumerate(threads):
-            logger.debug(f"{i}th thread alive: {t.is_alive()}")
-
-        for t in threads:
-            t.join()
-        self.tap_jobs = None
-        del threads
+        return True
 
     def _query_for_photometry(self, tables, chunks, mag, flux, nthreads, query_type):
         # ----------------------------------------------------------------------
@@ -1266,13 +1278,15 @@ class WISEDataBase(abc.ABC):
                     time.sleep(5)
 
             logger.info(f'added {self.queue.qsize()} tasks to queue')
+            self.dump_tap_cache()
             logger.info(f"wait some time to give tap_jobs some time")
-            sys.exit(0)
+            return False
 
         logger.info(f'starting worker threads to retrieve results, {self.queue.qsize()} tasks in queue')
         nthreads = min(len(tables) * len(chunks), nthreads)
-        self._run_tap_worker_threads(nthreads)
+        success = self._run_tap_worker_threads(nthreads)
         self.queue = None
+        return success
 
     # ----------------------------------------------------------------------
     #     select individual lightcurves and bin
