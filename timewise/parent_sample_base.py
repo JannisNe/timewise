@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import logging
 
-from timewise.general import cache_dir, plots_dir
+from timewise.general import get_directories
 from timewise.utils import plot_sdss_cutout, plot_panstarrs_cutout
 
 
@@ -26,14 +26,14 @@ class ParentSampleBase(abc.ABC):
 
     def __init__(self, base_name):
         # set up directories
-        self.cache_dir = os.path.join(cache_dir, base_name)
-        self.plots_dir = os.path.join(plots_dir, base_name)
+        d = get_directories()
+        self.cache_dir = d["cache_dir"] / base_name
+        self.plots_dir = d["plots_dir"] / base_name
 
         for d in [self.cache_dir, self.plots_dir]:
-            if not os.path.isdir(d):
-                os.makedirs(d)
+            d.parent.mkdir(parents=True, exist_ok=True)
 
-        self.local_sample_copy = os.path.join(self.cache_dir, 'sample.csv')
+        self.local_sample_copy = self.cache_dir / 'sample.csv'
 
     def plot_cutout(self, ind, arcsec=20, interactive=False, **kwargs):
         """
@@ -54,9 +54,10 @@ class ParentSampleBase(abc.ABC):
 
         fn = kwargs.pop(
             "fn",
-            [os.path.join(self.plots_dir, f"{i}_{r[self.default_keymap['id']]}.pdf")
+            [self.plots_dir / f"{i}_{r[self.default_keymap['id']]}.pdf"
              for i, r in sel.iterrows()]
         )
+        self.plots_dir.mkdir(parents=True, exist_ok=True)
 
         logger.debug(f"\nRA: {ra}\nDEC: {dec}\nTITLE: {title}\nFN: {fn}")
         ou = list()
@@ -84,4 +85,5 @@ class ParentSampleBase(abc.ABC):
 
     def save_local(self):
         logger.debug(f"saving under {self.local_sample_copy}")
+        self.local_sample_copy.parent.mkdir(parents=True, exist_ok=True)
         self.df.to_csv(self.local_sample_copy)

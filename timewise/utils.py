@@ -13,14 +13,19 @@ from astropy.table import Table
 from PIL import Image
 from io import BytesIO
 import hashlib
+from threading import Thread
+from queue import Queue
+import sys
 
-
-from timewise.general import cache_dir, backoff_hndlr
+from timewise.general import backoff_hndlr, get_directories
 
 
 logger = logging.getLogger(__name__)
 mirong_url = 'http://staff.ustc.edu.cn/~jnac/data_public/wisevar.txt'
-local_copy = os.path.join(cache_dir, 'mirong_sample.csv')
+
+
+def get_mirong_path():
+    return get_directories()['cache_dir'] / 'mirong_sample.csv'
 
 
 @cache
@@ -30,7 +35,8 @@ def get_2d_gaussian_correction(cl):
 
 def get_mirong_sample():
 
-    if not os.path.isfile(local_copy):
+    mirong_path = get_mirong_path()
+    if not mirong_path.is_file():
 
         logger.info(f'getting MIRONG sample from {mirong_url}')
         r = requests.get(mirong_url)
@@ -45,16 +51,16 @@ def get_mirong_sample():
         mirong_sample = pd.DataFrame(lll[1:-1], columns=lll[0])
         mirong_sample['ra'] = mirong_sample['RA']
         mirong_sample['dec'] = mirong_sample['DEC']
-        logger.debug(f'saving to {local_copy}')
-
-        mirong_sample.to_csv(local_copy, index=False)
         logger.info(f'found {len(mirong_sample)} objects in MIRONG Sample')
+
         mirong_sample.drop(columns=['ra', 'dec'], inplace=True)
-        mirong_sample.to_csv(local_copy, index=False)
+        logger.debug(f'saving to {mirong_path}')
+        mirong_path.parent.mkdir(parents=True, exist_ok=True)
+        mirong_sample.to_csv(mirong_path, index=False)
 
     else:
-        logger.debug(f'loading {local_copy}')
-        mirong_sample = pd.read_csv(local_copy)
+        logger.debug(f'loading {mirong_path}')
+        mirong_sample = pd.read_csv(mirong_path)
 
     return mirong_sample
 
@@ -154,9 +160,10 @@ class PanSTARRSQueryError(Exception):
 def load_cache_or_download(url):
     logger.debug(f"loading or downloading {url}")
     h = hashlib.md5(url.encode()).hexdigest()
-    cache_file = os.path.join(cache_dir, h + ".cache")
+    cache_dir = get_directories()['cache_dir']
+    cache_file = cache_dir / (h + ".cache")
     logger.debug(f"cache file is {cache_file}")
-    if not os.path.isfile(cache_file):
+    if not cache_file.is_file():
         logger.debug(f"downloading {url}")
         r = requests.get(url)
         with open(cache_file, 'wb') as f:
@@ -465,3 +472,47 @@ class StableTAPService(vo.dal.TAPService):
 #######################################################
 #            END CUSTOM TAP Service                   #
 ###########################################################################################################
+
+
+###########################################################################################################
+#            START CUSTOM TAP Service                 #
+#######################################################
+
+
+class ErrorQueue(Queue):
+    """Queue subclass whose join() re-raises exceptions from worker threads."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.error_queue = Queue()
+
+    def report_error(self, exc_info):
+        """Called by workers to push an exception into the error queue."""
+        self.error_queue.put(exc_info)
+        # Also decrement unfinished_tasks, so join() won't block forever
+        with self.all_tasks_done:
+            self.unfinished_tasks = max(0, self.unfinished_tasks - 1)
+            self.all_tasks_done.notify_all()
+
+    def join(self):
+        """Wait until all tasks are done, or raise if a worker failed."""
+        with self.all_tasks_done:
+            while self.unfinished_tasks:
+                if not self.error_queue.empty():
+                    exc_info = self.error_queue.get()
+                    raise exc_info[1].with_traceback(exc_info[2])
+                self.all_tasks_done.wait()
+
+
+class ExceptionSafeThread(Thread):
+    """Thread subclass that reports uncaught exceptions to the ErrorQueue."""
+
+    def __init__(self, error_queue: ErrorQueue, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.error_queue = error_queue
+
+    def run(self):
+        try:
+            super().run()
+        except Exception:
+            self.error_queue.report_error(sys.exc_info())

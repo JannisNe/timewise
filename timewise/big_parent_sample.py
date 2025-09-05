@@ -1,5 +1,4 @@
 import gc
-import os
 import pickle
 import threading
 import time
@@ -30,7 +29,7 @@ class BigParentSampleBase(ParentSampleBase):
         self._keep_df_in_memory = keep_file_in_memory
         self._time_when_df_was_used_last = time.time()
         self._df = None
-        self._cache_file = os.path.join(self.cache_dir, "cache.pkl")
+        self._cache_file = self.cache_dir / "cache.pkl"
         self._lock_cache_file = False
 
         self._clean_thread = threading.Thread(target=self._periodically_drop_df_to_disk, daemon=True, name='ParentSampleCleanThread').start()
@@ -50,7 +49,7 @@ class BigParentSampleBase(ParentSampleBase):
 
         if isinstance(self._df, type(None)):
 
-            if os.path.isfile(self._cache_file):
+            if self._cache_file.is_file():
                 logger.debug(f'loading from {self._cache_file}')
                 self._wait_for_unlock_cache_file()
                 self._lock_cache_file = True
@@ -97,9 +96,9 @@ class BigParentSampleBase(ParentSampleBase):
         logger.debug('stopped clean thread')
 
     def __del__(self):
-        if hasattr(self, "_cache_file") and os.path.isfile(self._cache_file):
+        if hasattr(self, "_cache_file") and self._cache_file.is_file():
             logger.debug(f'removing {self._cache_file}')
-            os.remove(self._cache_file)
+            self._cache_file.unlink()
 
         if hasattr(self, "clean_thread"):
             logger.debug(f'stopping clean thread')

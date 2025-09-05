@@ -662,7 +662,7 @@ class WiseDataByVisit(WISEDataBase):
 
         if save:
             if fn is None:
-                fn = os.path.join(self.plots_dir, f"{ind}_binning_diag_{which}cutout.pdf")
+                fn = self.plots_dir / f"{ind}_binning_diag_{which}cutout.pdf"
             logger.debug(f"saving under {fn}")
             fig.savefig(fn)
 
