@@ -17,7 +17,7 @@ build:
       - pip install poetry
     post_install:
         # Install project's dependencies
-      - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH poetry install --with docs
+      - VIRTUAL_ENV=$READTHEDOCS_VIRTUALENV_PATH poetry install -E docs
       - python -c "import myst_parser; print(myst_parser.__version__)"
 
 # Build documentation in the docs/ directory with Sphinx
