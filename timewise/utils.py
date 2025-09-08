@@ -453,6 +453,7 @@ class StableTAPService(vo.dal.TAPService):
     def submit_job(
             self,
             query,
+            *,
             language="ADQL",
             maxrec=None,
             uploads=None,
@@ -461,10 +462,10 @@ class StableTAPService(vo.dal.TAPService):
         return StableAsyncTAPJob.create(
             self.baseurl,
             query,
-            language,
-            maxrec,
-            uploads,
-            self._session,
+            language=language,
+            maxrec=maxrec,
+            uploads=uploads,
+            session=self._session,
             **keywords
         )
 
