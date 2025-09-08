@@ -1147,6 +1147,8 @@ class WISEDataBase(abc.ABC):
             try:
                 job = self.service.submit_job(qstring, uploads={'ids': Table(tab_d)})
                 job.run()
+                logger.debug(job.url)
+                time.sleep(5)  # wait a bit until checking phase
 
                 if isinstance(job.phase, type(None)):
                     raise vo.dal.DALServiceError(f"Job submission failed. No phase!")
