@@ -9,8 +9,6 @@
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here.
 import sphinx_rtd_theme
-from importlib.metadata import version
-
 
 # -- Project information -----------------------------------------------------
 
@@ -19,7 +17,7 @@ copyright = '2022, Jannis Necker'
 author = 'Jannis Necker'
 
 # The full version, including alpha/beta/rc tags
-release = f'v{version("timewise")}'
+release = f'v0.5.2'
 
 
 # -- General configuration ---------------------------------------------------
