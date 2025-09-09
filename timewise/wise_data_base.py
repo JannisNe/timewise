@@ -1151,7 +1151,10 @@ class WISEDataBase(abc.ABC):
                 time.sleep(5)  # wait a bit until checking phase
 
                 if isinstance(job.phase, type(None)):
-                    raise vo.dal.DALServiceError(f"Job submission failed. No phase!")
+                    raise vo.dal.DALServiceError(
+                        f"Job submission failed. No phase!"
+                        f"response: {job.submit_response}"
+                    )
 
                 logger.info(f'submitted job for {t} for chunk {i}: ')
                 logger.debug(f'Job: {job.url}; {job.phase}')
@@ -1159,7 +1162,11 @@ class WISEDataBase(abc.ABC):
                 self.queue.put((t, i))
                 break
 
-            except (requests.exceptions.ConnectionError, vo.dal.exceptions.DALServiceError) as e:
+            except (
+                    requests.exceptions.ConnectionError,
+                    vo.dal.exceptions.DALServiceError,
+                    requests.HTTPError
+            ) as e:
                 wait = 60
                 N_tries -= 1
                 logger.warning(f"{chunk_number}th query of {table_name}: Could not submit TAP job!\n"
