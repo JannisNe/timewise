@@ -36,11 +36,15 @@ class Downloader:
 
         self.submit_queue: Queue = Queue()
         self.stop_event = threading.Event()
+        self.submit_thread = threading.Thread(target=self._submission_worker, daemon=True)
+        self.poll_thread = threading.Thread(target=self._polling_worker, daemon=True)
+        self.all_chunks_queued = False
 
     # ----------------------------
     # Disk helpers (atomic writes)
     # ----------------------------
-    def _atomic_write(self, target: Path, content: str):
+    @staticmethod
+    def _atomic_write(target: Path, content: str):
         tmp = target.with_suffix(target.suffix + ".tmp")
         with open(tmp, "w") as f:
             f.write(content)
@@ -191,8 +195,6 @@ class Downloader:
                 continue
 
         # start threads
-        self.submit_thread = threading.Thread(target=self._submission_worker, daemon=True)
-        self.poll_thread = threading.Thread(target=self._polling_worker, daemon=True)
         self.submit_thread.start()
         self.poll_thread.start()
 
