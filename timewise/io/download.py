@@ -2,25 +2,39 @@ import os
 import json
 import time
 import threading
+import logging
 from pathlib import Path
-from queue import Queue, Empty
-from typing import Dict, Any, List
+from queue import Empty
+from typing import Dict, List
 
 import pandas as pd
+import numpy as np
+from astropy.table import Table
 from pydantic import BaseModel, Field
+from pyvo.utils.http import create_session
+from pyvo.dal.tap import TAPService
+from six import BytesIO
 
-from timewise.query import QueryConfig
+from .stable_tap import StableTAPService, StableAsyncTAPJob
+from ..types import TAPJobMeta
+from ..query import QueryConfig
+from ..util.error_threading import ErrorQueue, ExceptionSafeThread
+
+
+logger = logging.getLogger(__name__)
 
 
 class DownloadConfig(BaseModel):
     input_csv: Path
     base_dir: Path
-    chunk_size: int = 500
+    chunk_size: int = 500_000
     raw_dir: str = "raw"
     max_concurrent_jobs: int = 4
     poll_interval: float = 10.0
     dry_run: bool = False
     queries: List[QueryConfig] = Field(..., description="One or more queries per chunk")
+
+    service_url: str = 'https://irsa.ipac.caltech.edu/TAP'
 
 
 class Downloader:
@@ -32,21 +46,24 @@ class Downloader:
         # Shared state
         self.job_lock = threading.Lock()
         # (chunk_id, query_idx) -> job meta
-        self.jobs: Dict[Any, Dict[str, Any]] = {}
+        self.jobs: Dict[tuple[int, int], TAPJobMeta] = {}
 
-        self.submit_queue: Queue = Queue()
         self.stop_event = threading.Event()
-        self.submit_thread = threading.Thread(target=self._submission_worker, daemon=True)
-        self.poll_thread = threading.Thread(target=self._polling_worker, daemon=True)
+        self.submit_queue: ErrorQueue = ErrorQueue(stop_event=self.stop_event)
+        self.submit_thread = ExceptionSafeThread(error_queue=self.submit_queue, target=self._submission_worker, daemon=True)
+        self.poll_thread = ExceptionSafeThread(error_queue=self.submit_queue, target=self._polling_worker, daemon=True)
         self.all_chunks_queued = False
+
+        self.session = create_session()
+        self.service: TAPService = StableTAPService(cfg.service_url, session=self.session)
 
     # ----------------------------
     # Disk helpers (atomic writes)
     # ----------------------------
     @staticmethod
-    def _atomic_write(target: Path, content: str):
+    def _atomic_write(target: Path, content: str, mode: str = "w"):
         tmp = target.with_suffix(target.suffix + ".tmp")
-        with open(tmp, "w") as f:
+        with open(tmp, mode) as f:
             f.write(content)
         os.replace(tmp, target)
 
@@ -60,27 +77,55 @@ class Downloader:
         return self.raw_path / f"chunk_{chunk_id:04d}_q{query_idx}.json"
 
     # ----------------------------
-    # TAP placeholders
+    # TAP submission and download
     # ----------------------------
-    def submit_tap_job(self, query_config: QueryConfig, chunk_df: pd.DataFrame) -> Dict[str, Any]:
+    def submit_tap_job(self, query_config: QueryConfig, chunk_df: pd.DataFrame) -> TAPJobMeta:
         adql = query_config.query.build()
         if self.cfg.dry_run:
-            return {"job_id": f"dry-{int(time.time()*1000)}", "job_url": "dry://job", "query": adql, "n_rows": len(chunk_df)}
-        # TODO: real pyvo TAP submission
-        return {"job_id": f"sim-{int(time.time()*1000)}", "job_url": "http://example.com/job", "query": adql, "n_rows": len(chunk_df)}
+            return TAPJobMeta(
+                url=f"dry-{int(time.time()*1000)}",
+                query=adql,
+                input_length=len(chunk_df),
+                submitted=time.time(),
+                last_checked=time.time(),
+                status="RUNNING",
+                query_config=query_config.dict(),
+                completed_at=0
+            )
 
-    def check_job_status(self, job_meta: Dict[str, Any]) -> str:
+        upload = Table({
+            key: np.array(chunk_df[key]).astype(dtype)
+            for key, dtype in query_config.query.input_columns.items()
+        })
+
+        logger.debug(f"uploading {len(upload)} objects.")
+        job = self.service.submit_job(adql, uploads={'input': upload})
+        job.run()
+        logger.debug(job.url)
+
+        return TAPJobMeta(
+            url=job.url,
+            query=adql,
+            query_config=query_config.dict(),
+            input_length=len(chunk_df),
+            submitted=time.time(),
+            last_checked=time.time(),
+            status=job.phase,
+            completed_at=0
+        )
+
+    def check_job_status(self, job_meta: TAPJobMeta) -> str:
         if self.cfg.dry_run:
             return "COMPLETED"
-        submitted = job_meta.get("submitted_at", time.time())
-        if time.time() - submitted > 20:
-            return "COMPLETED"
-        return "RUNNING"
+        return StableAsyncTAPJob(url=job_meta["url"], session=self.session).phase
 
-    def download_job_result(self, job_meta: Dict[str, Any]) -> str:
+    def download_job_result(self, job_meta: TAPJobMeta) -> Table:
         if self.cfg.dry_run:
-            return json.dumps({"rows": job_meta.get("n_rows", 0), "status": "dry-complete"}, indent=2)
-        return json.dumps({"rows": job_meta.get("n_rows", 0), "status": "sim-complete"}, indent=2)
+            return Table({k: [2, 5, 1] for k in job_meta["query_config"]["input_columns"]})
+        job = StableAsyncTAPJob(url=job_meta["url"], session=self.session)
+        job.wait()
+        logger.info(f'{job_meta}: Done!')
+        return job.fetch_result().to_table()
 
     # ----------------------------
     # Submission thread
@@ -88,28 +133,21 @@ class Downloader:
     def _submission_worker(self):
         while not self.stop_event.is_set():
             try:
-                chunk_id, query_idx, query_config, chunk_df = self.submit_queue.get(timeout=1.0)
+                chunk_id, query_idx, query_config, chunk_df = self.submit_queue.get(timeout=1.0)  # type: int, int, QueryConfig, pd.DataFrame
             except Empty:
-                if getattr(self, "all_chunks_queued", False):
+                if self.all_chunks_queued:
                     break
                 continue
 
             # Wait until we have capacity
             while not self.stop_event.is_set():
                 with self.job_lock:
-                    running = sum(1 for j in self.jobs.values() if j.get("status") in ("PENDING", "RUNNING"))
+                    running = sum(1 for j in self.jobs.values() if j.get("status") in ("QUEUED", "EXECUTING", "RUN"))
                 if running < self.cfg.max_concurrent_jobs:
                     break
                 time.sleep(1.0)
 
-            job_info = self.submit_tap_job(query_config, chunk_df)
-            job_meta = {
-                "job_id": job_info["job_id"],
-                "job_url": job_info.get("job_url"),
-                "status": "PENDING",
-                "submitted_at": time.time(),
-                "chunk_size": len(chunk_df),
-            }
+            job_meta = self.submit_tap_job(query_config, chunk_df)
 
             job_path = self._job_path(chunk_id, query_idx)
             self._atomic_write(job_path, json.dumps(job_meta, indent=2))
@@ -133,7 +171,7 @@ class Downloader:
                 if key not in self.jobs:
                     try:
                         with open(job_file) as f:
-                            jm = json.load(f)
+                            jm = TAPJobMeta(**json.load(f))
                         with self.job_lock:
                             self.jobs[key] = jm
                     except Exception:
@@ -142,33 +180,37 @@ class Downloader:
             with self.job_lock:
                 items = list(self.jobs.items())
 
-            for (chunk_id, query_idx), meta in items:
-                if meta.get("status") in ("COMPLETED", "ERROR"):
+            for (chunk_id, query_idx), meta in items:  # type: tuple[int, int], TAPJobMeta
+                if meta.get("status") in ("COMPLETED", "ERROR", "ABORTED"):
                     continue
 
                 status = self.check_job_status(meta)
                 if status == "COMPLETED":
-                    payload = self.download_job_result(meta)
-                    self._atomic_write(self._chunk_path(chunk_id, query_idx), payload)
+                    payload_table = self.download_job_result(meta)
+                    with BytesIO() as io:
+                        payload = payload_table.write(io, format="fits")
+                        payload.seek(0)
+                        self._atomic_write(self._chunk_path(chunk_id, query_idx), payload, mode="wb")
                     self._atomic_write(self._marker_path(chunk_id, query_idx), "done")
                     meta["status"] = "COMPLETED"
                     meta["completed_at"] = time.time()
                     self._atomic_write(self._job_path(chunk_id, query_idx), json.dumps(meta, indent=2))
                     with self.job_lock:
                         self.jobs[(chunk_id, query_idx)] = meta
-                elif status == "ERROR":
-                    meta["status"] = "ERROR"
+                elif status in ("ERROR", "ABORTED"):
+                    meta["status"] = status
                     with self.job_lock:
                         self.jobs[(chunk_id, query_idx)] = meta
                     self._atomic_write(self._job_path(chunk_id, query_idx), json.dumps(meta, indent=2))
                 else:
                     with self.job_lock:
                         self.jobs[(chunk_id, query_idx)]["status"] = status
-                    self._atomic_write(self._job_path(chunk_id, query_idx), json.dumps(self.jobs[(chunk_id, query_idx)], indent=2))
+                        snapshot = self.jobs[(chunk_id, query_idx)]
+                    self._atomic_write(self._job_path(chunk_id, query_idx), json.dumps(snapshot, indent=2))
 
-            if getattr(self, "all_chunks_queued", False):
+            if not self.all_chunks_queued:
                 with self.job_lock:
-                    all_done = all(j.get("status") in ("COMPLETED", "ERROR") for j in self.jobs.values())
+                    all_done = all(j.get("status") in ("COMPLETED", "ERROR", "ABORTED") for j in self.jobs.values())
                 if all_done:
                     break
 
