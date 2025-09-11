@@ -122,3 +122,6 @@ class StableTAPService(vo.dal.TAPService):
         logger.debug(job.url)
         assert job.phase
         return job
+
+    def get_job_from_url(self, url):
+        return StableAsyncTAPJob(url, session=self._session)
