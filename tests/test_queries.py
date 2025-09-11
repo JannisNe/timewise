@@ -25,6 +25,15 @@ query_inputs = [
     ),
     (
         {
+            "type": "positional_allwise",
+            "radius_arcsec": 6,
+            "magnitudes": True,
+            "fluxes": True,
+        },
+        "positional_allwise_mag_fluxes.txt",
+    ),
+    (
+        {
             "type": "positional_neowise",
             "radius_arcsec": 6,
             "magnitudes": True,
@@ -40,6 +49,15 @@ query_inputs = [
             "fluxes": True,
         },
         "positional_neowise_fluxes.txt",
+    ),
+    (
+        {
+            "type": "positional_neowise",
+            "radius_arcsec": 6,
+            "magnitudes": True,
+            "fluxes": True,
+        },
+        "positional_neowise_mag_fluxes.txt",
     ),
 ]
 
