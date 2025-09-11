@@ -13,7 +13,7 @@ from astropy.table import Table
 from pydantic import BaseModel, Field, model_validator
 from pyvo.utils.http import create_session
 from pyvo.dal.tap import TAPService
-from six import BytesIO
+from io import BytesIO
 
 from .stable_tap import StableTAPService, StableAsyncTAPJob
 from ..types import TAPJobMeta
@@ -271,9 +271,13 @@ class Downloader:
 
             if self.all_chunks_queued:
                 with self.job_lock:
-                    all_done = all(
-                        j.get("status") in ("COMPLETED", "ERROR", "ABORTED")
-                        for j in self.jobs.values()
+                    all_done = (
+                        all(
+                            j.get("status") in ("COMPLETED", "ERROR", "ABORTED")
+                            for j in self.jobs.values()
+                        )
+                        if len(self.jobs) > 0
+                        else False
                     )
                 if all_done:
                     logger.info("All tasks done! Exiting polling thread")
