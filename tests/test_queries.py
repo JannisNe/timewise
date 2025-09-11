@@ -4,7 +4,6 @@ from timewise.query import QueryConfig
 
 DATA_DIR = Path(__file__).parent / "data" / "queries"
 
-# Map query "type" → config dict to instantiate
 query_inputs = [
     (
         {"type": "positional_allwise",
