@@ -1,9 +1,13 @@
 from pathlib import Path
+
+import numpy as np
 import pytest
 import json
+from itertools import product
 
 from timewise.types import TAPJobMeta
 from timewise.io.download import DownloadConfig, Downloader
+from timewise.util.csv_utils import get_n_rows
 from dummy_tap import DummyTAPService
 
 
@@ -17,7 +21,7 @@ def cfg(tmp_path) -> DownloadConfig:
             chunk_size=32,
             max_concurrent_jobs=1,
             dry_run=False,
-            poll_interval=1,
+            poll_interval=0.1,
             queries=[
                 {
                     "query": {
@@ -45,15 +49,14 @@ def test_downloader_creates_files(cfg):
     dl.service = DummyTAPService(baseurl="", chunksize=cfg.chunk_size)
     dl.run()
 
-    # check job metadata files exist
-    job_files = list((cfg.output_dir / "raw").glob("chunk_*_q*.json"))
-    assert job_files, "No job files created"
+    n_chunks = int(np.ceil(get_n_rows(cfg.input_csv) / cfg.chunk_size))
+    n_queries = len(cfg.queries)
 
-    # check marker files exist
-    marker_files = list((cfg.output_dir / "raw").glob("chunk_*_q*.ok"))
-    assert marker_files, "No marker files created"
+    for q, c in product(range(n_queries), range(n_chunks)):
+        assert dl._marker_path(c, q).exists()
+        assert dl._chunk_path(c, q).exists()
 
-    # check contents are valid JSON
-    with open(job_files[0]) as f:
-        data = TAPJobMeta(**json.load(f))
-    assert "job_id" in data
+        job_path = dl._job_path(c, q)
+        assert job_path.exists()
+        with job_path.open("r") as f:
+            TAPJobMeta(**json.load(f))
