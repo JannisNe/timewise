@@ -42,7 +42,7 @@ class PositionalQuery(Query):
         q += f'RIGHT JOIN\n\t{self.table_name} \n'
         q += 'WHERE \n'
         q += f"\tCONTAINS(POINT('J2000',{self.table_name}.{self.ra_key},{self.table_name}.{self.dec_key})," \
-             f"CIRCLE('J2000',mine.ra_in,mine.dec_in,{self.radius_arcsec / 3600}))=1 "
+             f"CIRCLE('J2000',mine.ra_in,mine.dec_in,{self.radius_arcsec / 3600:.18f}))=1 "
 
         if len(self.constraints) > 0:
             q += ' AND (\n'
