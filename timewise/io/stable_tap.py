@@ -68,14 +68,21 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
             **keywords,
         )
         response = tapquery.submit()
+
+        # check if the response is valid
         response.raise_for_status()
+
+        # check if the response contains an error from the ADQL engine
         root = ElementTree.fromstring(response.content)
         info = root.find(".//v:INFO", {"v": "http://www.ivoa.net/xml/VOTable/v1.3"})
         if info.attrib.get("value") == "ERROR":
             raise vo.dal.DALQueryError(info.text.strip())
+
+        # create the job instance
         job = cls(response.url, session=session)
         job._client_set_maxrec = maxrec
         job.submit_response = response
+
         return job
 
     @property
