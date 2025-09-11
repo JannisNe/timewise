@@ -10,7 +10,7 @@ class PositionalQuery(Query):
     radius_arcsec: float
     magnitudes: bool = False
     fluxes: bool = True
-    input_columns = {"ra": float, "dec": float, "orig_id": int}
+    input_columns = {"ra_in": float, "dec_in": float, "orig_id": int}
 
     table_name: ClassVar[str]
     id_key: ClassVar[str]
@@ -34,12 +34,12 @@ class PositionalQuery(Query):
         for k in keys:
             q += f"{self.table_name}.{k}, "
         q += f"\n\tmine.{self.original_id_key} \n"
-        q += "FROM\n\tTAP_UPLOAD.input AS mine \n"
+        q += f"FROM\n\tTAP_UPLOAD.{self.upload_name} AS mine \n"
         q += f"RIGHT JOIN\n\t{self.table_name} \n"
         q += "WHERE \n"
         q += (
             f"\tCONTAINS(POINT('J2000',{self.table_name}.{self.ra_key},{self.table_name}.{self.dec_key}),"
-            f"CIRCLE('J2000',mine.ra,mine.dec,{self.radius_arcsec / 3600:.18f}))=1 "
+            f"CIRCLE('J2000',mine.ra_in,mine.dec_in,{self.radius_arcsec / 3600:.18f}))=1 "
         )
 
         if len(self.constraints) > 0:

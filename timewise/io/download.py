@@ -136,7 +136,9 @@ class Downloader:
         )
 
         logger.debug(f"uploading {len(upload)} objects.")
-        job = self.service.submit_job(adql, uploads={"input": upload})
+        job = self.service.submit_job(
+            adql, uploads={query_config.query.upload_name: upload}
+        )
         job.run()
         logger.debug(job.url)
 
