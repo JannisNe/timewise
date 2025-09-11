@@ -245,11 +245,13 @@ class Downloader:
                     logger.info(f"completed {chunk_id}, query {query_idx}")
                     payload_table = self.download_job_result(meta)
                     logger.debug(payload_table.columns)
-                    with BytesIO() as io:
-                        payload = payload_table.write(io, format="fits")
-                        io.seek(0)
+                    with BytesIO() as payload:
+                        payload_table.write(payload, format="fits")
+                        payload.seek(0)
                         self._atomic_write(
-                            self._chunk_path(chunk_id, query_idx), io, mode="wb"
+                            self._chunk_path(chunk_id, query_idx),
+                            payload.getvalue(),
+                            mode="wb",
                         )
                     self._atomic_write(self._marker_path(chunk_id, query_idx), "done")
                     meta["status"] = "COMPLETED"
