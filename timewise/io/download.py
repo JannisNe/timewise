@@ -85,7 +85,7 @@ class Downloader:
     def submit_tap_job(self, query_config: QueryConfig, chunk_id: int) -> TAPJobMeta:
         adql = query_config.query.build()
         cs = self.cfg.chunk_size
-        sr = range(1, chunk_id * cs + 1)
+        sr = list(range(1, chunk_id * cs + 1))
         chunk_df = pd.read_csv(self.cfg.input_csv, skiprows=sr, nrows=cs)
         if self.cfg.dry_run:
             return TAPJobMeta(
@@ -95,7 +95,7 @@ class Downloader:
                 submitted=time.time(),
                 last_checked=time.time(),
                 status="RUNNING",
-                query_config=query_config.dict(),
+                query_config=query_config.model_dump(),
                 completed_at=0
             )
 
@@ -112,7 +112,7 @@ class Downloader:
         return TAPJobMeta(
             url=job.url,
             query=adql,
-            query_config=query_config.dict(),
+            query_config=query_config.model_dump(),
             input_length=len(chunk_df),
             submitted=time.time(),
             last_checked=time.time(),
