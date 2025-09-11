@@ -10,7 +10,7 @@ from typing import Dict, List
 import pandas as pd
 import numpy as np
 from astropy.table import Table
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pyvo.utils.http import create_session
 from pyvo.dal.tap import TAPService
 from six import BytesIO
@@ -36,6 +36,29 @@ class DownloadConfig(BaseModel):
     queries: List[QueryConfig] = Field(..., description="One or more queries per chunk")
 
     service_url: str = "https://irsa.ipac.caltech.edu/TAP"
+
+    @model_validator(mode="after")
+    def validate_input_csv_columns(self) -> "DownloadConfig":
+        """Ensure that the input CSV contains all columns required by queries."""
+        # only validate if the CSV actually exists
+        if not self.input_csv.exists():
+            raise ValueError(f"CSV file does not exist: {self.input_csv}")
+
+        # read just the header, avoid loading the entire file
+        header = pd.read_csv(self.input_csv, nrows=0).columns
+
+        missing_columns = set()
+        for qc in self.queries:
+            for col in qc.query.input_columns.keys():
+                if col not in header:
+                    missing_columns.add(col)
+
+        if missing_columns:
+            raise ValueError(
+                f"CSV file {self.input_csv} is missing required columns: {sorted(missing_columns)}"
+            )
+
+        return self
 
 
 class Downloader:
