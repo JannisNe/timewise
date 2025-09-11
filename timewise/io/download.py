@@ -269,7 +269,7 @@ class Downloader:
                         json.dumps(snapshot, indent=2),
                     )
 
-            if not self.all_chunks_queued:
+            if self.all_chunks_queued:
                 with self.job_lock:
                     all_done = all(
                         j.get("status") in ("COMPLETED", "ERROR", "ABORTED")
