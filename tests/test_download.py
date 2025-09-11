@@ -21,7 +21,7 @@ def cfg(tmp_path) -> DownloadConfig:
             chunk_size=32,
             max_concurrent_jobs=1,
             dry_run=False,
-            poll_interval=0.1,
+            poll_interval=1,
             queries=[
                 {
                     "query": {
