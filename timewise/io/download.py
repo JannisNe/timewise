@@ -80,6 +80,7 @@ class Downloader:
             error_queue=self.submit_queue, target=self._polling_worker, daemon=True
         )
         self.all_chunks_queued = False
+        self.all_chunks_submitted = False
 
         self.session = create_session()
         self.service: StableTAPService = StableTAPService(
@@ -180,6 +181,7 @@ class Downloader:
                 chunk_id, query_idx, query_config = self.submit_queue.get(timeout=1.0)  # type: int, int, QueryConfig
             except Empty:
                 if self.all_chunks_queued:
+                    self.all_chunks_submitted = True
                     break
                 continue
 
@@ -278,7 +280,7 @@ class Downloader:
                         json.dumps(snapshot, indent=2),
                     )
 
-            if self.all_chunks_queued:
+            if self.all_chunks_submitted:
                 with self.job_lock:
                     all_done = (
                         all(
@@ -341,12 +343,12 @@ class Downloader:
         self.all_chunks_queued = True
         # wait until all jobs are submitted
         self.submit_queue.join()
+        # wait for the submit thread
+        self.submit_thread.join()
         # the polling thread will exit ones all results are downloaded
         self.poll_thread.join()
         # the stop event will stop also the submit thread
         self.stop_event.set()
-        # wait for the submit thread
-        self.submit_thread.join()
         # if any thread exited with an error report it
         self.submit_queue.raise_errors()
         logger.info("Done running downloader!")
