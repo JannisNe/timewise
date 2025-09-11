@@ -156,7 +156,7 @@ class Downloader:
     def check_job_status(self, job_meta: TAPJobMeta) -> str:
         if self.cfg.dry_run:
             return "COMPLETED"
-        return StableAsyncTAPJob(url=job_meta["url"], session=self.session).phase
+        return self.service.get_job_from_url(url=job_meta["url"]).phase
 
     def download_job_result(self, job_meta: TAPJobMeta) -> Table:
         if self.cfg.dry_run:
@@ -164,7 +164,7 @@ class Downloader:
                 {k: [2, 5, 1] for k in job_meta["query_config"]["input_columns"]}
             )
         logger.info(f"downloading {job_meta}")
-        job = StableAsyncTAPJob(url=job_meta["url"], session=self.session)
+        job = self.service.get_job_from_url(url=job_meta["url"])
         job.wait()
         logger.info(f"{job_meta}: Done!")
         return job.fetch_result().to_table()
