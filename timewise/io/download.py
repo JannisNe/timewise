@@ -31,7 +31,6 @@ class DownloadConfig(BaseModel):
     raw_dir: str = "raw"
     max_concurrent_jobs: int = 4
     poll_interval: float = 10.0
-    dry_run: bool = False
     queries: List[QueryConfig] = Field(..., description="One or more queries per chunk")
 
     service_url: str = "https://irsa.ipac.caltech.edu/TAP"
@@ -116,17 +115,6 @@ class Downloader:
         cs = self.cfg.chunk_size
         sr = list(range(1, chunk_id * cs + 1))
         chunk_df = pd.read_csv(self.cfg.input_csv, skiprows=sr, nrows=cs)
-        if self.cfg.dry_run:
-            return TAPJobMeta(
-                url=f"dry-{int(time.time() * 1000)}",
-                query=adql,
-                input_length=len(chunk_df),
-                submitted=time.time(),
-                last_checked=time.time(),
-                status="RUNNING",
-                query_config=query_config.model_dump(),
-                completed_at=0,
-            )
 
         upload = Table(
             {
@@ -154,18 +142,9 @@ class Downloader:
         )
 
     def check_job_status(self, job_meta: TAPJobMeta) -> str:
-        if self.cfg.dry_run:
-            return "COMPLETED"
         return self.service.get_job_from_url(url=job_meta["url"]).phase
 
     def download_job_result(self, job_meta: TAPJobMeta) -> Table:
-        if self.cfg.dry_run:
-            return Table(
-                {
-                    k: [2, 5, 1]
-                    for k in job_meta["query_config"]["query"]["input_columns"]
-                }
-            )
         logger.info(f"downloading {job_meta}")
         job = self.service.get_job_from_url(url=job_meta["url"])
         job.wait()
