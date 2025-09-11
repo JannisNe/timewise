@@ -214,8 +214,10 @@ class Downloader:
             for job_file in sorted(self.raw_path.glob("chunk_*_q*.job.json")):
                 logger.debug(f"found job file {job_file}")
                 parts = job_file.stem.split("_")
+                logger.debug(parts)
                 chunk_id = int(parts[1])
-                query_idx = int(parts[2][1:])
+                query_idx = int(parts[2][1:-4])
+                logger.debug(f"chunk {chunk_id}, query {query_idx}")
                 key = (chunk_id, query_idx)
                 if key not in self.jobs:
                     try:
@@ -332,7 +334,14 @@ class Downloader:
                 self.submit_queue.put((chunk_id, query_idx, qcfg))
 
         self.all_chunks_queued = True
+        # wait until all jobs are submitted
         self.submit_queue.join()
-        self.stop_event.set()
-        self.submit_thread.join()
+        # the polling thread will exit ones all results are downloaded
         self.poll_thread.join()
+        # the stop event will stop also the submit thread
+        self.stop_event.set()
+        # wait for the submit thread
+        self.submit_thread.join()
+        # if any thread exited with an error report it
+        self.submit_queue.raise_errors()
+        logger.info("Done running downloader!")

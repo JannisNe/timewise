@@ -30,6 +30,14 @@ class ErrorQueue(Queue):
                     raise exc_info[1].with_traceback(exc_info[2])
                 self.all_tasks_done.wait()
 
+    def raise_errors(self):
+        """
+        Raise the first worker exception, if any.
+        """
+        if not self.error_queue.empty():
+            exc_info = self.error_queue.get()
+            raise exc_info[1].with_traceback(exc_info[2])
+
 
 class ExceptionSafeThread(Thread):
     """Thread subclass that reports uncaught exceptions to the ErrorQueue."""
