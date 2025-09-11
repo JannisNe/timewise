@@ -106,7 +106,7 @@ class Downloader:
         return self.raw_path / f"chunk_{chunk_id:04d}_q{query_idx}.ok"
 
     def _chunk_path(self, chunk_id: int, query_idx: int) -> Path:
-        return self.raw_path / f"chunk_{chunk_id:04d}_q{query_idx}.json"
+        return self.raw_path / f"chunk_{chunk_id:04d}_q{query_idx}.fits"
 
     # ----------------------------
     # TAP submission and download
