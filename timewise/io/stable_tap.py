@@ -1,7 +1,7 @@
 import logging
-
 import backoff
 import pyvo as vo
+import xml.etree.ElementTree as ET
 
 
 logger = logging.getLogger(__name__)
@@ -69,6 +69,10 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
         )
         response = tapquery.submit()
         response.raise_for_status()
+        root = ET.fromstring(response.content)
+        info = root.find(".//v:INFO", {"v": "http://www.ivoa.net/xml/VOTable/v1.3"})
+        if info.attrib.get("value") == "ERROR":
+            raise vo.dal.DALQueryError(info.text.strip())
         job = cls(response.url, session=session)
         job._client_set_maxrec = maxrec
         job.submit_response = response
@@ -108,5 +112,6 @@ class StableTAPService(vo.dal.TAPService):
             session=self._session,
             **keywords,
         )
+        logger.debug(job.url)
         assert job.phase
         return job
