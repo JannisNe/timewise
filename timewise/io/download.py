@@ -12,10 +12,9 @@ import numpy as np
 from astropy.table import Table
 from pydantic import BaseModel, Field, model_validator
 from pyvo.utils.http import create_session
-from pyvo.dal.tap import TAPService
 from io import BytesIO
 
-from .stable_tap import StableTAPService, StableAsyncTAPJob
+from .stable_tap import StableTAPService
 from ..types import TAPJobMeta
 from ..query import QueryConfig
 from ..util.error_threading import ErrorQueue, ExceptionSafeThread
@@ -83,7 +82,7 @@ class Downloader:
         self.all_chunks_queued = False
 
         self.session = create_session()
-        self.service: TAPService = StableTAPService(
+        self.service: StableTAPService = StableTAPService(
             cfg.service_url, session=self.session
         )
 
@@ -91,7 +90,7 @@ class Downloader:
     # Disk helpers (atomic writes)
     # ----------------------------
     @staticmethod
-    def _atomic_write(target: Path, content: str, mode: str = "w"):
+    def _atomic_write(target: Path, content: str | bytes, mode: str = "w"):
         tmp = target.with_suffix(target.suffix + ".tmp")
         logger.debug(f"writing {tmp}")
         with open(tmp, mode) as f:
@@ -161,7 +160,10 @@ class Downloader:
     def download_job_result(self, job_meta: TAPJobMeta) -> Table:
         if self.cfg.dry_run:
             return Table(
-                {k: [2, 5, 1] for k in job_meta["query_config"]["input_columns"]}
+                {
+                    k: [2, 5, 1]
+                    for k in job_meta["query_config"]["query"]["input_columns"]
+                }
             )
         logger.info(f"downloading {job_meta}")
         job = self.service.get_job_from_url(url=job_meta["url"])
@@ -187,7 +189,7 @@ class Downloader:
                     running = sum(
                         1
                         for j in self.jobs.values()
-                        if j.get("status") in ("QUEUED", "EXECUTING", "RUN")
+                        if j.get("status") in ("QUEUED", "EXECUTING", "RUNNING")
                     )
                 if running < self.cfg.max_concurrent_jobs:
                     break
@@ -242,11 +244,12 @@ class Downloader:
                 if status == "COMPLETED":
                     logger.info(f"completed {chunk_id}, query {query_idx}")
                     payload_table = self.download_job_result(meta)
+                    logger.debug(payload_table.columns)
                     with BytesIO() as io:
                         payload = payload_table.write(io, format="fits")
-                        payload.seek(0)
+                        io.seek(0)
                         self._atomic_write(
-                            self._chunk_path(chunk_id, query_idx), payload, mode="wb"
+                            self._chunk_path(chunk_id, query_idx), io, mode="wb"
                         )
                     self._atomic_write(self._marker_path(chunk_id, query_idx), "done")
                     meta["status"] = "COMPLETED"
