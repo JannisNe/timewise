@@ -3,7 +3,7 @@ from .base import PositionalQuery
 
 
 class PositionalNEOWISEQuery(PositionalQuery):
-    type: Literal["positional_neowise"] = "positional_neowise"
+    type: Literal["positional_neowiser_p1bs_psd"] = "positional_neowiser_p1bs_psd"
     table_name = "neowiser_p1bs_psd"
     id_key = "allwise_cntr"
     magnitude_keys = ["w1mpro", "w1sigmpro", "w2mpro", "w2sigmpro"]

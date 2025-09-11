@@ -3,7 +3,7 @@ from .base import PositionalQuery
 
 
 class PositionalAllWISEQuery(PositionalQuery):
-    type: Literal["positional_allwise"] = "positional_allwise"
+    type: Literal["positional_allwise_p3as_mep"] = "positional_allwise_p3as_mep"
     table_name = "allwise_p3as_mep"
     id_key = "cntr_mf"
     magnitude_keys = ["w1mpro_ep", "w1sigmpro_ep", "w2mpro_ep", "w2sigmpro_ep"]

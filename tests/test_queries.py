@@ -7,57 +7,57 @@ DATA_DIR = Path(__file__).parent / "data" / "queries"
 query_inputs = [
     (
         {
-            "type": "positional_allwise",
+            "type": "positional_allwise_p3as_mep",
             "radius_arcsec": 6,
             "magnitudes": True,
             "fluxes": False,
         },
-        "positional_allwise_mag.txt",
+        "positional_allwise_p3as_mep_mag.txt",
     ),
     (
         {
-            "type": "positional_allwise",
+            "type": "positional_allwise_p3as_mep",
             "radius_arcsec": 6,
             "magnitudes": False,
             "fluxes": True,
         },
-        "positional_allwise_fluxes.txt",
+        "positional_allwise_p3as_mep_fluxes.txt",
     ),
     (
         {
-            "type": "positional_allwise",
+            "type": "positional_allwise_p3as_mep",
             "radius_arcsec": 6,
             "magnitudes": True,
             "fluxes": True,
         },
-        "positional_allwise_mag_fluxes.txt",
+        "positional_allwise_p3as_mep_mag_fluxes.txt",
     ),
     (
         {
-            "type": "positional_neowise",
+            "type": "positional_neowiser_p1bs_psd",
             "radius_arcsec": 6,
             "magnitudes": True,
             "fluxes": False,
         },
-        "positional_neowise_mag.txt",
+        "positional_neowiser_p1bs_psd_mag.txt",
     ),
     (
         {
-            "type": "positional_neowise",
+            "type": "positional_neowiser_p1bs_psd",
             "radius_arcsec": 6,
             "magnitudes": False,
             "fluxes": True,
         },
-        "positional_neowise_fluxes.txt",
+        "positional_neowiser_p1bs_psd_fluxes.txt",
     ),
     (
         {
-            "type": "positional_neowise",
+            "type": "positional_neowiser_p1bs_psd",
             "radius_arcsec": 6,
             "magnitudes": True,
             "fluxes": True,
         },
-        "positional_neowise_mag_fluxes.txt",
+        "positional_neowiser_p1bs_psd_mag_fluxes.txt",
     ),
 ]
 
