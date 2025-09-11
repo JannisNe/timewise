@@ -75,7 +75,7 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
         # check if the response contains an error from the ADQL engine
         root = ElementTree.fromstring(response.content)
         info = root.find(".//v:INFO", {"v": "http://www.ivoa.net/xml/VOTable/v1.3"})
-        if info.attrib.get("value") == "ERROR":
+        if info and (info.attrib.get("value") == "ERROR"):
             raise vo.dal.DALQueryError(info.text.strip())
 
         # create the job instance
