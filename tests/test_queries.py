@@ -6,33 +6,41 @@ DATA_DIR = Path(__file__).parent / "data" / "queries"
 
 query_inputs = [
     (
-        {"type": "positional_allwise",
-         "radius_arcsec": 6,
-         "magnitudes": True,
-         "fluxes": False},
-        "positional_allwise_mag.txt"
+        {
+            "type": "positional_allwise",
+            "radius_arcsec": 6,
+            "magnitudes": True,
+            "fluxes": False,
+        },
+        "positional_allwise_mag.txt",
     ),
     (
-        {"type": "positional_allwise",
-         "radius_arcsec": 6,
-         "magnitudes": False,
-         "fluxes": True},
-        "positional_allwise_fluxes.txt"
+        {
+            "type": "positional_allwise",
+            "radius_arcsec": 6,
+            "magnitudes": False,
+            "fluxes": True,
+        },
+        "positional_allwise_fluxes.txt",
     ),
     (
-        {"type": "positional_neowise",
-         "radius_arcsec": 6,
-         "magnitudes": True,
-         "fluxes": False},
-        "positional_neowise_mag.txt"
+        {
+            "type": "positional_neowise",
+            "radius_arcsec": 6,
+            "magnitudes": True,
+            "fluxes": False,
+        },
+        "positional_neowise_mag.txt",
     ),
     (
-        {"type": "positional_neowise",
-         "radius_arcsec": 6,
-         "magnitudes": False,
-         "fluxes": True},
-        "positional_neowise_fluxes.txt"
-    )
+        {
+            "type": "positional_neowise",
+            "radius_arcsec": 6,
+            "magnitudes": False,
+            "fluxes": True,
+        },
+        "positional_neowise_fluxes.txt",
+    ),
 ]
 
 
@@ -55,4 +63,4 @@ def test_query_build_matches_reference(config_dict, ref_path):
     print(expected)
     print(built)
 
-    assert built == expected, f"query mismatch"
+    assert built == expected, "query mismatch"

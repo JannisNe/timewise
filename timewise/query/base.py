@@ -10,11 +10,10 @@ class Query(abc.ABC, BaseModel):
         "cc_flags like '00%'",
         "qi_fact >= 1",
         "saa_sep >= 5",
-        "moon_masked like '00%'"
+        "moon_masked like '00%'",
     ]
     original_id_key: str = "orig_id"
     input_columns: ClassVar[dict[str, type]]
 
     @abc.abstractmethod
-    def build(self) -> str:
-        ...
+    def build(self) -> str: ...

@@ -4,10 +4,7 @@ from .positional.positional_allwise import PositionalAllWISEQuery
 from .positional.positional_neowise import PositionalNEOWISEQuery
 
 # Discriminated union of all query types
-QueryType = Union[
-    PositionalAllWISEQuery,
-    PositionalNEOWISEQuery
-]
+QueryType = Union[PositionalAllWISEQuery, PositionalNEOWISEQuery]
 
 
 class QueryConfig(BaseModel):

@@ -43,9 +43,16 @@ class ExceptionSafeThread(Thread):
         name: Optional[str] = None,
         args: tuple = (),
         kwargs: Optional[Mapping[str, Any]] = None,
-        daemon: Optional[bool] = None
+        daemon: Optional[bool] = None,
     ):
-        super().__init__(group=group, target=target, name=name, args=args, kwargs=kwargs, daemon=daemon)
+        super().__init__(
+            group=group,
+            target=target,
+            name=name,
+            args=args,
+            kwargs=kwargs,
+            daemon=daemon,
+        )
         self.error_queue = error_queue
 
     def run(self):

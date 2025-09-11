@@ -1,5 +1,4 @@
 import logging
-import time
 
 import backoff
 import pyvo as vo
@@ -9,9 +8,11 @@ logger = logging.getLogger(__name__)
 
 
 def backoff_hndlr(details):
-    logger.info("Backing off {wait:0.1f} seconds after {tries} tries "
-                "calling function {target} with args {args} and kwargs "
-                "{kwargs}".format(**details))
+    logger.info(
+        "Backing off {wait:0.1f} seconds after {tries} tries "
+        "calling function {target} with args {args} and kwargs "
+        "{kwargs}".format(**details)
+    )
 
 
 class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
@@ -26,8 +27,16 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
 
     @classmethod
     def create(
-            cls, baseurl, query, *, language="ADQL", maxrec=None, uploads=None,
-            session=None, **keywords):
+        cls,
+        baseurl,
+        query,
+        *,
+        language="ADQL",
+        maxrec=None,
+        uploads=None,
+        session=None,
+        **keywords,
+    ):
         """
         creates a async tap job on the server under ``baseurl``
         Raises requests.HTTPError if TAPQuery.submit() failes.
@@ -49,8 +58,15 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
            optional session to use for network requests
         """
         tapquery = vo.dal.TAPQuery(
-            baseurl, query, mode="async", language=language, maxrec=maxrec,
-            uploads=uploads, session=session, **keywords)
+            baseurl,
+            query,
+            mode="async",
+            language=language,
+            maxrec=maxrec,
+            uploads=uploads,
+            session=session,
+            **keywords,
+        )
         response = tapquery.submit()
         response.raise_for_status()
         job = cls(response.url, session=session)
@@ -63,7 +79,7 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
         backoff.expo,
         (vo.dal.DALServiceError, AttributeError),
         max_tries=50,
-        on_backoff=backoff_hndlr
+        on_backoff=backoff_hndlr,
     )
     def phase(self):
         return super(StableAsyncTAPJob, self).phase
@@ -78,16 +94,10 @@ class StableTAPService(vo.dal.TAPService):
         backoff.expo,
         (vo.dal.DALServiceError, AttributeError, AssertionError),
         max_tries=5,
-        on_backoff=backoff_hndlr
+        on_backoff=backoff_hndlr,
     )
     def submit_job(
-            self,
-            query,
-            *,
-            language="ADQL",
-            maxrec=None,
-            uploads=None,
-            **keywords
+        self, query, *, language="ADQL", maxrec=None, uploads=None, **keywords
     ):
         job = StableAsyncTAPJob.create(
             self.baseurl,
@@ -96,7 +106,7 @@ class StableTAPService(vo.dal.TAPService):
             maxrec=maxrec,
             uploads=uploads,
             session=self._session,
-            **keywords
+            **keywords,
         )
         assert job.phase
         return job
