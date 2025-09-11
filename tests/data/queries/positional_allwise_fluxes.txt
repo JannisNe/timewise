@@ -1,0 +1,15 @@
+SELECT
+	allwise_p3as_mep.ra, allwise_p3as_mep.dec, allwise_p3as_mep.mjd, allwise_p3as_mep.cntr_mf, allwise_p3as_mep.w1flux_ep, allwise_p3as_mep.w1sigflux_ep, allwise_p3as_mep.w2flux_ep, allwise_p3as_mep.w2sigflux_ep,
+	mine.orig_id
+FROM
+	TAP_UPLOAD.input AS mine
+RIGHT JOIN
+	allwise_p3as_mep
+WHERE
+	CONTAINS(POINT('J2000',allwise_p3as_mep.ra,allwise_p3as_mep.dec),CIRCLE('J2000',mine.ra_in,mine.dec_in,0.001666666666666667))=1  AND (
+	allwise_p3as_mep.nb < 2 AND
+	allwise_p3as_mep.na < 1 AND
+	allwise_p3as_mep.cc_flags like '00%' AND
+	allwise_p3as_mep.qi_fact >= 1 AND
+	allwise_p3as_mep.saa_sep >= 5 AND
+	allwise_p3as_mep.moon_masked like '00%'	)
