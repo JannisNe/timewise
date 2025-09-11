@@ -35,7 +35,7 @@ class DownloadConfig(BaseModel):
     dry_run: bool = False
     queries: List[QueryConfig] = Field(..., description="One or more queries per chunk")
 
-    service_url: str = 'https://irsa.ipac.caltech.edu/TAP'
+    service_url: str = "https://irsa.ipac.caltech.edu/TAP"
 
 
 class Downloader:
@@ -51,12 +51,18 @@ class Downloader:
 
         self.stop_event = threading.Event()
         self.submit_queue: ErrorQueue = ErrorQueue(stop_event=self.stop_event)
-        self.submit_thread = ExceptionSafeThread(error_queue=self.submit_queue, target=self._submission_worker, daemon=True)
-        self.poll_thread = ExceptionSafeThread(error_queue=self.submit_queue, target=self._polling_worker, daemon=True)
+        self.submit_thread = ExceptionSafeThread(
+            error_queue=self.submit_queue, target=self._submission_worker, daemon=True
+        )
+        self.poll_thread = ExceptionSafeThread(
+            error_queue=self.submit_queue, target=self._polling_worker, daemon=True
+        )
         self.all_chunks_queued = False
 
         self.session = create_session()
-        self.service: TAPService = StableTAPService(cfg.service_url, session=self.session)
+        self.service: TAPService = StableTAPService(
+            cfg.service_url, session=self.session
+        )
 
     # ----------------------------
     # Disk helpers (atomic writes)
@@ -89,23 +95,25 @@ class Downloader:
         chunk_df = pd.read_csv(self.cfg.input_csv, skiprows=sr, nrows=cs)
         if self.cfg.dry_run:
             return TAPJobMeta(
-                url=f"dry-{int(time.time()*1000)}",
+                url=f"dry-{int(time.time() * 1000)}",
                 query=adql,
                 input_length=len(chunk_df),
                 submitted=time.time(),
                 last_checked=time.time(),
                 status="RUNNING",
                 query_config=query_config.model_dump(),
-                completed_at=0
+                completed_at=0,
             )
 
-        upload = Table({
-            key: np.array(chunk_df[key]).astype(dtype)
-            for key, dtype in query_config.query.input_columns.items()
-        })
+        upload = Table(
+            {
+                key: np.array(chunk_df[key]).astype(dtype)
+                for key, dtype in query_config.query.input_columns.items()
+            }
+        )
 
         logger.debug(f"uploading {len(upload)} objects.")
-        job = self.service.submit_job(adql, uploads={'input': upload})
+        job = self.service.submit_job(adql, uploads={"input": upload})
         job.run()
         logger.debug(job.url)
 
@@ -117,7 +125,7 @@ class Downloader:
             submitted=time.time(),
             last_checked=time.time(),
             status=job.phase,
-            completed_at=0
+            completed_at=0,
         )
 
     def check_job_status(self, job_meta: TAPJobMeta) -> str:
@@ -127,11 +135,13 @@ class Downloader:
 
     def download_job_result(self, job_meta: TAPJobMeta) -> Table:
         if self.cfg.dry_run:
-            return Table({k: [2, 5, 1] for k in job_meta["query_config"]["input_columns"]})
+            return Table(
+                {k: [2, 5, 1] for k in job_meta["query_config"]["input_columns"]}
+            )
         logger.info(f"downloading {job_meta}")
         job = StableAsyncTAPJob(url=job_meta["url"], session=self.session)
         job.wait()
-        logger.info(f'{job_meta}: Done!')
+        logger.info(f"{job_meta}: Done!")
         return job.fetch_result().to_table()
 
     # ----------------------------
@@ -149,7 +159,11 @@ class Downloader:
             # Wait until we have capacity
             while not self.stop_event.is_set():
                 with self.job_lock:
-                    running = sum(1 for j in self.jobs.values() if j.get("status") in ("QUEUED", "EXECUTING", "RUN"))
+                    running = sum(
+                        1
+                        for j in self.jobs.values()
+                        if j.get("status") in ("QUEUED", "EXECUTING", "RUN")
+                    )
                 if running < self.cfg.max_concurrent_jobs:
                     break
                 time.sleep(1.0)
@@ -204,11 +218,15 @@ class Downloader:
                     with BytesIO() as io:
                         payload = payload_table.write(io, format="fits")
                         payload.seek(0)
-                        self._atomic_write(self._chunk_path(chunk_id, query_idx), payload, mode="wb")
+                        self._atomic_write(
+                            self._chunk_path(chunk_id, query_idx), payload, mode="wb"
+                        )
                     self._atomic_write(self._marker_path(chunk_id, query_idx), "done")
                     meta["status"] = "COMPLETED"
                     meta["completed_at"] = time.time()
-                    self._atomic_write(self._job_path(chunk_id, query_idx), json.dumps(meta, indent=2))
+                    self._atomic_write(
+                        self._job_path(chunk_id, query_idx), json.dumps(meta, indent=2)
+                    )
                     with self.job_lock:
                         self.jobs[(chunk_id, query_idx)] = meta
                 elif status in ("ERROR", "ABORTED"):
@@ -216,16 +234,24 @@ class Downloader:
                     meta["status"] = status
                     with self.job_lock:
                         self.jobs[(chunk_id, query_idx)] = meta
-                    self._atomic_write(self._job_path(chunk_id, query_idx), json.dumps(meta, indent=2))
+                    self._atomic_write(
+                        self._job_path(chunk_id, query_idx), json.dumps(meta, indent=2)
+                    )
                 else:
                     with self.job_lock:
                         self.jobs[(chunk_id, query_idx)]["status"] = status
                         snapshot = self.jobs[(chunk_id, query_idx)]
-                    self._atomic_write(self._job_path(chunk_id, query_idx), json.dumps(snapshot, indent=2))
+                    self._atomic_write(
+                        self._job_path(chunk_id, query_idx),
+                        json.dumps(snapshot, indent=2),
+                    )
 
             if not self.all_chunks_queued:
                 with self.job_lock:
-                    all_done = all(j.get("status") in ("COMPLETED", "ERROR", "ABORTED") for j in self.jobs.values())
+                    all_done = all(
+                        j.get("status") in ("COMPLETED", "ERROR", "ABORTED")
+                        for j in self.jobs.values()
+                    )
                 if all_done:
                     logger.info("All tasks done! Exiting polling thread")
                     break
