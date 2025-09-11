@@ -63,8 +63,10 @@ class Downloader:
     @staticmethod
     def _atomic_write(target: Path, content: str, mode: str = "w"):
         tmp = target.with_suffix(target.suffix + ".tmp")
+        logger.debug(f"writing {tmp}")
         with open(tmp, mode) as f:
             f.write(content)
+        logger.debug(f"moving {tmp} to {target}")
         os.replace(tmp, target)
 
     def _job_path(self, chunk_id: int, query_idx: int) -> Path:
@@ -122,6 +124,7 @@ class Downloader:
     def download_job_result(self, job_meta: TAPJobMeta) -> Table:
         if self.cfg.dry_run:
             return Table({k: [2, 5, 1] for k in job_meta["query_config"]["input_columns"]})
+        logger.info(f"downloading {job_meta}")
         job = StableAsyncTAPJob(url=job_meta["url"], session=self.session)
         job.wait()
         logger.info(f'{job_meta}: Done!')
@@ -147,6 +150,7 @@ class Downloader:
                     break
                 time.sleep(1.0)
 
+            logger.info(f"submitting chunk {chunk_id}, query {query_idx}")
             job_meta = self.submit_tap_job(query_config, chunk_df)
 
             job_path = self._job_path(chunk_id, query_idx)
@@ -161,9 +165,11 @@ class Downloader:
     # Polling thread
     # ----------------------------
     def _polling_worker(self):
+        logger.debug("starting polling worker")
         while not self.stop_event.is_set():
             # reload job files from disk
             for job_file in sorted(self.raw_path.glob("chunk_*_q*.job.json")):
+                logger.debug(f"found job file {job_file}")
                 parts = job_file.stem.split("_")
                 chunk_id = int(parts[1])
                 query_idx = int(parts[2][1:])
@@ -172,6 +178,8 @@ class Downloader:
                     try:
                         with open(job_file) as f:
                             jm = TAPJobMeta(**json.load(f))
+                        logger.debug(f"loaded {jm}")
+                        logger.debug(f"setting {key}")
                         with self.job_lock:
                             self.jobs[key] = jm
                     except Exception:
@@ -182,10 +190,12 @@ class Downloader:
 
             for (chunk_id, query_idx), meta in items:  # type: tuple[int, int], TAPJobMeta
                 if meta.get("status") in ("COMPLETED", "ERROR", "ABORTED"):
+                    logger.debug(f"{meta} was already {meta['status']}")
                     continue
 
                 status = self.check_job_status(meta)
                 if status == "COMPLETED":
+                    logger.info(f"completed {chunk_id}, query {query_idx}")
                     payload_table = self.download_job_result(meta)
                     with BytesIO() as io:
                         payload = payload_table.write(io, format="fits")
@@ -198,6 +208,7 @@ class Downloader:
                     with self.job_lock:
                         self.jobs[(chunk_id, query_idx)] = meta
                 elif status in ("ERROR", "ABORTED"):
+                    logger.warning(f"failed {chunk_id}, query {query_idx}: {status}")
                     meta["status"] = status
                     with self.job_lock:
                         self.jobs[(chunk_id, query_idx)] = meta
@@ -212,6 +223,7 @@ class Downloader:
                 with self.job_lock:
                     all_done = all(j.get("status") in ("COMPLETED", "ERROR", "ABORTED") for j in self.jobs.values())
                 if all_done:
+                    logger.info("All tasks done! Exiting polling thread")
                     break
 
             time.sleep(self.cfg.poll_interval)
