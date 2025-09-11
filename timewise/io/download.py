@@ -19,6 +19,7 @@ from .stable_tap import StableTAPService, StableAsyncTAPJob
 from ..types import TAPJobMeta
 from ..query import QueryConfig
 from ..util.error_threading import ErrorQueue, ExceptionSafeThread
+from ..util.csv_utils import get_n_rows
 
 
 logger = logging.getLogger(__name__)
@@ -81,8 +82,11 @@ class Downloader:
     # ----------------------------
     # TAP submission and download
     # ----------------------------
-    def submit_tap_job(self, query_config: QueryConfig, chunk_df: pd.DataFrame) -> TAPJobMeta:
+    def submit_tap_job(self, query_config: QueryConfig, chunk_id: int) -> TAPJobMeta:
         adql = query_config.query.build()
+        cs = self.cfg.chunk_size
+        sr = range(1, chunk_id * cs + 1)
+        chunk_df = pd.read_csv(self.cfg.input_csv, skiprows=sr, nrows=cs)
         if self.cfg.dry_run:
             return TAPJobMeta(
                 url=f"dry-{int(time.time()*1000)}",
@@ -136,7 +140,7 @@ class Downloader:
     def _submission_worker(self):
         while not self.stop_event.is_set():
             try:
-                chunk_id, query_idx, query_config, chunk_df = self.submit_queue.get(timeout=1.0)  # type: int, int, QueryConfig, pd.DataFrame
+                chunk_id, query_idx, query_config = self.submit_queue.get(timeout=1.0)  # type: int, int, QueryConfig
             except Empty:
                 if self.all_chunks_queued:
                     break
@@ -151,7 +155,7 @@ class Downloader:
                 time.sleep(1.0)
 
             logger.info(f"submitting chunk {chunk_id}, query {query_idx}")
-            job_meta = self.submit_tap_job(query_config, chunk_df)
+            job_meta = self.submit_tap_job(query_config, chunk_id)
 
             job_path = self._job_path(chunk_id, query_idx)
             self._atomic_write(job_path, json.dumps(job_meta, indent=2))
@@ -232,9 +236,8 @@ class Downloader:
     # Main run loop
     # ----------------------------
     def run(self):
-        df = pd.read_csv(self.cfg.input_csv)
-        n = len(df)
         chunk_size = self.cfg.chunk_size
+        n = get_n_rows(self.cfg.input_csv) - 1  # one header row
 
         # load existing job metadata
         for job_file in sorted(self.raw_path.glob("chunk_*_q*.job.json")):
@@ -255,7 +258,6 @@ class Downloader:
         # enqueue all chunks & queries
         for i in range(0, n, chunk_size):
             chunk_id = i // chunk_size
-            chunk_df = df.iloc[i:i + chunk_size]
 
             for query_idx, qcfg in enumerate(self.cfg.queries):
                 marker = self._marker_path(chunk_id, query_idx)
@@ -272,7 +274,7 @@ class Downloader:
                     except Exception:
                         pass
 
-                self.submit_queue.put((chunk_id, query_idx, qcfg, chunk_df))
+                self.submit_queue.put((chunk_id, query_idx, qcfg))
 
         self.all_chunks_queued = True
         self.submit_queue.join()
