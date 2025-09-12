@@ -111,7 +111,7 @@ class Downloader:
     # TAP submission and download
     # ----------------------------
     def submit_tap_job(self, query_config: QueryConfig, chunk_id: int) -> TAPJobMeta:
-        adql = query_config.query.build()
+        adql = query_config.query.adql
         cs = self.cfg.chunk_size
         sr = list(range(1, chunk_id * cs + 1))
         chunk_df = pd.read_csv(self.cfg.input_csv, skiprows=sr, nrows=cs)
