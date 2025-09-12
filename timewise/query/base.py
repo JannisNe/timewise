@@ -1,6 +1,7 @@
 import abc
 from typing import ClassVar, Type
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
+from hashlib import sha256
 
 
 class Query(abc.ABC, BaseModel):
@@ -19,3 +20,14 @@ class Query(abc.ABC, BaseModel):
 
     @abc.abstractmethod
     def build(self) -> str: ...
+
+    @computed_field
+    @property
+    def adql(self) -> str:
+        """ADQL string computed once per instance."""
+        return self.build()
+
+    @computed_field
+    @property
+    def hash(self) -> str:
+        return sha256(self.adql.encode()).hexdigest()
