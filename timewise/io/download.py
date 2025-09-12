@@ -85,7 +85,7 @@ class Downloader:
         self.backend = cfg.backend
 
     # ----------------------------
-    # Disk helpers (atomic writes)
+    # helpers
     # ----------------------------
     @property
     def n_chunks(self) -> int:
