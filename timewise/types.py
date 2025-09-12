@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import TypedDict, NamedTuple
 
 from timewise.query import QueryConfig
 
@@ -12,3 +12,16 @@ class TAPJobMeta(TypedDict):
     query: str
     query_config: QueryConfig | dict
     completed_at: float
+
+
+class TaskID(NamedTuple):
+    """
+    Generic identifier for a unit of work.
+    Can be extended by Downloader/Processor as needed.
+    """
+
+    namespace: str  # e.g. "downloader", "processor"
+    key: str  # unique string, e.g. "chunk_0001_q0" or "mask_2025-01-01"
+
+    def as_str(self) -> str:
+        return f"{self.namespace}_{self.key}"
