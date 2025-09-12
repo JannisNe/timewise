@@ -1,11 +1,14 @@
 import json
+import logging
 from pathlib import Path
 from typing import Any, Literal
 from astropy.table import Table
 
 from .base import Backend
-from ..io.download import logger
 from ..types import TaskID
+
+
+logger = logging.getLogger(__name__)
 
 
 class FileSystemBackend(Backend):
