@@ -1,10 +1,10 @@
 import abc
-from typing import ClassVar, Literal, Type
+from typing import ClassVar, Type
 from pydantic import BaseModel
 
 
 class Query(abc.ABC, BaseModel):
-    type: ClassVar[Literal[str]]
+    type: ClassVar[str]
     constraints: list[str] = [
         "nb < 2",
         "na < 1",
