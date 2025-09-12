@@ -36,7 +36,7 @@ class FileSystemBackend(Backend):
         tmp.parent.mkdir(parents=True, exist_ok=True)
         logger.debug(f"writing {path}")
         tmp.write_text(json.dumps(meta, indent=2))
-        path.replace(tmp)
+        tmp.replace(path)
 
     def load_meta(self, task: TaskID) -> dict[str, Any] | None:
         path = self._meta_path(task)
@@ -68,7 +68,7 @@ class FileSystemBackend(Backend):
         tmp.parent.mkdir(parents=True, exist_ok=True)
         logger.debug(f"writing {path}")
         content.write(tmp, format="fits")
-        path.replace(tmp)
+        tmp.replace(path)
 
     def load_data(self, task: TaskID) -> Table:
         path = self._data_path(task)
