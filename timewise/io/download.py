@@ -82,7 +82,7 @@ class Downloader:
             cfg.service_url, session=self.session
         )
 
-        self.backend: Backend = cfg.backend
+        self.backend = cfg.backend
 
     # ----------------------------
     # Disk helpers (atomic writes)
@@ -155,10 +155,10 @@ class Downloader:
         return self.service.get_job_from_url(url=job_meta["url"]).phase
 
     def download_job_result(self, job_meta: TAPJobMeta) -> Table:
-        logger.info(f"downloading {job_meta}")
+        logger.info(f"downloading {job_meta['url']}")
         job = self.service.get_job_from_url(url=job_meta["url"])
         job.wait()
-        logger.info(f"{job_meta}: Done!")
+        logger.info(f"{job_meta['url']}: Done!")
         return job.fetch_result().to_table()
 
     # ----------------------------
@@ -210,7 +210,7 @@ class Downloader:
 
             for task, meta in items:  # type: TaskID, TAPJobMeta
                 if meta.get("status") in ("COMPLETED", "ERROR", "ABORTED"):
-                    logger.debug(f"{meta} was already {meta['status']}")
+                    logger.debug(f"{task} was already {meta['status']}")
                     continue
 
                 status = self.check_job_status(meta)
@@ -222,7 +222,7 @@ class Downloader:
                     meta["status"] = "COMPLETED"
                     meta["completed_at"] = time.time()
                     backend.save_meta(task, meta)
-                    backend.is_done(task)
+                    backend.mark_done(task)
                     with self.job_lock:
                         self.jobs[task] = meta
                 elif status in ("ERROR", "ABORTED"):
