@@ -5,6 +5,7 @@ import pytest
 import json
 from itertools import product
 
+
 from timewise.types import TAPJobMeta
 from timewise.io.download import DownloadConfig, Downloader
 from timewise.util.csv_utils import get_n_rows
@@ -17,10 +18,10 @@ def cfg(tmp_path) -> DownloadConfig:
     return DownloadConfig.model_validate(
         dict(
             input_csv=input_csv,
-            base_dir=tmp_path,
             chunk_size=32,
             max_concurrent_jobs=1,
             poll_interval=1,
+            backend={"type": "filesystem", "base_path": tmp_path / "test/download"},
             queries=[
                 {
                     "query": {

@@ -1,24 +1,23 @@
-import os
-import json
 import time
 import threading
 import logging
 from pathlib import Path
 from queue import Empty
 from typing import Dict, List
+from itertools import product
 
 import pandas as pd
 import numpy as np
 from astropy.table import Table
 from pydantic import BaseModel, Field, model_validator
 from pyvo.utils.http import create_session
-from io import BytesIO
 
 from .stable_tap import StableTAPService
-from ..types import TAPJobMeta
+from ..types import TAPJobMeta, TaskID
 from ..query import QueryConfig
 from ..util.error_threading import ErrorQueue, ExceptionSafeThread
 from ..util.csv_utils import get_n_rows
+from ..backend import BackendType
 
 
 logger = logging.getLogger(__name__)
@@ -26,12 +25,11 @@ logger = logging.getLogger(__name__)
 
 class DownloadConfig(BaseModel):
     input_csv: Path
-    base_dir: Path
     chunk_size: int = 500_000
-    raw_dir: str = "raw"
     max_concurrent_jobs: int = 4
     poll_interval: float = 10.0
     queries: List[QueryConfig] = Field(..., description="One or more queries per chunk")
+    backend: BackendType = Field(..., discriminator="type")
 
     service_url: str = "https://irsa.ipac.caltech.edu/TAP"
 
@@ -62,13 +60,11 @@ class DownloadConfig(BaseModel):
 class Downloader:
     def __init__(self, cfg: DownloadConfig):
         self.cfg = cfg
-        self.raw_path = Path(self.cfg.base_dir) / self.cfg.raw_dir
-        self.raw_path.mkdir(parents=True, exist_ok=True)
 
         # Shared state
         self.job_lock = threading.Lock()
-        # (chunk_id, query_idx) -> job meta
-        self.jobs: Dict[tuple[int, int], TAPJobMeta] = {}
+        # (chunk_id, query_hash) -> job meta
+        self.jobs: Dict[TaskID, TAPJobMeta] = {}
 
         self.stop_event = threading.Event()
         self.submit_queue: ErrorQueue = ErrorQueue(stop_event=self.stop_event)
@@ -86,26 +82,40 @@ class Downloader:
             cfg.service_url, session=self.session
         )
 
+        self.backend: Backend = cfg.backend
+
     # ----------------------------
     # Disk helpers (atomic writes)
     # ----------------------------
+    @property
+    def n_chunks(self) -> int:
+        chunk_size = self.cfg.chunk_size
+        n = get_n_rows(self.cfg.input_csv) - 1  # one header row
+        return int(np.ceil(n / chunk_size))
+
     @staticmethod
-    def _atomic_write(target: Path, content: str | bytes, mode: str = "w"):
-        tmp = target.with_suffix(target.suffix + ".tmp")
-        logger.debug(f"writing {tmp}")
-        with open(tmp, mode) as f:
-            f.write(content)
-        logger.debug(f"moving {tmp} to {target}")
-        os.replace(tmp, target)
+    def get_task_id(chunk_id, query_hash) -> TaskID:
+        return TaskID(namespace="download", key=f"chunk{chunk_id:04d}_q{query_hash}")
 
-    def _job_path(self, chunk_id: int, query_idx: int) -> Path:
-        return self.raw_path / f"chunk_{chunk_id:04d}_q{query_idx}.job.json"
+    def iter_tasks(self) -> TaskID:
+        for chunk_id in range(self.n_chunks):
+            for q in self.cfg.queries:
+                yield self.get_task_id(chunk_id, q.query.hash)
 
-    def _marker_path(self, chunk_id: int, query_idx: int) -> Path:
-        return self.raw_path / f"chunk_{chunk_id:04d}_q{query_idx}.ok"
-
-    def _chunk_path(self, chunk_id: int, query_idx: int) -> Path:
-        return self.raw_path / f"chunk_{chunk_id:04d}_q{query_idx}.fits"
+    def load_job_meta(self):
+        backend = self.backend
+        for task in self.iter_tasks():
+            if backend.meta_exists(task):
+                logger.debug(f"found job metadata {task}")
+                if task not in self.jobs:
+                    try:
+                        jm = TAPJobMeta(**backend.load_meta(task))
+                        logger.debug(f"loaded {jm}")
+                        logger.debug(f"setting {task}")
+                        with self.job_lock:
+                            self.jobs[task] = jm
+                    except Exception:
+                        continue
 
     # ----------------------------
     # TAP submission and download
@@ -157,7 +167,7 @@ class Downloader:
     def _submission_worker(self):
         while not self.stop_event.is_set():
             try:
-                chunk_id, query_idx, query_config = self.submit_queue.get(timeout=1.0)  # type: int, int, QueryConfig
+                chunk_id, query_config = self.submit_queue.get(timeout=1.0)  # type: int, QueryConfig
             except Empty:
                 if self.all_chunks_queued:
                     self.all_chunks_submitted = True
@@ -176,14 +186,12 @@ class Downloader:
                     break
                 time.sleep(1.0)
 
-            logger.info(f"submitting chunk {chunk_id}, query {query_idx}")
+            task = self.get_task_id(chunk_id, query_config.query.hash)
+            logger.info(f"submitting {task}")
             job_meta = self.submit_tap_job(query_config, chunk_id)
-
-            job_path = self._job_path(chunk_id, query_idx)
-            self._atomic_write(job_path, json.dumps(job_meta, indent=2))
-
+            self.backend.save_meta(task, job_meta)
             with self.job_lock:
-                self.jobs[(chunk_id, query_idx)] = job_meta
+                self.jobs[task] = job_meta
 
             self.submit_queue.task_done()
 
@@ -192,72 +200,42 @@ class Downloader:
     # ----------------------------
     def _polling_worker(self):
         logger.debug("starting polling worker")
+        backend = self.backend
         while not self.stop_event.is_set():
-            # reload job files from disk
-            for job_file in sorted(self.raw_path.glob("chunk_*_q*.job.json")):
-                logger.debug(f"found job file {job_file}")
-                parts = job_file.stem.split("_")
-                logger.debug(parts)
-                chunk_id = int(parts[1])
-                query_idx = int(parts[2][1:-4])
-                logger.debug(f"chunk {chunk_id}, query {query_idx}")
-                key = (chunk_id, query_idx)
-                if key not in self.jobs:
-                    try:
-                        with open(job_file) as f:
-                            jm = TAPJobMeta(**json.load(f))
-                        logger.debug(f"loaded {jm}")
-                        logger.debug(f"setting {key}")
-                        with self.job_lock:
-                            self.jobs[key] = jm
-                    except Exception:
-                        continue
+            # reload job infos
+            self.load_job_meta()
 
             with self.job_lock:
                 items = list(self.jobs.items())
 
-            for (chunk_id, query_idx), meta in items:  # type: tuple[int, int], TAPJobMeta
+            for task, meta in items:  # type: TaskID, TAPJobMeta
                 if meta.get("status") in ("COMPLETED", "ERROR", "ABORTED"):
                     logger.debug(f"{meta} was already {meta['status']}")
                     continue
 
                 status = self.check_job_status(meta)
                 if status == "COMPLETED":
-                    logger.info(f"completed {chunk_id}, query {query_idx}")
+                    logger.info(f"completed {task}")
                     payload_table = self.download_job_result(meta)
                     logger.debug(payload_table.columns)
-                    with BytesIO() as payload:
-                        payload_table.write(payload, format="fits")
-                        payload.seek(0)
-                        self._atomic_write(
-                            self._chunk_path(chunk_id, query_idx),
-                            payload.getvalue(),
-                            mode="wb",
-                        )
-                    self._atomic_write(self._marker_path(chunk_id, query_idx), "done")
+                    backend.save_data(task, payload_table)
                     meta["status"] = "COMPLETED"
                     meta["completed_at"] = time.time()
-                    self._atomic_write(
-                        self._job_path(chunk_id, query_idx), json.dumps(meta, indent=2)
-                    )
+                    backend.save_meta(task, meta)
+                    backend.is_done(task)
                     with self.job_lock:
-                        self.jobs[(chunk_id, query_idx)] = meta
+                        self.jobs[task] = meta
                 elif status in ("ERROR", "ABORTED"):
-                    logger.warning(f"failed {chunk_id}, query {query_idx}: {status}")
+                    logger.warning(f"failed {task}: {status}")
                     meta["status"] = status
                     with self.job_lock:
-                        self.jobs[(chunk_id, query_idx)] = meta
-                    self._atomic_write(
-                        self._job_path(chunk_id, query_idx), json.dumps(meta, indent=2)
-                    )
+                        self.jobs[task] = meta
+                    backend.save_meta(task, meta)
                 else:
                     with self.job_lock:
-                        self.jobs[(chunk_id, query_idx)]["status"] = status
-                        snapshot = self.jobs[(chunk_id, query_idx)]
-                    self._atomic_write(
-                        self._job_path(chunk_id, query_idx),
-                        json.dumps(snapshot, indent=2),
-                    )
+                        self.jobs[task]["status"] = status
+                        snapshot = self.jobs[task]
+                    backend.save_meta(task, snapshot)
 
             if self.all_chunks_submitted:
                 with self.job_lock:
@@ -279,46 +257,23 @@ class Downloader:
     # Main run loop
     # ----------------------------
     def run(self):
-        chunk_size = self.cfg.chunk_size
-        n = get_n_rows(self.cfg.input_csv) - 1  # one header row
-
         # load existing job metadata
-        for job_file in sorted(self.raw_path.glob("chunk_*_q*.job.json")):
-            try:
-                parts = job_file.stem.split("_")
-                chunk_id = int(parts[1])
-                query_idx = int(parts[2][1:])
-                with open(job_file) as f:
-                    jm = json.load(f)
-                self.jobs[(chunk_id, query_idx)] = jm
-            except Exception:
-                continue
+        self.load_job_meta()
 
         # start threads
         self.submit_thread.start()
         self.poll_thread.start()
 
         # enqueue all chunks & queries
-        for i in range(0, n, chunk_size):
-            chunk_id = i // chunk_size
+        backend = self.backend
+        for chunk_id, qcfg in product(range(self.n_chunks), self.cfg.queries):
+            task = self.get_task_id(chunk_id, qcfg.query.hash)
 
-            for query_idx, qcfg in enumerate(self.cfg.queries):
-                marker = self._marker_path(chunk_id, query_idx)
-                if marker.exists():
-                    continue
-                job_file = self._job_path(chunk_id, query_idx)
-                if job_file.exists():
-                    try:
-                        with open(job_file) as f:
-                            jm = json.load(f)
-                        with self.job_lock:
-                            self.jobs[(chunk_id, query_idx)] = jm
-                        continue
-                    except Exception:
-                        pass
+            # skip if the download is done, or the job is queued
+            if backend.is_done(task) or (task in self.jobs):
+                continue
 
-                self.submit_queue.put((chunk_id, query_idx, qcfg))
-
+            self.submit_queue.put((chunk_id, qcfg))
         self.all_chunks_queued = True
         # wait until all jobs are submitted
         self.submit_queue.join()
