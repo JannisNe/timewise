@@ -1,9 +1,10 @@
 import abc
-from typing import ClassVar
+from typing import ClassVar, Literal, Type
 from pydantic import BaseModel
 
 
 class Query(abc.ABC, BaseModel):
+    type: ClassVar[Literal[str]]
     constraints: list[str] = [
         "nb < 2",
         "na < 1",
@@ -14,7 +15,7 @@ class Query(abc.ABC, BaseModel):
     ]
     original_id_key: str = "orig_id"
     upload_name: ClassVar[str] = "mine"
-    input_columns: ClassVar[dict[str, type]]
+    input_columns: ClassVar[dict[str, Type]]
 
     @abc.abstractmethod
     def build(self) -> str: ...
