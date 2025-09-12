@@ -23,5 +23,5 @@ class TaskID(NamedTuple):
     namespace: str  # e.g. "downloader", "processor"
     key: str  # unique string, e.g. "chunk_0001_q0" or "mask_2025-01-01"
 
-    def as_str(self) -> str:
+    def __str__(self):
         return f"{self.namespace}_{self.key}"
