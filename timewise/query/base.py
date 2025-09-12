@@ -30,4 +30,4 @@ class Query(abc.ABC, BaseModel):
     @computed_field
     @property
     def hash(self) -> str:
-        return sha256(self.adql.encode()).hexdigest()
+        return self.type + sha256(self.adql.encode()).hexdigest()
