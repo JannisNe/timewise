@@ -95,7 +95,7 @@ class Downloader:
 
     @staticmethod
     def get_task_id(chunk_id, query_hash) -> TaskID:
-        return TaskID(namespace="download", key=f"chunk{chunk_id:04d}_q{query_hash}")
+        return TaskID(namespace="download", key=f"chunk{chunk_id:04d}_{query_hash}")
 
     def iter_tasks(self) -> TaskID:
         for chunk_id in range(self.n_chunks):
