@@ -2,7 +2,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import json
 from itertools import product
 
 
@@ -50,13 +49,12 @@ def test_downloader_creates_files(cfg):
     dl.run()
 
     n_chunks = int(np.ceil(get_n_rows(cfg.input_csv) / cfg.chunk_size))
-    n_queries = len(cfg.queries)
 
-    for q, c in product(range(n_queries), range(n_chunks)):
-        assert dl._marker_path(c, q).exists()
-        assert dl._chunk_path(c, q).exists()
+    for q, c in product(cfg.queries, range(n_chunks)):
+        task = dl.get_task_id(c, q.query.hash)
+        b = dl.backend
+        assert b.is_done(task)
+        assert b.data_exists(task)
 
-        job_path = dl._job_path(c, q)
-        assert job_path.exists()
-        with job_path.open("r") as f:
-            TAPJobMeta(**json.load(f))
+        assert b.meta_exists(task)
+        assert TAPJobMeta(**b.load_meta(task))
