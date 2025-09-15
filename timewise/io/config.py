@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from ..query import QueryType
 from ..backend import BackendType
+from ..types import TYPE_MAP
 
 
 class DownloadConfig(BaseModel):
@@ -25,18 +26,26 @@ class DownloadConfig(BaseModel):
         if not self.input_csv.exists():
             raise ValueError(f"CSV file does not exist: {self.input_csv}")
 
-        # read just the header, avoid loading the entire file
-        header = pd.read_csv(self.input_csv, nrows=0).columns
+        # read just the header and first 10 lines
+        input_table = pd.read_csv(self.input_csv, nrows=10)
 
         missing_columns = set()
+        wrong_dtype = set()
         for qc in self.queries:
-            for col in qc.input_columns.keys():
-                if col not in header:
+            for col, dtype in qc.input_columns.items():
+                if col not in input_table.columns:
                     missing_columns.add(col)
+                try:
+                    input_table[col].astype(TYPE_MAP[dtype])
+                except Exception:
+                    wrong_dtype.add(col)
 
+        msg = f"CSV file {self.input_csv}: "
         if missing_columns:
-            raise ValueError(
-                f"CSV file {self.input_csv} is missing required columns: {sorted(missing_columns)}"
+            msg += f"\n\tmissing required columns: {sorted(missing_columns)}"
+        if wrong_dtype:
+            msg += (
+                f"\n\tcolumns not convertable to right data type: {sorted(wrong_dtype)}"
             )
 
         return self

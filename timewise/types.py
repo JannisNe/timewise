@@ -25,3 +25,6 @@ class TaskID(NamedTuple):
 
     def __str__(self):
         return f"{self.namespace}_{self.key}"
+
+
+TYPE_MAP = {"float": float, "str": str, "int": int}

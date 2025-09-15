@@ -1,5 +1,6 @@
 import logging
-from typing import Literal
+from typing import Literal, Dict
+from pydantic import computed_field
 
 from .base import Query
 
@@ -9,7 +10,10 @@ logger = logging.getLogger(__name__)
 class PositionalQuery(Query):
     type: Literal["positional"] = "positional"
     radius_arcsec: float
-    input_columns = {"ra": float, "dec": float, "orig_id": int}
+
+    @computed_field
+    def input_columns(self) -> Dict[str, str]:
+        return {"ra": "float", "dec": "float", self.original_id_key: "int"}
 
     def build(self) -> str:
         logger.debug(f"constructing positional query for {self.table.name}")

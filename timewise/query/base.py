@@ -1,5 +1,5 @@
 import abc
-from typing import ClassVar, Type, List
+from typing import ClassVar, List
 from pydantic import BaseModel, computed_field
 from hashlib import sha256
 
@@ -9,7 +9,7 @@ from ..tables import TableType
 class Query(abc.ABC, BaseModel):
     type: ClassVar[str]
     upload_name: ClassVar[str] = "mine"
-    input_columns: ClassVar[dict[str, Type]]
+    input_columns: ClassVar[dict[str, str]]
 
     original_id_key: str = "orig_id"
     constraints: List[str] = [
