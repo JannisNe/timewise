@@ -1,7 +1,7 @@
 import logging
 from typing import Literal
 
-from ..base import Query
+from .base import Query
 
 logger = logging.getLogger(__name__)
 
