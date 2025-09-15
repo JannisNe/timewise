@@ -1,6 +1,7 @@
 import pytest
 from pathlib import Path
-from timewise.query import QueryConfig
+from pydantic import TypeAdapter
+from timewise.query import QueryType
 
 DATA_DIR = Path(__file__).parent / "data" / "queries"
 
@@ -73,10 +74,10 @@ def test_query_build_matches_reference(config_dict, ref_path):
     expected = normalize_sql(ref_file.read_text())
 
     # Instantiate query from config
-    cfg = QueryConfig.model_validate({"query": config_dict})
+    q = TypeAdapter(QueryType).validate_python(config_dict)
 
     # Build query and compare
-    built = normalize_sql(cfg.query.build())
+    built = normalize_sql(q.build())
 
     print(expected)
     print(built)

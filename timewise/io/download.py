@@ -1,60 +1,24 @@
 import time
 import threading
 import logging
-from pathlib import Path
 from queue import Empty
-from typing import Dict, List
+from typing import Dict
 from itertools import product
 
 import pandas as pd
 import numpy as np
 from astropy.table import Table
-from pydantic import BaseModel, Field, model_validator
 from pyvo.utils.http import create_session
 
 from .stable_tap import StableTAPService
+from .config import DownloadConfig
 from ..types import TAPJobMeta, TaskID
-from ..query import QueryConfig
+from ..query.base import Query
 from ..util.error_threading import ErrorQueue, ExceptionSafeThread
 from ..util.csv_utils import get_n_rows
-from ..backend import BackendType
 
 
 logger = logging.getLogger(__name__)
-
-
-class DownloadConfig(BaseModel):
-    input_csv: Path
-    chunk_size: int = 500_000
-    max_concurrent_jobs: int = 4
-    poll_interval: float = 10.0
-    queries: List[QueryConfig] = Field(..., description="One or more queries per chunk")
-    backend: BackendType = Field(..., discriminator="type")
-
-    service_url: str = "https://irsa.ipac.caltech.edu/TAP"
-
-    @model_validator(mode="after")
-    def validate_input_csv_columns(self) -> "DownloadConfig":
-        """Ensure that the input CSV contains all columns required by queries."""
-        # only validate if the CSV actually exists
-        if not self.input_csv.exists():
-            raise ValueError(f"CSV file does not exist: {self.input_csv}")
-
-        # read just the header, avoid loading the entire file
-        header = pd.read_csv(self.input_csv, nrows=0).columns
-
-        missing_columns = set()
-        for qc in self.queries:
-            for col in qc.query.input_columns.keys():
-                if col not in header:
-                    missing_columns.add(col)
-
-        if missing_columns:
-            raise ValueError(
-                f"CSV file {self.input_csv} is missing required columns: {sorted(missing_columns)}"
-            )
-
-        return self
 
 
 class Downloader:
@@ -100,7 +64,7 @@ class Downloader:
     def iter_tasks(self) -> TaskID:
         for chunk_id in range(self.n_chunks):
             for q in self.cfg.queries:
-                yield self.get_task_id(chunk_id, q.query.hash)
+                yield self.get_task_id(chunk_id, q.hash)
 
     def load_job_meta(self):
         backend = self.backend
@@ -120,8 +84,8 @@ class Downloader:
     # ----------------------------
     # TAP submission and download
     # ----------------------------
-    def submit_tap_job(self, query_config: QueryConfig, chunk_id: int) -> TAPJobMeta:
-        adql = query_config.query.adql
+    def submit_tap_job(self, query: Query, chunk_id: int) -> TAPJobMeta:
+        adql = query.adql
         cs = self.cfg.chunk_size
         sr = list(range(1, chunk_id * cs + 1))
         chunk_df = pd.read_csv(self.cfg.input_csv, skiprows=sr, nrows=cs)
@@ -129,21 +93,19 @@ class Downloader:
         upload = Table(
             {
                 key: np.array(chunk_df[key]).astype(dtype)
-                for key, dtype in query_config.query.input_columns.items()
+                for key, dtype in query.input_columns.items()
             }
         )
 
         logger.debug(f"uploading {len(upload)} objects.")
-        job = self.service.submit_job(
-            adql, uploads={query_config.query.upload_name: upload}
-        )
+        job = self.service.submit_job(adql, uploads={query.upload_name: upload})
         job.run()
         logger.debug(job.url)
 
         return TAPJobMeta(
             url=job.url,
             query=adql,
-            query_config=query_config.model_dump(),
+            query_config=query.model_dump(),
             input_length=len(chunk_df),
             submitted=time.time(),
             last_checked=time.time(),
@@ -167,7 +129,7 @@ class Downloader:
     def _submission_worker(self):
         while not self.stop_event.is_set():
             try:
-                chunk_id, query_config = self.submit_queue.get(timeout=1.0)  # type: int, QueryConfig
+                chunk_id, query = self.submit_queue.get(timeout=1.0)  # type: int, Query
             except Empty:
                 if self.all_chunks_queued:
                     self.all_chunks_submitted = True
@@ -186,9 +148,9 @@ class Downloader:
                     break
                 time.sleep(1.0)
 
-            task = self.get_task_id(chunk_id, query_config.query.hash)
+            task = self.get_task_id(chunk_id, query.hash)
             logger.info(f"submitting {task}")
-            job_meta = self.submit_tap_job(query_config, chunk_id)
+            job_meta = self.submit_tap_job(query, chunk_id)
             self.backend.save_meta(task, job_meta)
             with self.job_lock:
                 self.jobs[task] = job_meta
@@ -266,14 +228,14 @@ class Downloader:
 
         # enqueue all chunks & queries
         backend = self.backend
-        for chunk_id, qcfg in product(range(self.n_chunks), self.cfg.queries):
-            task = self.get_task_id(chunk_id, qcfg.query.hash)
+        for chunk_id, q in product(range(self.n_chunks), self.cfg.queries):
+            task = self.get_task_id(chunk_id, q.hash)
 
             # skip if the download is done, or the job is queued
             if backend.is_done(task) or (task in self.jobs):
                 continue
 
-            self.submit_queue.put((chunk_id, qcfg))
+            self.submit_queue.put((chunk_id, q))
         self.all_chunks_queued = True
         # wait until all jobs are submitted
         self.submit_queue.join()

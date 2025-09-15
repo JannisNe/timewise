@@ -1,6 +1,6 @@
 from typing import TypedDict, NamedTuple
 
-from timewise.query import QueryConfig
+from timewise.query import QueryType
 
 
 class TAPJobMeta(TypedDict):
@@ -10,7 +10,7 @@ class TAPJobMeta(TypedDict):
     last_checked: float
     input_length: int
     query: str
-    query_config: QueryConfig | dict
+    query_config: QueryType | dict
     completed_at: float
 
 

@@ -23,20 +23,16 @@ def cfg(tmp_path) -> DownloadConfig:
             backend={"type": "filesystem", "base_path": tmp_path / "test/download"},
             queries=[
                 {
-                    "query": {
-                        "type": "positional_allwise_p3as_mep",
-                        "radius_arcsec": 6,
-                        "magnitudes": True,
-                        "fluxes": True,
-                    },
+                    "type": "positional_allwise_p3as_mep",
+                    "radius_arcsec": 6,
+                    "magnitudes": True,
+                    "fluxes": True,
                 },
                 {
-                    "query": {
-                        "type": "positional_neowiser_p1bs_psd",
-                        "radius_arcsec": 6,
-                        "magnitudes": True,
-                        "fluxes": True,
-                    },
+                    "type": "positional_neowiser_p1bs_psd",
+                    "radius_arcsec": 6,
+                    "magnitudes": True,
+                    "fluxes": True,
                 },
             ],
         )
@@ -51,7 +47,7 @@ def test_downloader_creates_files(cfg):
     n_chunks = int(np.ceil(get_n_rows(cfg.input_csv) / cfg.chunk_size))
 
     for q, c in product(cfg.queries, range(n_chunks)):
-        task = dl.get_task_id(c, q.query.hash)
+        task = dl.get_task_id(c, q.hash)
         b = dl.backend
         assert b.is_done(task)
         assert b.data_exists(task)
