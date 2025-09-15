@@ -1,5 +1,5 @@
 import logging
-from typing import ClassVar
+from typing import Literal
 
 from ..base import Query
 
@@ -7,34 +7,29 @@ logger = logging.getLogger(__name__)
 
 
 class PositionalQuery(Query):
+    type: Literal["positional"] = "positional"
     radius_arcsec: float
     input_columns = {"ra": float, "dec": float, "orig_id": int}
 
-    table_name: ClassVar[str]
-
-    ra_key: ClassVar[str] = "ra"
-    dec_key: ClassVar[str] = "dec"
-    time_key: ClassVar[str] = "mjd"
-
     def build(self) -> str:
-        logger.debug(f"constructing positional query for {self.table_name}")
+        logger.debug(f"constructing positional query for {self.table.name}")
 
         q = "SELECT \n\t"
         for k in self.columns:
-            q += f"{self.table_name}.{k}, "
+            q += f"{self.table.name}.{k}, "
         q += f"\n\tmine.{self.original_id_key} \n"
         q += f"FROM\n\tTAP_UPLOAD.{self.upload_name} AS mine \n"
-        q += f"RIGHT JOIN\n\t{self.table_name} \n"
+        q += f"RIGHT JOIN\n\t{self.table.name} \n"
         q += "WHERE \n"
         q += (
-            f"\tCONTAINS(POINT('J2000',{self.table_name}.{self.ra_key},{self.table_name}.{self.dec_key}),"
+            f"\tCONTAINS(POINT('J2000',{self.table.name}.{self.table.ra_column},{self.table.name}.{self.table.dec_column}),"
             f"CIRCLE('J2000',mine.ra,mine.dec,{self.radius_arcsec / 3600:.18f}))=1 "
         )
 
         if len(self.constraints) > 0:
             q += " AND (\n"
             for c in self.constraints:
-                q += f"\t{self.table_name}.{c} AND \n"
+                q += f"\t{self.table.name}.{c} AND \n"
             q = q.strip(" AND \n")
             q += "\t)"
 

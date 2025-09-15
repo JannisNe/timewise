@@ -1,9 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
 from typing import Union, Annotated, TypeAlias
-from .positional.positional_allwise_p3as_mep import PositionalAllWISEQuery
-from .positional.positional_neowiser_p1bs_psd import PositionalNEOWISEQuery
+from .positional.base import PositionalQuery
 
 # Discriminated union of all query types
-QueryType: TypeAlias = Annotated[
-    Union[PositionalAllWISEQuery, PositionalNEOWISEQuery], Field(discriminator="type")
-]
+QueryType: TypeAlias = Annotated[Union[PositionalQuery], Field(discriminator="type")]

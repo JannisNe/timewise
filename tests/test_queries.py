@@ -8,7 +8,7 @@ DATA_DIR = Path(__file__).parent / "data" / "queries"
 query_inputs = [
     (
         {
-            "type": "positional_allwise_p3as_mep",
+            "type": "positional",
             "radius_arcsec": 6,
             "columns": [
                 "ra",
@@ -20,12 +20,13 @@ query_inputs = [
                 "w2mpro_ep",
                 "w2sigmpro_ep",
             ],
+            "table": {"name": "allwise_p3as_mep"},
         },
         "positional_allwise_p3as_mep_mag.txt",
     ),
     (
         {
-            "type": "positional_allwise_p3as_mep",
+            "type": "positional",
             "radius_arcsec": 6,
             "columns": [
                 "ra",
@@ -37,12 +38,13 @@ query_inputs = [
                 "w2flux_ep",
                 "w2sigflux_ep",
             ],
+            "table": {"name": "allwise_p3as_mep"},
         },
         "positional_allwise_p3as_mep_fluxes.txt",
     ),
     (
         {
-            "type": "positional_allwise_p3as_mep",
+            "type": "positional",
             "radius_arcsec": 6,
             "columns": [
                 "ra",
@@ -58,12 +60,13 @@ query_inputs = [
                 "w2flux_ep",
                 "w2sigflux_ep",
             ],
+            "table": {"name": "allwise_p3as_mep"},
         },
         "positional_allwise_p3as_mep_mag_fluxes.txt",
     ),
     (
         {
-            "type": "positional_neowiser_p1bs_psd",
+            "type": "positional",
             "radius_arcsec": 6,
             "columns": [
                 "ra",
@@ -75,12 +78,13 @@ query_inputs = [
                 "w2mpro",
                 "w2sigmpro",
             ],
+            "table": {"name": "neowiser_p1bs_psd"},
         },
         "positional_neowiser_p1bs_psd_mag.txt",
     ),
     (
         {
-            "type": "positional_neowiser_p1bs_psd",
+            "type": "positional",
             "radius_arcsec": 6,
             "columns": [
                 "ra",
@@ -92,12 +96,13 @@ query_inputs = [
                 "w2flux",
                 "w2sigflux",
             ],
+            "table": {"name": "neowiser_p1bs_psd"},
         },
         "positional_neowiser_p1bs_psd_fluxes.txt",
     ),
     (
         {
-            "type": "positional_neowiser_p1bs_psd",
+            "type": "positional",
             "radius_arcsec": 6,
             "columns": [
                 "ra",
@@ -113,6 +118,7 @@ query_inputs = [
                 "w2flux",
                 "w2sigflux",
             ],
+            "table": {"name": "neowiser_p1bs_psd"},
         },
         "positional_neowiser_p1bs_psd_mag_fluxes.txt",
     ),
