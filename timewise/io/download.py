@@ -10,12 +10,13 @@ import numpy as np
 from astropy.table import Table
 from pyvo.utils.http import create_session
 
+from timewise.chunking import Chunk
 from .stable_tap import StableTAPService
 from .config import DownloadConfig
-from ..types import TAPJobMeta, TaskID
+from ..types import TAPJobMeta, TaskID, TYPE_MAP
 from ..query.base import Query
 from ..util.error_threading import ErrorQueue, ExceptionSafeThread
-from ..util.csv_utils import get_n_rows
+from ..chunking import Chunker
 
 
 logger = logging.getLogger(__name__)
@@ -47,24 +48,21 @@ class Downloader:
         )
 
         self.backend = cfg.backend
+        self.chunker = Chunker(input_csv=cfg.input_csv, chunk_size=cfg.chunk_size)
 
     # ----------------------------
     # helpers
     # ----------------------------
-    @property
-    def n_chunks(self) -> int:
-        chunk_size = self.cfg.chunk_size
-        n = get_n_rows(self.cfg.input_csv) - 1  # one header row
-        return int(np.ceil(n / chunk_size))
-
     @staticmethod
-    def get_task_id(chunk_id, query_hash) -> TaskID:
-        return TaskID(namespace="download", key=f"chunk{chunk_id:04d}_{query_hash}")
+    def get_task_id(chunk: Chunk, query: Query) -> TaskID:
+        return TaskID(
+            namespace="download", key=f"chunk{chunk.chunk_id:04d}_{query.hash}"
+        )
 
     def iter_tasks(self) -> TaskID:
-        for chunk_id in range(self.n_chunks):
+        for chunk in self.chunker:
             for q in self.cfg.queries:
-                yield self.get_task_id(chunk_id, q.hash)
+                yield self.get_task_id(chunk, q)
 
     def load_job_meta(self):
         backend = self.backend
@@ -84,18 +82,36 @@ class Downloader:
     # ----------------------------
     # TAP submission and download
     # ----------------------------
-    def submit_tap_job(self, query: Query, chunk_id: int) -> TAPJobMeta:
+    def submit_tap_job(self, query: Query, chunk: Chunk) -> TAPJobMeta:
         adql = query.adql
-        cs = self.cfg.chunk_size
-        sr = list(range(1, chunk_id * cs + 1))
-        chunk_df = pd.read_csv(self.cfg.input_csv, skiprows=sr, nrows=cs)
+        start = min(chunk.row_numbers)
+        nrows = max(chunk.row_numbers) - start + 1
 
-        upload = Table(
-            {
-                key: np.array(chunk_df[key]).astype(dtype)
-                for key, dtype in query.input_columns.items()
-            }
+        columns = (
+            None if start == 0 else pd.read_csv(self.cfg.input_csv, nrows=0).columns
         )
+        chunk_df = pd.read_csv(
+            self.cfg.input_csv, skiprows=start, nrows=nrows, names=columns
+        )
+
+        assert all(chunk_df.index.isin(chunk.indices)), (
+            "Some inputs loaded from wrong chunk!"
+        )
+        assert all(np.isin(chunk.indices, chunk_df.index)), (
+            f"Some indices are missing in chunk {chunk.chunk_id}!"
+        )
+        logger.debug(f"loaded {len(chunk_df)} objects")
+
+        try:
+            upload = Table(
+                {
+                    key: np.array(chunk_df[key]).astype(TYPE_MAP[dtype])
+                    for key, dtype in query.input_columns.items()
+                }
+            )
+        except KeyError as e:
+            print(chunk_df)
+            raise KeyError(e)
 
         logger.debug(f"uploading {len(upload)} objects.")
         job = self.service.submit_job(adql, uploads={query.upload_name: upload})
@@ -129,7 +145,7 @@ class Downloader:
     def _submission_worker(self):
         while not self.stop_event.is_set():
             try:
-                chunk_id, query = self.submit_queue.get(timeout=1.0)  # type: int, Query
+                chunk, query = self.submit_queue.get(timeout=1.0)  # type: Chunk, Query
             except Empty:
                 if self.all_chunks_queued:
                     self.all_chunks_submitted = True
@@ -148,9 +164,9 @@ class Downloader:
                     break
                 time.sleep(1.0)
 
-            task = self.get_task_id(chunk_id, query.hash)
+            task = self.get_task_id(chunk, query)
             logger.info(f"submitting {task}")
-            job_meta = self.submit_tap_job(query, chunk_id)
+            job_meta = self.submit_tap_job(query, chunk)
             self.backend.save_meta(task, job_meta)
             with self.job_lock:
                 self.jobs[task] = job_meta
@@ -228,14 +244,14 @@ class Downloader:
 
         # enqueue all chunks & queries
         backend = self.backend
-        for chunk_id, q in product(range(self.n_chunks), self.cfg.queries):
-            task = self.get_task_id(chunk_id, q.hash)
+        for chunk, q in product(self.chunker, self.cfg.queries):
+            task = self.get_task_id(chunk, q)
 
             # skip if the download is done, or the job is queued
             if backend.is_done(task) or (task in self.jobs):
                 continue
 
-            self.submit_queue.put((chunk_id, q))
+            self.submit_queue.put((chunk, q))
         self.all_chunks_queued = True
         # wait until all jobs are submitted
         self.submit_queue.join()

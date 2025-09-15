@@ -1,13 +1,12 @@
 from pathlib import Path
 
-import numpy as np
 import pytest
 from itertools import product
 
 
 from timewise.types import TAPJobMeta
 from timewise.io.download import DownloadConfig, Downloader
-from timewise.util.csv_utils import get_n_rows
+from timewise.chunking import Chunker
 from dummy_tap import DummyTAPService
 
 
@@ -70,10 +69,10 @@ def test_downloader_creates_files(cfg):
     dl.service = DummyTAPService(baseurl="", chunksize=cfg.chunk_size)
     dl.run()
 
-    n_chunks = int(np.ceil(get_n_rows(cfg.input_csv) / cfg.chunk_size))
+    chunks = Chunker(input_csv=cfg.input_csv, chunk_size=cfg.chunk_size)
 
-    for q, c in product(cfg.queries, range(n_chunks)):
-        task = dl.get_task_id(c, q.hash)
+    for q, c in product(cfg.queries, chunks):
+        task = dl.get_task_id(c, q)
         b = dl.backend
         assert b.is_done(task)
         assert b.data_exists(task)
