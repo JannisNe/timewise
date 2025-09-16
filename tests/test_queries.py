@@ -141,7 +141,4 @@ def test_query_build_matches_reference(config_dict, ref_path):
     # Build query and compare
     built = normalize_sql(q.build())
 
-    print(expected)
-    print(built)
-
     assert built == expected, "query mismatch"
