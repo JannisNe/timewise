@@ -15,7 +15,7 @@ import numpy as np
 from ampel.abstract.AbsAlertLoader import AbsAlertLoader
 
 
-class WiseFileAlertLoader(AbsAlertLoader[Dict]):
+class TimewiseFileLoader(AbsAlertLoader[Dict]):
     """
     Load alerts from one of more files.
     """

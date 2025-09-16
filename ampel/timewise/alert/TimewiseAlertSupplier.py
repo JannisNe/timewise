@@ -20,7 +20,7 @@ from ampel.alert.BaseAlertSupplier import BaseAlertSupplier
 from ampel.view.ReadOnlyDict import ReadOnlyDict
 
 
-class NeoWisePhotometryAlertSupplier(BaseAlertSupplier):
+class TimewiseAlertSupplier(BaseAlertSupplier):
     """
     Iterable class that, for each transient name provided by the underlying alert_loader
     returns a PhotoAlert instance.
