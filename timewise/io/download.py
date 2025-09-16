@@ -10,13 +10,12 @@ import numpy as np
 from astropy.table import Table
 from pyvo.utils.http import create_session
 
-from timewise.chunking import Chunk
 from .stable_tap import StableTAPService
 from .config import DownloadConfig
 from ..types import TAPJobMeta, TaskID, TYPE_MAP
 from ..query.base import Query
 from ..util.error_threading import ErrorQueue, ExceptionSafeThread
-from ..chunking import Chunker
+from ..chunking import Chunker, Chunk
 
 
 logger = logging.getLogger(__name__)
