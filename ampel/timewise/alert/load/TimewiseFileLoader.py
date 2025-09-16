@@ -51,6 +51,7 @@ class WiseFileAlertLoader(AbsAlertLoader[Dict]):
         current_stock_id = None
 
         # emit all datapoints per file and stock id
+        # This way ampel runs not per datapoint but per object
         for p in self.paths:
             for f in p.parent.glob(p.name):
                 table = Table.read(
