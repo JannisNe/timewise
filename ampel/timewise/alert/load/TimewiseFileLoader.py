@@ -7,9 +7,9 @@
 # Last Modified Date:  16.09.2025
 # Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
 
-from typing import Dict
+from typing import Dict, List
 from pathlib import Path
-from astropy.table import Table
+from astropy.table import Table, vstack
 
 import numpy as np
 from ampel.abstract.AbsAlertLoader import AbsAlertLoader
@@ -26,6 +26,9 @@ class WiseFileAlertLoader(AbsAlertLoader[Dict]):
     # chunk size for reading files in MB
     chunk_size: int = 100
 
+    # column name of id
+    stock_id_column_name: str
+
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -37,10 +40,17 @@ class WiseFileAlertLoader(AbsAlertLoader[Dict]):
 
         self.paths = [Path(file) for file in np.atleast_1d(self.file)]
 
+    @staticmethod
+    def encode_result(res: List[Table]):
+        vstack(res).to_pandas().to_dict()
+
     def __iter__(self):
         return self
 
     def __next__(self) -> Dict:
+        current_stock_id = None
+
+        # emit all datapoints per file and stock id
         for p in self.paths:
             for f in p.parent.glob(p.name):
                 table = Table.read(
@@ -53,8 +63,27 @@ class WiseFileAlertLoader(AbsAlertLoader[Dict]):
                     },
                 )
 
+                # set up result list
+                res = []
+
                 # iterate over every table chunk:
                 for c in table:
-                    # iterate over every row in the table
-                    for row in c:
-                        yield dict(row)
+                    # iterate over all stock ids
+                    for stock_id in np.unique(c[self.stock_id_column_name]):
+                        selection = c[c[self.stock_id_column_name] == stock_id]
+
+                        if (stock_id == current_stock_id) and selection:
+                            res.append(selection)
+
+                        # emit the previous stock id result if present
+                        else:
+                            if res:
+                                yield self.encode_result(res)
+
+                            # set up next result list and update current stock id
+                            res = [selection] if selection else []
+                            current_stock_id = stock_id
+
+                # emit the result for the last stock id
+                if res:
+                    yield self.encode_result(res)
