@@ -63,14 +63,16 @@ class WiseFileAlertLoader(AbsAlertLoader[Dict]):
                     },
                 )
 
+                table.rename_colum(self.stock_id_column_name, "stock_id")
+
                 # set up result list
                 res = []
 
                 # iterate over every table chunk:
                 for c in table:
                     # iterate over all stock ids
-                    for stock_id in np.unique(c[self.stock_id_column_name]):
-                        selection = c[c[self.stock_id_column_name] == stock_id]
+                    for stock_id in np.unique(c["stock_id"]):
+                        selection = c[c["stock_id"] == stock_id]
 
                         if (stock_id == current_stock_id) and selection:
                             res.append(selection)
