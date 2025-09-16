@@ -1,0 +1,106 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# File:                timewise/ampel/timewise/alert/TimewiseAlertSupplier.py
+# License:             BSD-3-Clause
+# Author:              Jannis Necker <jannis.necker@gmail.com>
+# Date:                16.09.2025
+# Last Modified Date:  16.09.2025
+# Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
+
+import sys
+from hashlib import blake2b
+from typing import Literal, List
+
+import numpy as np
+from bson import encode
+from astropy.table import Table
+
+from ampel.alert.AmpelAlert import AmpelAlert
+from ampel.alert.BaseAlertSupplier import BaseAlertSupplier
+from ampel.view.ReadOnlyDict import ReadOnlyDict
+
+
+class NeoWisePhotometryAlertSupplier(BaseAlertSupplier):
+    """
+    Iterable class that, for each transient name provided by the underlying alert_loader
+    returns a PhotoAlert instance.
+    """
+
+    stat_pps: int = 0
+    stat_uls: int = 0
+
+    dpid: Literal["hash", "inc"] = "hash"
+    #    external_directory: Optional[ str ]
+    #    deserialize: None | Literal["avro", "json"]
+
+    bands: List[str] = ["w1", "w2"]
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.counter = 0 if self.dpid == "hash" else 1
+
+    def __next__(self) -> AmpelAlert:
+        """
+        :returns: a dict with a structure that AlertProcessor understands
+        :raises StopIteration: when alert_loader dries out.
+        :raises AttributeError: if alert_loader was not set properly before this method is called
+        """
+        d = self._deserialize(next(self.alert_loader))  # type: ignore
+
+        table = Table(d)
+        stock_ids = np.unique(table["stock_id"])
+        assert len(stock_ids) == 1
+        stock_id = stock_ids[0]
+
+        band_agnostic_columns = [
+            c for c in table.columns if not any([c.startswith(b) for b in self.bands])
+        ]
+
+        tables_per_band = {}
+        for band in self.bands:
+            band_specific_columns = [c for c in table.columns if c.startswith(band)]
+            selected_table = table[band_agnostic_columns + band_specific_columns]
+
+            # remove the band specific part of the column name, w1 or w2 etc.
+            # and the _ep at the end of AllWISE MEP data
+            renamed_band_specific_columns = [
+                c[2:].replace("_ep", "") for c in band_specific_columns
+            ]
+            selected_table.rename_column(
+                band_specific_columns, renamed_band_specific_columns
+            )
+
+            # add the filter info
+            table["filter"] = band
+
+            tables_per_band[band] = selected_table
+
+        # make the tables into a list of dictionaries for ampel to understand
+        all_ids = b""
+        pps = []
+        for band, t in tables_per_band.items():
+            for row in t:
+                pp = dict(row)
+                pp_hash = blake2b(encode(pp), digest_size=7).digest()
+                if self.counter:
+                    pp["candid"] = self.counter
+                    self.counter += 1
+                else:
+                    pp["candid"] = int.from_bytes(pp_hash, byteorder=sys.byteorder)
+
+                all_ids += pp_hash
+                pps.append(ReadOnlyDict(pp))
+
+        if not pps:
+            return self.__next__()
+
+        # Update stats
+        self.stat_pps += len(pps)
+
+        return AmpelAlert(
+            id=int.from_bytes(  # alert id
+                blake2b(all_ids, digest_size=7).digest(), byteorder=sys.byteorder
+            ),
+            stock=str(stock_id),  # internal ampel id
+            datapoints=tuple(pps),
+        )
