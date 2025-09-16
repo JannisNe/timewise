@@ -25,7 +25,7 @@ class FileSystemBackend(Backend):
         return self.base_path / f"{task}.ok"
 
     def _data_path(self, task: TaskID) -> Path:
-        return self.base_path / f"{task}.fits"
+        return self.base_path / f"{task}.csv"
 
     # ----------------------------
     # Metadata
@@ -67,7 +67,7 @@ class FileSystemBackend(Backend):
         tmp = path.with_suffix(".tmp")
         tmp.parent.mkdir(parents=True, exist_ok=True)
         logger.debug(f"writing {path}")
-        content.write(tmp, format="fits")
+        content.write(tmp, format="csv")
         tmp.replace(path)
 
     def load_data(self, task: TaskID) -> Table:
