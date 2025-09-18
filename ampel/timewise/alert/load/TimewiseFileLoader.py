@@ -41,8 +41,8 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         self._paths = [Path(file) for file in np.atleast_1d(self.file)]
 
     @staticmethod
-    def encode_result(res: List[Table]):
-        vstack(res).to_pandas().to_dict()
+    def encode_result(res: List[Table]) -> Dict:
+        return vstack(res).to_pandas().to_dict()
 
     def __iter__(self):
         return self
@@ -81,7 +81,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
                         # emit the previous stock id result if present
                         else:
                             if res:
-                                yield self.encode_result(res)
+                                return self.encode_result(res)
 
                             # set up next result list and update current stock id
                             res = [selection] if selection else []
@@ -89,4 +89,4 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
 
                 # emit the result for the last stock id
                 if res:
-                    yield self.encode_result(res)
+                    return self.encode_result(res)
