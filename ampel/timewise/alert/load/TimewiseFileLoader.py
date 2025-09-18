@@ -43,7 +43,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
 
     @staticmethod
     def encode_result(res: List[Table]) -> Dict:
-        return vstack(res).to_pandas().to_dict()
+        return vstack(res).to_pandas().to_dict(orient="list")
 
     def __iter__(self):
         return self
