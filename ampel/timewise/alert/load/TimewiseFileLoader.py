@@ -10,6 +10,7 @@
 from typing import Dict, List
 from pathlib import Path
 from astropy.table import Table, vstack
+from astropy.io import ascii
 
 import numpy as np
 from ampel.abstract.AbsAlertLoader import AbsAlertLoader
@@ -54,7 +55,8 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         # This way ampel runs not per datapoint but per object
         for p in self._paths:
             for f in p.parent.glob(p.name):
-                table = Table.read(
+                self.logger.debug(f"reading {f}")
+                tablegen = ascii.read(
                     f,
                     format="csv",
                     guess=False,
@@ -64,13 +66,12 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
                     },
                 )
 
-                table.rename_colum(self.stock_id_column_name, "stock_id")
-
                 # set up result list
                 res = []
 
                 # iterate over every table chunk:
-                for c in table:
+                for c in tablegen:
+                    c.rename_column(self.stock_id_column_name, "stock_id")
                     # iterate over all stock ids
                     for stock_id in np.unique(c["stock_id"]):
                         selection = c[c["stock_id"] == stock_id]
