@@ -31,10 +31,12 @@ dependencies = [
     "jupyter[jupyter]>=1.0.0,<2.0.0",
     "ampel-core (>=0.10.4.post0,<0.11.0)",
     "ampel-alerts (>=0.10.1,<0.11.0)",
+    "typer (>=0.17.4,<0.18.0)",
+    "ampel-ztf (>=0.10.2,<0.11.0)",
 ]
 
 [project.scripts]
-timewise = "timewise.cli:timewise_cli"
+timewise = "timewise.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/JannisNe/timewise"
