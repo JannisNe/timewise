@@ -38,7 +38,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         if self.logger:
             self.logger.info(f"Registering {len(self.file)} file(s) to load")
 
-        self.paths = [Path(file) for file in np.atleast_1d(self.file)]
+        self._paths = [Path(file) for file in np.atleast_1d(self.file)]
 
     @staticmethod
     def encode_result(res: List[Table]):
@@ -52,7 +52,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
 
         # emit all datapoints per file and stock id
         # This way ampel runs not per datapoint but per object
-        for p in self.paths:
+        for p in self._paths:
             for f in p.parent.glob(p.name):
                 table = Table.read(
                     f,
