@@ -1,10 +1,10 @@
-from typing import Literal
+from typing import Literal, ClassVar, Dict, Type
 from .base import TableConfig
 
 
 class neowiser_p1bs_psd(TableConfig):
-    name: Literal["neowiser_p1bs_psd"] = "neowiser_p1bs_psd"
-    columns_dtypes = {
+    name: ClassVar[Literal["neowiser_p1bs_psd"]] = "neowiser_p1bs_psd"
+    columns_dtypes: ClassVar[Dict[str, Type]] = {
         "ra": float,
         "dec": float,
         "mjd": float,
@@ -18,5 +18,5 @@ class neowiser_p1bs_psd(TableConfig):
         "w2flux": float,
         "w2sigflux": float,
     }
-    ra_column = "ra"
-    dec_column = "dec"
+    ra_column: ClassVar[str] = "ra"
+    dec_column: ClassVar[str] = "dec"

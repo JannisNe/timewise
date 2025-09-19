@@ -1,10 +1,10 @@
-from typing import Literal
+from typing import Literal, ClassVar, Type, Dict
 from .base import TableConfig
 
 
 class allwise_p3as_mep(TableConfig):
-    name: Literal["allwise_p3as_mep"] = "allwise_p3as_mep"
-    columns_dtypes = {
+    name: ClassVar[Literal["allwise_p3as_mep"]] = "allwise_p3as_mep"
+    columns_dtypes: ClassVar[Dict[str, Type]] = {
         "ra": float,
         "dec": float,
         "mjd": float,
@@ -18,5 +18,5 @@ class allwise_p3as_mep(TableConfig):
         "w2flux_ep": float,
         "w2sigflux_ep": float,
     }
-    ra_column = "ra"
-    dec_column = "dec"
+    ra_column: ClassVar[str] = "ra"
+    dec_column: ClassVar[str] = "dec"
