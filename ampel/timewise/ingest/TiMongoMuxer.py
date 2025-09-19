@@ -130,8 +130,8 @@ class TiMongoMuxer(AbsT0Muxer):
                 unique_dps_ids[key] = [dp["id"]]
 
         # make sure no duplicate datapoints exist
-        for simultaneous_dps in unique_dps_ids.items():
-            assert len(simultaneous_dps) == 1, "Duplicate photopoints!"
+        for key, simultaneous_dps in unique_dps_ids.items():
+            assert len(simultaneous_dps) == 1, f"Duplicate photopoints at {key}!"
 
         # Part 2: Update new data points that are already superseded
         ############################################################
@@ -139,13 +139,7 @@ class TiMongoMuxer(AbsT0Muxer):
         # Difference between candids from the alert and candids present in DB
         ids_dps_to_insert = ids_dps_alert - ids_dps_db
 
-        # Project datapoint the same way whether they were drawn from the db or from the alert.
-        if self.idempotent and self.projection:
-            for i, el in enumerate(dps_combine):
-                if el in ids_dps_to_insert:
-                    dps_combine[i] = self._project(el, self._projection_spec)
-
-        return [dp for dp in dps if dp["id"] in ids_dps_to_insert], dps_combine
+        return [dp for dp in dps if dp["id"] in ids_dps_to_insert], None
 
     def _project(self, doc, projection) -> DataPoint:
         out: dict[str, Any] = {}
