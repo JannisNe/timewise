@@ -1,3 +1,4 @@
 unit:
 - ampel.timewise.alert.load.TimewiseFileLoader
 - ampel.timewise.alert.TimewiseAlertSupplier
+- ampel.timewise.ingest.TiDataPointShaper
