@@ -51,6 +51,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         tables = [t for t in self._table_types if t.name in p.name]
         assert len(tables) > 0, f"No matching table found for {p}!"
         assert len(tables) < 2, f"More than one matching table found for {p}!"
+        self.logger.debug(f"{p.name} is from table {tables[0].name}")
         return tables[0]
 
     def find_dtypes_from_path(self, p: Path) -> Dict[str, Type]:
