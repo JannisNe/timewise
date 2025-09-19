@@ -6,14 +6,14 @@
 # Date:                16.09.2025
 # Last Modified Date:  16.09.2025
 # Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
-
-from typing import Dict, List
+from typing import Dict, List, get_args, Type
 from pathlib import Path
 from astropy.table import Table, vstack
 from astropy.io import ascii
 
 import numpy as np
 from ampel.abstract.AbsAlertLoader import AbsAlertLoader
+from timewise.tables import TableType
 
 
 class TimewiseFileLoader(AbsAlertLoader[Dict]):
@@ -41,9 +41,21 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
 
         self._paths = [Path(file) for file in np.atleast_1d(self.file)]
 
+        self._table_types = get_args(TableType.__origin__)
+
     @staticmethod
     def encode_result(res: List[Table]) -> Dict:
         return vstack(res).to_pandas().to_dict(orient="list")
+
+    def find_table_from_path(self, p: Path) -> TableType:
+        tables = [t for t in self._table_types if t.name in p.name]
+        assert len(tables) > 0, f"No matching table found for {p}!"
+        assert len(tables) < 2, f"More than one matching table found for {p}!"
+        return tables[0]
+
+    def find_dtypes_from_path(self, p: Path) -> Dict[str, Type]:
+        table = self.find_table_from_path(p)
+        return table.columns_dtypes
 
     def __iter__(self):
         return self
@@ -64,6 +76,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
                         "chunk_size": 100 * self.chunk_size,
                         "chunk_generator": True,
                     },
+                    converters=self.find_dtypes_from_path(f),
                 )
 
                 # set up result list
