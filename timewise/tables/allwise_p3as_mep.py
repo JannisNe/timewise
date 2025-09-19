@@ -3,7 +3,7 @@ from .base import TableConfig
 
 
 class allwise_p3as_mep(TableConfig):
-    name: ClassVar[Literal["allwise_p3as_mep"]] = "allwise_p3as_mep"
+    name: Literal["allwise_p3as_mep"] = "allwise_p3as_mep"
     columns_dtypes: ClassVar[Dict[str, Type]] = {
         "ra": float,
         "dec": float,

@@ -3,7 +3,7 @@ from .base import TableConfig
 
 
 class neowiser_p1bs_psd(TableConfig):
-    name: ClassVar[Literal["neowiser_p1bs_psd"]] = "neowiser_p1bs_psd"
+    name: Literal["neowiser_p1bs_psd"] = "neowiser_p1bs_psd"
     columns_dtypes: ClassVar[Dict[str, Type]] = {
         "ra": float,
         "dec": float,
