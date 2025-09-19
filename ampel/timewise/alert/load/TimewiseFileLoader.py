@@ -56,7 +56,9 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
 
     def find_dtypes_from_path(self, p: Path) -> Dict[str, pdtype.Dtype]:
         table = self.find_table_from_path(p)
-        return table.columns_dtypes
+        mapping = table.columns_dtypes
+        mapping[self.stock_id_column_name] = str
+        return mapping
 
     def __iter__(self):
         return self
