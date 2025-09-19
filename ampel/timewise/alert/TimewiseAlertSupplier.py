@@ -81,6 +81,7 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
         for band, t in tables_per_band.items():
             for row in t:
                 pp = dict(row)
+                pp["fid"] = int(band[-1])
                 pp_hash = blake2b(encode(pp), digest_size=7).digest()
                 if self.counter:
                     pp["candid"] = self.counter
