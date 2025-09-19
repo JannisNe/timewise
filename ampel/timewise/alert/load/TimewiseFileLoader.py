@@ -48,10 +48,14 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         return pd.concat(res).to_dict(orient="list")
 
     def find_table_from_path(self, p: Path) -> TableType:
-        tables = [t for t in self._table_types if t.name in p.name]
+        tables = [
+            t for t in self._table_types if t.model_fields["name"].default in p.name
+        ]
         assert len(tables) > 0, f"No matching table found for {p}!"
         assert len(tables) < 2, f"More than one matching table found for {p}!"
-        self.logger.debug(f"{p.name} is from table {tables[0].name}")
+        self.logger.debug(
+            f"{p.name} is from table {tables[0].model_fields['name'].default}"
+        )
         return tables[0]
 
     def find_dtypes_from_path(self, p: Path) -> Dict[str, pdtype.Dtype]:
