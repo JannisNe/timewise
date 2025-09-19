@@ -139,6 +139,8 @@ class TiMongoMuxer(AbsT0Muxer):
         # Difference between candids from the alert and candids present in DB
         ids_dps_to_insert = ids_dps_alert - ids_dps_db
 
+        # TODO: add combine_dps
+
         return [dp for dp in dps if dp["id"] in ids_dps_to_insert], None
 
     def _project(self, doc, projection) -> DataPoint:
