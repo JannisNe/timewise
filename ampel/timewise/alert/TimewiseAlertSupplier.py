@@ -66,7 +66,7 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
             renamed_band_specific_columns = [
                 c[2:].replace("_ep", "") for c in band_specific_columns
             ]
-            selected_table.rename_column(
+            selected_table.rename_columns(
                 band_specific_columns, renamed_band_specific_columns
             )
 
