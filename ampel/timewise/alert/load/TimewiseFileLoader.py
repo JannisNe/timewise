@@ -6,12 +6,12 @@
 # Date:                16.09.2025
 # Last Modified Date:  16.09.2025
 # Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
-from typing import Dict, List, get_args, Type
+from typing import Dict, List, get_args
 from pathlib import Path
-from astropy.table import Table, vstack
-from astropy.io import ascii
 
 import numpy as np
+import pandas as pd
+from pandas import _typing as pdtype
 from ampel.abstract.AbsAlertLoader import AbsAlertLoader
 from timewise.tables import TableType
 
@@ -24,8 +24,8 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
     #: paths to files to load
     file: str | list[str]
 
-    # chunk size for reading files in MB
-    chunk_size: int = 100
+    # chunk size for reading files in number of lines
+    chunk_size: int = 100_000
 
     # column name of id
     stock_id_column_name: str
@@ -44,8 +44,8 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         self._table_types = get_args(TableType.__origin__)
 
     @staticmethod
-    def encode_result(res: List[Table]) -> Dict:
-        return vstack(res).to_pandas().to_dict(orient="list")
+    def encode_result(res: List[pd.DataFrame]) -> Dict:
+        return pd.concat(res).to_dict(orient="list")
 
     def find_table_from_path(self, p: Path) -> TableType:
         tables = [t for t in self._table_types if t.name in p.name]
@@ -54,7 +54,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         self.logger.debug(f"{p.name} is from table {tables[0].name}")
         return tables[0]
 
-    def find_dtypes_from_path(self, p: Path) -> Dict[str, Type]:
+    def find_dtypes_from_path(self, p: Path) -> Dict[str, pdtype.Dtype]:
         table = self.find_table_from_path(p)
         return table.columns_dtypes
 
@@ -69,28 +69,27 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         for p in self._paths:
             for f in p.parent.glob(p.name):
                 self.logger.debug(f"reading {f}")
-                tablegen = ascii.read(
+                tablegen = pd.read_csv(
                     f,
-                    format="csv",
-                    guess=False,
-                    fast_reader={
-                        "chunk_size": 100 * self.chunk_size,
-                        "chunk_generator": True,
-                    },
-                    converters=self.find_dtypes_from_path(f),
+                    header=0,
+                    dtype=self.find_dtypes_from_path(f),
+                    engine="c",
+                    chunksize=self.chunk_size,
                 )
 
                 # set up result list
                 res = []
 
                 # iterate over every table chunk:
-                for c in tablegen:
-                    c.rename_column(self.stock_id_column_name, "stock_id")
+                for c in tablegen:  # type: pd.DataFrame
+                    c.rename(
+                        columns={self.stock_id_column_name: "stock_id"}, inplace=True
+                    )
                     # iterate over all stock ids
                     for stock_id in np.unique(c["stock_id"]):
                         selection = c[c["stock_id"] == stock_id]
 
-                        if (stock_id == current_stock_id) and selection:
+                        if (stock_id == current_stock_id) and len(selection):
                             res.append(selection)
 
                         # emit the previous stock id result if present
@@ -99,7 +98,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
                                 return self.encode_result(res)
 
                             # set up next result list and update current stock id
-                            res = [selection] if selection else []
+                            res = [selection] if len(selection) else []
                             current_stock_id = stock_id
 
                 # emit the result for the last stock id
