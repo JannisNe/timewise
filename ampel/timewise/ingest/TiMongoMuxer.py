@@ -109,10 +109,6 @@ class TiMongoMuxer(AbsT0Muxer):
         # choose the one with the larger id
         # (jd, fid) -> ids
         unique_dps_ids: dict[tuple[float, float, float], list[DataPointId]] = {}
-        # id -> superseding ids
-        ids_dps_superseded: dict[DataPointId, list[DataPointId]] = {}
-        # id -> final datapoint
-        unique_dps: dict[DataPointId, DataPoint] = {}
 
         for dp in dps_db + dps:
             # jd alone is not enough for matching pps because each time is associated with
