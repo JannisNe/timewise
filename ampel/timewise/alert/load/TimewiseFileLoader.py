@@ -36,12 +36,17 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         if not self.file:
             raise ValueError("Parameter 'files' cannot be empty")
 
-        if self.logger:
-            self.logger.info(f"Registering {len(self.file)} file(s) to load")
-
         self._paths = [Path(file) for file in np.atleast_1d(self.file)]
+        self._files = np.array(
+            [list(p.parent.glob(p.name)) for p in self._paths]
+        ).flatten()
+
+        if self.logger:
+            self.logger.info(f"Registering {len(self._files)} file(s) to load")
 
         self._table_types = get_args(TableType.__origin__)
+
+        self._gen = self.iter_stocks()
 
     @staticmethod
     def encode_result(res: List[pd.DataFrame]) -> pd.DataFrame:
@@ -64,10 +69,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         mapping[self.stock_id_column_name] = int
         return mapping
 
-    def __iter__(self):
-        return self
-
-    def __next__(self) -> pd.DataFrame:
+    def iter_stocks(self):
         current_stock_id = None
 
         # emit all datapoints per file and stock id
@@ -101,7 +103,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
                         # emit the previous stock id result if present
                         else:
                             if res:
-                                return self.encode_result(res)
+                                yield self.encode_result(res)
 
                             # set up next result list and update current stock id
                             res = [selection] if len(selection) else []
@@ -109,4 +111,10 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
 
                 # emit the result for the last stock id
                 if res:
-                    return self.encode_result(res)
+                    yield self.encode_result(res)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self) -> pd.DataFrame:
+        return next(self._gen)
