@@ -63,11 +63,9 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
 
             # remove the band specific part of the column name, w1 or w2 etc.
             # and the _ep at the end of AllWISE MEP data
-            renamed_band_specific_columns = [
-                c[2:].replace("_ep", "") for c in band_specific_columns
-            ]
-            selected_table.rename_columns(
-                band_specific_columns, renamed_band_specific_columns
+            selected_table.rename(
+                columns={c: c[2:].replace("_ep", "") for c in band_specific_columns},
+                inplace=True,
             )
 
             # add the filter info
