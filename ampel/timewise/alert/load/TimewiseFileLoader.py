@@ -44,8 +44,8 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         self._table_types = get_args(TableType.__origin__)
 
     @staticmethod
-    def encode_result(res: List[pd.DataFrame]) -> Dict:
-        return pd.concat(res).to_dict(orient="list")
+    def encode_result(res: List[pd.DataFrame]) -> pd.DataFrame:
+        return pd.concat(res)
 
     def find_table_from_path(self, p: Path) -> TableType:
         tables = [
@@ -67,7 +67,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
     def __iter__(self):
         return self
 
-    def __next__(self) -> Dict:
+    def __next__(self) -> pd.DataFrame:
         current_stock_id = None
 
         # emit all datapoints per file and stock id

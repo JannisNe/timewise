@@ -11,9 +11,7 @@ import sys
 from hashlib import blake2b
 from typing import Literal, List
 
-import numpy as np
 from bson import encode
-from astropy.table import Table
 
 from ampel.alert.AmpelAlert import AmpelAlert
 from ampel.alert.BaseAlertSupplier import BaseAlertSupplier
@@ -45,10 +43,9 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
         :raises StopIteration: when alert_loader dries out.
         :raises AttributeError: if alert_loader was not set properly before this method is called
         """
-        d = self._deserialize(next(self.alert_loader))  # type: ignore
+        table = self._deserialize(next(self.alert_loader))  # type: ignore
 
-        table = Table(d)
-        stock_ids = np.unique(table["stock_id"])
+        stock_ids = table["stock_id"].unique()
         assert len(stock_ids) == 1
         stock_id = stock_ids[0]
 
@@ -56,7 +53,10 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
             c for c in table.columns if not any([c.startswith(b) for b in self.bands])
         ]
 
-        tables_per_band = {}
+        # make the tables into a list of dictionaries for ampel to understand
+        all_ids = b""
+        pps = []
+
         for band in self.bands:
             band_specific_columns = [c for c in table.columns if c.startswith(band)]
             selected_table = table[band_agnostic_columns + band_specific_columns]
@@ -71,16 +71,10 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
             )
 
             # add the filter info
-            table["filter"] = band
+            selected_table["filter"] = band
 
-            tables_per_band[band] = selected_table
-
-        # make the tables into a list of dictionaries for ampel to understand
-        all_ids = b""
-        pps = []
-        for band, t in tables_per_band.items():
-            for row in t:
-                pp = dict(row)
+            for i, row in selected_table.iterrows():
+                pp = row.to_dict()
                 pp["fid"] = int(band[-1])
                 pp_hash = blake2b(encode(pp), digest_size=7).digest()
                 if self.counter:
