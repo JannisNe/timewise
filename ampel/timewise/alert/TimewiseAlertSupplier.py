@@ -12,6 +12,7 @@ from hashlib import blake2b
 from typing import Literal, List
 
 from bson import encode
+import pandas as pd
 
 from ampel.alert.AmpelAlert import AmpelAlert
 from ampel.alert.BaseAlertSupplier import BaseAlertSupplier
@@ -63,6 +64,7 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
 
             # remove the band specific part of the column name, w1 or w2 etc.
             # and the _ep at the end of AllWISE MEP data
+            pd.options.mode.chained_assignment = None
             selected_table.rename(
                 columns={c: c[2:].replace("_ep", "") for c in band_specific_columns},
                 inplace=True,
@@ -70,6 +72,7 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
 
             # add the filter info
             selected_table["filter"] = band
+            pd.options.mode.chained_assignment = "warn"
 
             for i, row in selected_table.iterrows():
                 pp = row.to_dict()
