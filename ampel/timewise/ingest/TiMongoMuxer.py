@@ -10,7 +10,6 @@ from bisect import bisect_right
 from contextlib import suppress
 from typing import Any
 
-from pymongo import UpdateOne
 
 from ampel.abstract.AbsT0Muxer import AbsT0Muxer
 from ampel.content.DataPoint import DataPoint
@@ -45,6 +44,8 @@ class TiMongoMuxer(AbsT0Muxer):
         "body.mjd": 1,
         "body.fid": 1,
         "body.flux": 1,
+        "body.ra": 1,
+        "body.dec": 1,
     }
 
     def __init__(self, **kwargs) -> None:
@@ -98,9 +99,6 @@ class TiMongoMuxer(AbsT0Muxer):
         # New pps/uls lists for db loaded datapoints
         dps_db = self._get_dps(stock_id)
 
-        ops: list[UpdateOne] = []
-        add_update = ops.append
-
         # Create set with datapoint ids from alert
         ids_dps_alert = {el["id"] for el in dps}
 
@@ -110,7 +108,7 @@ class TiMongoMuxer(AbsT0Muxer):
         # uniquify photopoints by jd, fid. For duplicate points,
         # choose the one with the larger id
         # (jd, fid) -> ids
-        unique_dps_ids: dict[tuple[float, int], list[DataPointId]] = {}
+        unique_dps_ids: dict[tuple[float, int, float, float], list[DataPointId]] = {}
         # id -> superseding ids
         ids_dps_superseded: dict[DataPointId, list[DataPointId]] = {}
         # id -> final datapoint
@@ -118,8 +116,14 @@ class TiMongoMuxer(AbsT0Muxer):
 
         for dp in dps_db + dps:
             # jd alone is not enough for matching pps because each time is associated with
-            # two filters!
-            key = (dp["body"]["mjd"], dp["body"]["fid"])
+            # two filters! Also, if there can be multiple sources within the same frame which
+            # leads to duplicate MJD and FID. Check position in addition.
+            key = (
+                dp["body"]["mjd"],
+                dp["body"]["fid"],
+                dp["body"]["ra"],
+                dp["body"]["dec"],
+            )
 
             if target := unique_dps_ids.get(key):
                 # insert id in order
@@ -131,7 +135,10 @@ class TiMongoMuxer(AbsT0Muxer):
 
         # make sure no duplicate datapoints exist
         for key, simultaneous_dps in unique_dps_ids.items():
-            assert len(simultaneous_dps) == 1, f"Duplicate photopoints at {key}!"
+            dps_db_wrong = [dp for dp in dps_db if dp["id"] in simultaneous_dps]
+            dps_wrong = [dp for dp in dps if dp["id"] in simultaneous_dps]
+            msg = f"stockID {stock_id}: Duplicate photopoints at {key}!\nDPS from DB:\n{dps_db_wrong}\nNew DPS:\n{dps_wrong}"
+            assert len(simultaneous_dps) == 1, msg
 
         # Part 2: Update new data points that are already superseded
         ############################################################
