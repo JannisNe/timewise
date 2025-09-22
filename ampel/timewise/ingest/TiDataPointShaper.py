@@ -51,7 +51,7 @@ class TiDataPointShaperBase(AmpelUnit):
                 {  # type: ignore[typeddict-item]
                     "id": photo_dict["candid"],
                     "stock": stock,
-                    "tag": tags[photo_dict["fid"]],
+                    "tag": tags[photo_dict["table_name"]],
                     "body": photo_dict,
                 }
             )
@@ -74,7 +74,7 @@ class TiDataPointShaperBase(AmpelUnit):
         return {  # type: ignore
             "id": hash_payload(encode(sorted_body), size=-self.digest_size * 8),
             "stock": stock,
-            "tag": [*tags[body["fid"]], *tag],
+            "tag": [*tags[body["table_name"]], *tag],
             "body": sorted_body,
         }
 

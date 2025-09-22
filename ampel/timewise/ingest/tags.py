@@ -9,7 +9,7 @@
 
 # tags is used by TiT0PhotoPointShaper and ZiT0UpperLimitShaper
 # key: filter id
-tags: dict[int, list[str]] = {
-    1: ["WISE", "TIMEWISE", "WISE_W1"],
-    2: ["WISE", "TIMEWISE", "WISE_W2"],
+tags: dict[str, list[str]] = {
+    "allwise_p3as_mep": ["WISE", "TIMEWISE", "allwise_p3as_mep"],
+    "neowiser_p1bs_psd": ["WISE", "TIMEWISE", "neowiser_p1bs_psd"],
 }

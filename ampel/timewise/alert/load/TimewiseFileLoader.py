@@ -11,7 +11,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from pandas import _typing as pdtype
 from ampel.abstract.AbsAlertLoader import AbsAlertLoader
 from timewise.tables import TableType
 
@@ -63,12 +62,6 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         )
         return tables[0]
 
-    def find_dtypes_from_path(self, p: Path) -> Dict[str, pdtype.Dtype]:
-        table = self.find_table_from_path(p)
-        mapping = table.columns_dtypes
-        mapping[self.stock_id_column_name] = int
-        return mapping
-
     def iter_stocks(self):
         current_stock_id = None
 
@@ -77,10 +70,16 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         for p in self._paths:
             for f in p.parent.glob(p.name):
                 self.logger.debug(f"reading {f}")
+
+                # find which table the data comes from and use the corresponding dtype
+                table = self.find_table_from_path(f)
+                dtype_mapping = table.columns_dtypes
+                dtype_mapping[self.stock_id_column_name] = int
+
                 tablegen = pd.read_csv(
                     f,
                     header=0,
-                    dtype=self.find_dtypes_from_path(f),
+                    dtype=dtype_mapping,
                     engine="c",
                     chunksize=self.chunk_size,
                 )
@@ -93,6 +92,9 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
                     c.rename(
                         columns={self.stock_id_column_name: "stock_id"}, inplace=True
                     )
+
+                    c["table_name"] = table.model_fields["name"].default
+
                     # iterate over all stock ids
                     for stock_id in np.unique(c["stock_id"]):
                         selection = c[c["stock_id"] == stock_id]

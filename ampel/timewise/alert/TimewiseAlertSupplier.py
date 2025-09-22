@@ -58,34 +58,27 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
         all_ids = b""
         pps = []
 
-        for band in self.bands:
-            band_specific_columns = [c for c in table.columns if c.startswith(band)]
-            selected_table = table[band_agnostic_columns + band_specific_columns]
+        # remove the _ep at the end of AllWISE MEP data
+        pd.options.mode.chained_assignment = None
+        table.rename(
+            columns={
+                c: c.replace("_ep", "") for c in table.columns if c.endswith("_ep")
+            },
+            inplace=True,
+        )
+        pd.options.mode.chained_assignment = "warn"
 
-            # remove the band specific part of the column name, w1 or w2 etc.
-            # and the _ep at the end of AllWISE MEP data
-            pd.options.mode.chained_assignment = None
-            selected_table.rename(
-                columns={c: c[2:].replace("_ep", "") for c in band_specific_columns},
-                inplace=True,
-            )
+        for i, row in table.iterrows():
+            pp = row.to_dict()
+            pp_hash = blake2b(encode(pp), digest_size=7).digest()
+            if self.counter:
+                pp["candid"] = self.counter
+                self.counter += 1
+            else:
+                pp["candid"] = int.from_bytes(pp_hash, byteorder=sys.byteorder)
 
-            # add the filter info
-            selected_table["filter"] = band
-            pd.options.mode.chained_assignment = "warn"
-
-            for i, row in selected_table.iterrows():
-                pp = row.to_dict()
-                pp["fid"] = int(band[-1])
-                pp_hash = blake2b(encode(pp), digest_size=7).digest()
-                if self.counter:
-                    pp["candid"] = self.counter
-                    self.counter += 1
-                else:
-                    pp["candid"] = int.from_bytes(pp_hash, byteorder=sys.byteorder)
-
-                all_ids += pp_hash
-                pps.append(ReadOnlyDict(pp))
+            all_ids += pp_hash
+            pps.append(ReadOnlyDict(pp))
 
         if not pps:
             return self.__next__()
@@ -97,6 +90,6 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
             id=int.from_bytes(  # alert id
                 blake2b(all_ids, digest_size=7).digest(), byteorder=sys.byteorder
             ),
-            stock=str(stock_id),  # internal ampel id
+            stock=int(stock_id),  # internal ampel id
             datapoints=tuple(pps),
         )

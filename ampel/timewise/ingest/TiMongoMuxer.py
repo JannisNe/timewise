@@ -42,8 +42,8 @@ class TiMongoMuxer(AbsT0Muxer):
         "channel": 1,
         "stock": 1,
         "body.mjd": 1,
-        "body.fid": 1,
-        "body.flux": 1,
+        "body.w1flux": 1,
+        "body.w2flux": 1,
         "body.ra": 1,
         "body.dec": 1,
     }
@@ -108,7 +108,7 @@ class TiMongoMuxer(AbsT0Muxer):
         # uniquify photopoints by jd, fid. For duplicate points,
         # choose the one with the larger id
         # (jd, fid) -> ids
-        unique_dps_ids: dict[tuple[float, int, float, float], list[DataPointId]] = {}
+        unique_dps_ids: dict[tuple[float, float, float], list[DataPointId]] = {}
         # id -> superseding ids
         ids_dps_superseded: dict[DataPointId, list[DataPointId]] = {}
         # id -> final datapoint
@@ -120,7 +120,6 @@ class TiMongoMuxer(AbsT0Muxer):
             # leads to duplicate MJD and FID. Check position in addition.
             key = (
                 dp["body"]["mjd"],
-                dp["body"]["fid"],
                 dp["body"]["ra"],
                 dp["body"]["dec"],
             )
@@ -145,10 +144,14 @@ class TiMongoMuxer(AbsT0Muxer):
 
         # Difference between candids from the alert and candids present in DB
         ids_dps_to_insert = ids_dps_alert - ids_dps_db
+        dps_to_insert = [dp for dp in dps if dp["id"] in ids_dps_to_insert]
+        self.logger.debug(
+            f"Got {len(ids_dps_alert)} datapoints from alerts, found {len(dps_db)} in DB, inserting {len(dps_to_insert)} datapoints"
+        )
 
         # TODO: add combine_dps
 
-        return [dp for dp in dps if dp["id"] in ids_dps_to_insert], None
+        return dps_to_insert, None
 
     def _project(self, doc, projection) -> DataPoint:
         out: dict[str, Any] = {}
