@@ -83,12 +83,10 @@ class Downloader:
     # ----------------------------
     def submit_tap_job(self, query: Query, chunk: Chunk) -> TAPJobMeta:
         adql = query.adql
-        start = min(chunk.row_numbers)
-        nrows = max(chunk.row_numbers) - start + 1
+        start = min(chunk.row_numbers) + 1  # plus one to always skip header line
+        nrows = max(chunk.row_numbers) - start + 2  # plus one: skip header, plus one:
 
-        columns = (
-            None if start == 0 else pd.read_csv(self.cfg.input_csv, nrows=0).columns
-        )
+        columns = pd.read_csv(self.cfg.input_csv, nrows=0).columns
         chunk_df = pd.read_csv(
             self.cfg.input_csv, skiprows=start, nrows=nrows, names=columns
         )

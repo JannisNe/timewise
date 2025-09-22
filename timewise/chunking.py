@@ -28,7 +28,7 @@ class Chunker:
             np.sum(f[i : i + chunk] == ord("\n")) for i in range(0, len(f), chunk)
         )
         del f
-        return num_newlines - 2  # one header row
+        return num_newlines - 1  # one header row
 
     def __len__(self) -> int:
         return int(np.ceil(self._n_rows / self.chunk_size))
@@ -44,4 +44,4 @@ class Chunker:
         stop = min(start + self.chunk_size, self._n_rows)
         indices = pd.read_csv(self.input_csv, skiprows=start, nrows=stop - start).index
         logger.debug(f"chunk {chunk_id}: from {start} to {stop}")
-        return Chunk(chunk_id, indices, np.arange(start, stop))
+        return Chunk(chunk_id, indices, np.arange(start=start, stop=stop))
