@@ -141,13 +141,12 @@ class TiMongoMuxer(AbsT0Muxer):
         # Difference between candids from the alert and candids present in DB
         ids_dps_to_insert = ids_dps_alert - ids_dps_db
         dps_to_insert = [dp for dp in dps if dp["id"] in ids_dps_to_insert]
+        dps_to_combine = [dp for dp in dps + dps_db if dp["id"] in unique_dps_ids]
         self.logger.debug(
             f"Got {len(ids_dps_alert)} datapoints from alerts, found {len(dps_db)} in DB, inserting {len(dps_to_insert)} datapoints"
         )
 
-        # TODO: add combine_dps
-
-        return dps_to_insert, None
+        return dps_to_insert, dps_to_combine
 
     def _project(self, doc, projection) -> DataPoint:
         out: dict[str, Any] = {}
