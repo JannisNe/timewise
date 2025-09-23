@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-import yaml
 
 import typer
 
@@ -11,13 +10,6 @@ from rich.logging import RichHandler
 
 
 app = typer.Typer(help="Timewsie CLI")
-
-
-def load_config(path: Path) -> TimewiseConfig:
-    assert path.exists(), f"{path} not found!"
-    with path.open("r") as f:
-        config_dict = yaml.safe_load(f)
-    return TimewiseConfig.model_validate(config_dict)
 
 
 # --- Global callback (runs before every command) ---
@@ -54,4 +46,4 @@ def download(
         ..., "--config", "-c", exists=True, help="Pipeline config file (YAML/JSON)"
     ),
 ):
-    Downloader(load_config(config_path).download).run()
+    Downloader(TimewiseConfig.from_yaml(config_path).download).run()
