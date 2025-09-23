@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 from itertools import product
-
+import pandas as pd
 
 from timewise.types import TAPJobMeta
 from timewise.io.download import DownloadConfig, Downloader
@@ -62,6 +62,17 @@ def cfg(tmp_path) -> DownloadConfig:
             ],
         )
     )
+
+
+def test_chunking(cfg):
+    dl = Downloader(cfg)
+    chunks = Chunker(input_csv=cfg.input_csv, chunk_size=cfg.chunk_size)
+    for i, chunk in enumerate(chunks):
+        chunk_data = dl.get_chunk_data(chunk)
+        assert (
+            len(pd.Index(chunk_data.orig_id).difference(range(i * 32, (i + 1) * 32)))
+            == 0
+        )
 
 
 def test_downloader_creates_files(cfg):
