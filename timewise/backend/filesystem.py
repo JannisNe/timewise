@@ -25,7 +25,7 @@ class FileSystemBackend(Backend):
         return self.base_path / f"{task}.ok"
 
     def _data_path(self, task: TaskID) -> Path:
-        return self.base_path / f"{task}.csv"
+        return self.base_path / f"{task}.hdf5"
 
     # ----------------------------
     # Metadata
@@ -67,14 +67,14 @@ class FileSystemBackend(Backend):
         tmp = path.with_suffix(".tmp")
         tmp.parent.mkdir(parents=True, exist_ok=True)
         logger.debug(f"writing {path}")
-        content.write(tmp, format="csv")
+        content.write(tmp, format="hdf5")
         tmp.replace(path)
 
     def load_data(self, task: TaskID) -> Table:
         path = self._data_path(task)
         if not path.exists():
             raise FileNotFoundError(f"No data for task {task}")
-        return Table.read(path, format="fits")
+        return Table.read(path, format="hdf5")
 
     def data_exists(self, task: TaskID) -> bool:
         return self._data_path(task).exists()
