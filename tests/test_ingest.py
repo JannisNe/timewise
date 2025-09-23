@@ -6,6 +6,7 @@ from ampel.cli.JobCommand import JobCommand
 from pymongo import MongoClient
 
 DATA_DIR = Path(__file__).parent / "data"
+AMPEL_CONFIG_PATH = Path(__file__).parent.parent / "ampel_config.yml"
 
 
 logger = logging.Logger(__name__)
@@ -15,8 +16,11 @@ def test_ingest():
     job_path = DATA_DIR / "test_ingest.yml"
     cmd = JobCommand()
     parser = cmd.get_parser()
+    ampel_config_path = DATA_DIR.parent.parent / "ampel_config.yml"
     args = vars(
-        parser.parse_args(["--schema", str(job_path), "--config", "ampel_config.yml"])
+        parser.parse_args(
+            ["--schema", str(job_path), "--config", str(ampel_config_path)]
+        )
     )
     logger.debug(args)
     JobCommand().run(args, unknown_args=())
