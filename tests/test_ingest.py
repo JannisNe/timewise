@@ -16,10 +16,9 @@ def test_ingest():
     job_path = DATA_DIR / "test_ingest.yml"
     cmd = JobCommand()
     parser = cmd.get_parser()
-    ampel_config_path = DATA_DIR.parent.parent / "ampel_config.yml"
     args = vars(
         parser.parse_args(
-            ["--schema", str(job_path), "--config", str(ampel_config_path)]
+            ["--schema", str(job_path), "--config", str(AMPEL_CONFIG_PATH)]
         )
     )
     logger.debug(args)
