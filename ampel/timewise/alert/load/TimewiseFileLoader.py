@@ -13,6 +13,8 @@ import numpy as np
 import pandas as pd
 from ampel.abstract.AbsAlertLoader import AbsAlertLoader
 from timewise.tables import TableType
+from timewise.config import TimewiseConfig
+from timewise.io.download import Downloader
 
 
 class TimewiseFileLoader(AbsAlertLoader[Dict]):
@@ -20,8 +22,8 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
     Load alerts from one of more files.
     """
 
-    #: paths to files to load
-    file: str | list[str]
+    # path to timewise download config file
+    timewise_config_file: str
 
     # chunk size for reading files in number of lines
     chunk_size: int = 100_000
@@ -32,10 +34,11 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
-        if not self.file:
-            raise ValueError("Parameter 'files' cannot be empty")
+        self.logger.debug(f"loading timewise config file {self.timewise_config_file}")
+        timewise_config = TimewiseConfig.from_yaml(self.timewise_config_file)
+        dl = Downloader(timewise_config.download)
 
-        self._paths = [Path(file) for file in np.atleast_1d(self.file)]
+        self._paths = [dl.backend._data_path(task) for task in dl.iter_tasks()]
         self._files = np.array(
             [list(p.parent.glob(p.name)) for p in self._paths]
         ).flatten()
