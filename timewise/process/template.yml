@@ -5,7 +5,7 @@ channel:
   policy: []
   version: 0
 mongo:
-  prefix: test_ampel
+  prefix: MONGODB_NAME
   reset: true
 name: timewise
 task:

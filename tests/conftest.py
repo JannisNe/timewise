@@ -89,4 +89,4 @@ def ampel_job_path(timewise_config_path) -> Path:
         task = dl.get_task_id(c, q)
         dl.backend.save_data(task, data)
 
-    return make_ampel_job_file(timewise_config_path)
+    return make_ampel_job_file(timewise_config_path, "test_ampel")
