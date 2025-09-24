@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 
 from timewise.types import TAPJobMeta
-from timewise.io.download import Downloader
+from timewise.io import Downloader
 from timewise.chunking import Chunker
 
 from dummy_tap import DummyTAPService, get_table_from_query_and_chunk

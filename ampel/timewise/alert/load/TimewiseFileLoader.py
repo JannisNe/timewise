@@ -13,7 +13,7 @@ from astropy.table import Table
 from ampel.abstract.AbsAlertLoader import AbsAlertLoader
 from timewise.tables import TableType
 from timewise.config import TimewiseConfig
-from timewise.io.download import Downloader
+from timewise.io import Downloader
 from timewise.types import TaskID
 
 

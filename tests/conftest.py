@@ -4,8 +4,7 @@ from itertools import product
 import pytest
 
 from tests.dummy_tap import get_table_from_query_and_chunk
-from timewise.io.config import DownloadConfig
-from timewise.io.download import Downloader
+from timewise.io import Downloader, DownloadConfig
 from timewise.config import TimewiseConfig
 from timewise.process.ampel import make_ampel_job_file
 

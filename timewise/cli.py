@@ -3,7 +3,7 @@ from pathlib import Path
 
 import typer
 
-from .io.download import Downloader
+from .io import Downloader
 from .config import TimewiseConfig
 from .process.ampel import make_ampel_job_file
 
