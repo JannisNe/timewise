@@ -41,7 +41,7 @@ def main(
     ctx.obj = {"log_level": level}
 
 
-@app.command()
+@app.command(help="Download WISE photometry from IRSA")
 def download(
     config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
 ):
