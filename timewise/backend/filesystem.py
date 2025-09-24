@@ -73,7 +73,7 @@ class FileSystemBackend(Backend):
     def load_data(self, task: TaskID) -> Table:
         path = self._data_path(task)
         if not path.exists():
-            raise FileNotFoundError(f"No data for task {task}")
+            raise FileNotFoundError(path)
         return Table.read(path, format="fits")
 
     def data_exists(self, task: TaskID) -> bool:
