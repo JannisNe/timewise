@@ -30,8 +30,9 @@ class DummyAsyncTAPJob:
     Hacky drop-in replacement for AsyncTAPJob
     """
 
-    def __init__(self, url, *, session=None, delete=True):
+    def __init__(self, url, *, session=None, delete=True, fail_fetch=False):
         self.url = url
+        self.fail_fetch = fail_fetch
 
     def _update(self, wait_for_statechange=False, timeout=10.0):
         pass
@@ -89,6 +90,8 @@ class DummyAsyncTAPJob:
         return "RUNNING"
 
     def fetch_result(self):
+        if self.fail_fetch:
+            raise vo.DALServiceError("failed fetch")
         q = normalize_sql(self.url.split("_chunk")[0])
         c = self.url.split("chunk")[1][0]
         t = get_table_from_query_and_chunk(q, c)
@@ -109,16 +112,28 @@ class DummyTAPService(vo.dal.TAPService):
     """
 
     def __init__(
-        self, baseurl, chunksize, *, capability_description=None, session=None
+        self,
+        baseurl,
+        chunksize,
+        *,
+        capability_description=None,
+        session=None,
+        fail_submit=False,
+        fail_fetch=False,
     ):
         super(DummyTAPService, self).__init__(
             baseurl, capability_description=None, session=None
         )
         self.chunksize = chunksize
+        self.fail_submit = fail_submit
+        self.fail_fetch = fail_fetch
 
     def submit_job(
         self, query, *, language="ADQL", maxrec=None, uploads=None, **keywords
     ):
+        if self.fail_submit:
+            raise vo.dal.exceptions.DALServiceError("failed submit")
+
         job = DummyAsyncTAPJob.create(
             self.baseurl,
             query,
@@ -134,4 +149,6 @@ class DummyTAPService(vo.dal.TAPService):
         return job
 
     def get_job_from_url(self, url):
-        return DummyAsyncTAPJob(url=url, session=self._session)
+        return DummyAsyncTAPJob(
+            url=url, session=self._session, fail_fetch=self.fail_fetch
+        )

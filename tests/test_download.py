@@ -1,6 +1,8 @@
 from itertools import product
 import pandas as pd
 import numpy as np
+import pytest
+import pyvo as vo
 
 from timewise.types import TAPJobMeta
 from timewise.io import Downloader
@@ -20,6 +22,22 @@ def test_chunking(download_cfg):
             len(pd.Index(chunk_data.orig_id).difference(range(i * 32, (i + 1) * 32)))
             == 0
         )
+
+
+def test_downloader_fails(download_cfg):
+    dl = Downloader(download_cfg)
+    dl.service = DummyTAPService(
+        baseurl="", chunksize=download_cfg.chunk_size, fail_submit=True
+    )
+    with pytest.raises(vo.DALServiceError, match="failed submit"):
+        dl.run()
+
+    dl = Downloader(download_cfg)
+    dl.service = DummyTAPService(
+        baseurl="", chunksize=download_cfg.chunk_size, fail_fetch=True
+    )
+    with pytest.raises(vo.DALServiceError, match="failed fetch"):
+        dl.run()
 
 
 def test_downloader_creates_files(download_cfg):
