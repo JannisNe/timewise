@@ -26,7 +26,6 @@ task:
           config:
             timewise_config_file: tests/data/test_download.yml
             stock_id_column_name: orig_id
-            chunk_size: 30
           unit: TimewiseFileLoader
       unit: TimewiseAlertSupplier
   multiplier: 1
