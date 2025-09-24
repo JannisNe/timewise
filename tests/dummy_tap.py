@@ -12,6 +12,19 @@ logger = logging.getLogger(__name__)
 DATA_DIR = Path(__file__).parent / "data"
 
 
+def get_table_from_query_and_chunk(query: str, chunk: int | str):
+    normalized_queries = {}
+    for t in ["allwise_p3as_mep", "neowiser_p1bs_psd"]:
+        fn = DATA_DIR / "queries" / f"positional_{t}_mag_fluxes.txt"
+        logger.debug(f"reading {fn}")
+        normalized_queries[normalize_sql(fn.read_text())] = t
+    t = normalized_queries[normalize_sql(query)]
+
+    fn = DATA_DIR / "photometry" / f"raw_photometry_{t}__chunk{chunk}.csv"
+    logger.debug(f"loading {fn}")
+    return Table.from_pandas(pd.read_csv(fn, index_col=0))
+
+
 class DummyAsyncTAPJob:
     """
     Hacky drop-in replacement for AsyncTAPJob
@@ -76,18 +89,9 @@ class DummyAsyncTAPJob:
         return "RUNNING"
 
     def fetch_result(self):
-        normalized_queries = {}
-        for t in ["allwise_p3as_mep", "neowiser_p1bs_psd"]:
-            fn = DATA_DIR / "queries" / f"positional_{t}_mag_fluxes.txt"
-            logger.debug(f"reading {fn}")
-            normalized_queries[normalize_sql(fn.read_text())] = t
         q = normalize_sql(self.url.split("_chunk")[0])
         c = self.url.split("chunk")[1][0]
-        t = normalized_queries[q]
-
-        fn = DATA_DIR / "photometry" / f"raw_photometry_{t}__chunk{c}.csv"
-        logger.debug(f"loading {fn}")
-        t = Table.from_pandas(pd.read_csv(fn, index_col=0))
+        t = get_table_from_query_and_chunk(q, c)
 
         def to_table():
             return t
