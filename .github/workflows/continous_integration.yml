@@ -73,6 +73,7 @@ jobs:
         run: |
           poetry run coverage run -m pytest ./tests
           poetry run coverage combine
+          poetry run coverage report
 
       - name: Run Coveralls
         env:
