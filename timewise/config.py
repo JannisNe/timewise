@@ -1,7 +1,8 @@
 from pathlib import Path
 import yaml
 
-from pydantic import BaseModel
+import numpy as np
+from pydantic import BaseModel, model_validator
 
 from .io.config import DownloadConfig
 
@@ -16,3 +17,11 @@ class TimewiseConfig(BaseModel):
         with path.open("r") as f:
             config_dict = yaml.safe_load(f)
         return cls.model_validate(config_dict)
+
+    @model_validator(mode="after")
+    def validate_query_original_id_key(self) -> "TimewiseConfig":
+        unique_keys = np.unique([q.original_id_key for q in self.download.queries])
+        assert len(unique_keys) == 1, (
+            "Can not use different 'original_id_key' in queries!"
+        )
+        return self
