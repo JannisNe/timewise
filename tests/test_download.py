@@ -3,11 +3,12 @@ from pathlib import Path
 import pytest
 from itertools import product
 import pandas as pd
+import numpy as np
 
 from timewise.types import TAPJobMeta
 from timewise.io.download import DownloadConfig, Downloader
 from timewise.chunking import Chunker
-from dummy_tap import DummyTAPService
+from dummy_tap import DummyTAPService, get_table_from_query_and_chunk
 
 
 @pytest.fixture
@@ -90,3 +91,13 @@ def test_downloader_creates_files(cfg):
 
         assert b.meta_exists(task)
         assert TAPJobMeta(**b.load_meta(task))
+
+        produced = dl.backend.load_data(task)
+        reference = get_table_from_query_and_chunk(q.adql, c.chunk_id)
+
+        for col in reference.colnames:
+            if hasattr(reference[col], "mask"):
+                m = ~(reference[col].mask & produced[col].mask)
+            else:
+                m = [True] * len(reference)
+            assert sum(np.array(reference[col] - produced[col])[m]) == 0
