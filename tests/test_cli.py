@@ -14,6 +14,6 @@ def test_download():
 
 def test_make_ampel_job(timewise_config_path):
     runner = CliRunner()
-    res = runner.invoke(app, ["make-ampel-job", str(timewise_config_path)])
+    res = runner.invoke(app, ["prepare-ampel", str(timewise_config_path)])
     assert res.exit_code == 0
     assert Path(res.output.split(" file: ")[-1].strip()).exists()

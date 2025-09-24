@@ -50,10 +50,10 @@ def download(
 @app.command(
     help="Reads the timewise config and replaces TIMEWISE_CONFIG_PATH and ORIGINAL_ID_KEY in the ampel job template"
 )
-def make_ampel_job(
+def prepare_ampel(
     config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
 ):
     cfg = TimewiseConfig.from_yaml(config_path)
     ampel_prepper = cfg.build_ampel_prepper()
-    p = ampel_prepper.make_ampel_job_file(config_path)
+    p = ampel_prepper.prepare(config_path)
     typer.echo(f"AMPEL job file: {p}")

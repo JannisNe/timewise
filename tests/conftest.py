@@ -90,4 +90,4 @@ def ampel_job_path(timewise_config_path) -> Path:
         dl.backend.save_data(task, data)
 
     ampel_prepper = cfg.build_ampel_prepper()
-    return ampel_prepper.make_ampel_job_file(timewise_config_path)
+    return ampel_prepper.prepare(timewise_config_path)

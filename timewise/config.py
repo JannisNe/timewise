@@ -35,4 +35,5 @@ class TimewiseConfig(BaseModel):
             input_csv=self.download.input_csv,
             input_mongo_db_name=self.ampel.input_mongo_db_name,
             template_path=self.ampel.template_path,
+            uri=self.ampel.uri,
         )
