@@ -56,8 +56,9 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
 
         # remove the _ep at the end of AllWISE MEP data
         columns_to_rename = [c for c in table.columns if c.endswith("_ep")]
-        new_columns_names = [c.replace("_ep", "") for c in columns_to_rename]
-        table.rename_columns(columns_to_rename, new_columns_names)
+        if len(columns_to_rename):
+            new_columns_names = [c.replace("_ep", "") for c in columns_to_rename]
+            table.rename_columns(columns_to_rename, new_columns_names)
 
         for row in table:
             # convert table row to dict, convert data types from numpy to native python
