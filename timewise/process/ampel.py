@@ -2,7 +2,7 @@ from pathlib import Path
 import logging
 
 import pandas as pd
-from pymongo import MongoClient
+from pymongo import MongoClient, ASCENDING
 
 
 logger = logging.getLogger(__name__)
@@ -26,11 +26,22 @@ class AmpelPrepper:
         self.uri = uri
 
     def import_input(self):
-        logger.debug(f"importing {self.input_csv} into {self.input_mongo_db_name}")
         client = MongoClient(host=self.uri)
-        client[self.input_mongo_db_name]["input"].insert_many(
-            pd.read_csv(self.input_csv).to_dict(orient="records")
-        )
+        db = client[self.input_mongo_db_name]
+
+        # if collection already exists, assume import was already done
+        if "input" in db.list_collection_names():
+            logger.debug(
+                f"'input' collection already exists in '{self.input_mongo_db_name}'."
+            )
+            return
+
+        logger.debug(f"importing {self.input_csv} into {self.input_mongo_db_name}")
+        col = client[self.input_mongo_db_name]["input"]
+
+        # create an index from stock id
+        col.create_index([(self.orig_id_key, ASCENDING)], unique=True)
+        col.insert_many(pd.read_csv(self.input_csv).to_dict(orient="records"))
 
     def make_ampel_job_file(self, cfg_path: Path) -> Path:
         logger.debug(f"loading ampel job template from {self.template_path}")
