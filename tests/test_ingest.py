@@ -1,42 +1,16 @@
 import logging
 from pathlib import Path
-from itertools import product
 
-import pytest
 from astropy.table import Table, vstack
 from ampel.cli.JobCommand import JobCommand
 from pymongo import MongoClient
 
-from timewise.process.ampel import make_ampel_job_file
-from timewise.config import TimewiseConfig
-from timewise.io.download import Downloader
-
-from tests.dummy_tap import get_table_from_query_and_chunk
 
 DATA_DIR = Path(__file__).parent / "data"
 AMPEL_CONFIG_PATH = Path(__file__).parent.parent / "ampel_config.yml"
 
 
 logger = logging.Logger(__name__)
-
-
-@pytest.fixture
-def ampel_job_path(tmp_path) -> Path:
-    timewise_config_template_path = DATA_DIR / "test_download.yml"
-    with timewise_config_template_path.open("r") as f:
-        timewise_config = f.read()
-    timewise_config = timewise_config.replace("BASE_PATH", str(tmp_path))
-    timewise_config_path = tmp_path / "timewise_config.yml"
-    with timewise_config_path.open("w") as f:
-        f.write(timewise_config)
-
-    dl = Downloader(TimewiseConfig.from_yaml(timewise_config_path).download)
-    for q, c in product(dl.cfg.queries, dl.chunker):
-        data = get_table_from_query_and_chunk(q.adql, c.chunk_id)
-        task = dl.get_task_id(c, q)
-        dl.backend.save_data(task, data)
-
-    return make_ampel_job_file(timewise_config_path)
 
 
 def test_ingest(ampel_job_path):
