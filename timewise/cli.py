@@ -5,7 +5,6 @@ import typer
 
 from .io import Downloader
 from .config import TimewiseConfig
-from .process.ampel import make_ampel_job_file
 
 from rich.logging import RichHandler
 
@@ -53,10 +52,8 @@ def download(
 )
 def make_ampel_job(
     config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
-    mongo_db_name: str = typer.Argument(help="Name of the MongoDB"),
-    template_path: Path = typer.Option(
-        None, "--template", "-t", help="Path to custom ampel job template"
-    ),
 ):
-    p = make_ampel_job_file(config_path, mongo_db_name, template_path)
+    cfg = TimewiseConfig.from_yaml(config_path)
+    ampel_prepper = cfg.build_ampel_prepper()
+    p = ampel_prepper.make_ampel_job_file(config_path)
     typer.echo(f"AMPEL job file: {p}")

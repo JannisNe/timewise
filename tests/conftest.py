@@ -6,7 +6,6 @@ import pytest
 from tests.dummy_tap import get_table_from_query_and_chunk
 from timewise.io import Downloader, DownloadConfig
 from timewise.config import TimewiseConfig
-from timewise.process.ampel import make_ampel_job_file
 
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -83,10 +82,12 @@ def timewise_config_path(tmp_path) -> Path:
 
 @pytest.fixture
 def ampel_job_path(timewise_config_path) -> Path:
-    dl = Downloader(TimewiseConfig.from_yaml(timewise_config_path).download)
+    cfg = TimewiseConfig.from_yaml(timewise_config_path)
+    dl = Downloader(cfg.download)
     for q, c in product(dl.cfg.queries, dl.chunker):
         data = get_table_from_query_and_chunk(q.adql, c.chunk_id)
         task = dl.get_task_id(c, q)
         dl.backend.save_data(task, data)
 
-    return make_ampel_job_file(timewise_config_path, "test_ampel")
+    ampel_prepper = cfg.build_ampel_prepper()
+    return ampel_prepper.make_ampel_job_file(timewise_config_path)
