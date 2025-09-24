@@ -12,7 +12,7 @@ from hashlib import blake2b
 from typing import Literal, List
 
 from bson import encode
-import pandas as pd
+import numpy as np
 
 from ampel.alert.AmpelAlert import AmpelAlert
 from ampel.alert.BaseAlertSupplier import BaseAlertSupplier
@@ -44,32 +44,24 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
         :raises StopIteration: when alert_loader dries out.
         :raises AttributeError: if alert_loader was not set properly before this method is called
         """
-        table = self._deserialize(next(self.alert_loader))  # type: ignore
+        table = self._deserialize(next(self.alert_loader))  # type: Table
 
-        stock_ids = table["stock_id"].unique()
+        stock_ids = np.unique(table["stock_id"])
         assert len(stock_ids) == 1
         stock_id = stock_ids[0]
-
-        band_agnostic_columns = [
-            c for c in table.columns if not any([c.startswith(b) for b in self.bands])
-        ]
 
         # make the tables into a list of dictionaries for ampel to understand
         all_ids = b""
         pps = []
 
         # remove the _ep at the end of AllWISE MEP data
-        pd.options.mode.chained_assignment = None
-        table.rename(
-            columns={
-                c: c.replace("_ep", "") for c in table.columns if c.endswith("_ep")
-            },
-            inplace=True,
-        )
-        pd.options.mode.chained_assignment = "warn"
+        columns_to_rename = [c for c in table.columns if c.endswith("_ep")]
+        new_columns_names = [c.replace("_ep", "") for c in columns_to_rename]
+        table.rename_columns(columns_to_rename, new_columns_names)
 
-        for i, row in table.iterrows():
-            pp = row.to_dict()
+        for row in table:
+            # convert table row to dict, convert data types from numpy to native python
+            pp = {k: v.item() for k, v in dict(row).items()}
             pp_hash = blake2b(encode(pp), digest_size=7).digest()
             if self.counter:
                 pp["candid"] = self.counter

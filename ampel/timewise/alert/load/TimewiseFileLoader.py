@@ -6,15 +6,15 @@
 # Date:                16.09.2025
 # Last Modified Date:  16.09.2025
 # Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
-from typing import Dict, List, get_args
-from pathlib import Path
+from typing import Dict, get_args
 
 import numpy as np
-import pandas as pd
+from astropy.table import Table
 from ampel.abstract.AbsAlertLoader import AbsAlertLoader
 from timewise.tables import TableType
 from timewise.config import TimewiseConfig
 from timewise.io.download import Downloader
+from timewise.types import TaskID
 
 
 class TimewiseFileLoader(AbsAlertLoader[Dict]):
@@ -37,89 +37,55 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         self.logger.debug(f"loading timewise config file {self.timewise_config_file}")
         timewise_config = TimewiseConfig.from_yaml(self.timewise_config_file)
         dl = Downloader(timewise_config.download)
+        self._timewise_backend = dl.backend
 
-        self._paths = [dl.backend._data_path(task) for task in dl.iter_tasks()]
-        self._files = np.array(
-            [list(p.parent.glob(p.name)) for p in self._paths]
-        ).flatten()
+        self._tasks = [task for task in dl.iter_tasks()]
 
         if self.logger:
-            self.logger.info(f"Registering {len(self._files)} file(s) to load")
+            self.logger.info(f"Registering {len(self._tasks)} task(s) to load")
 
         self._table_types = get_args(TableType.__origin__)
 
         self._gen = self.iter_stocks()
 
     @staticmethod
-    def encode_result(res: List[pd.DataFrame]) -> pd.DataFrame:
-        return pd.concat(res)
+    def encode_result(res: Table) -> Table:
+        return res
 
-    def find_table_from_path(self, p: Path) -> TableType:
+    def find_table_from_task(self, task: TaskID) -> TableType:
         tables = [
-            t for t in self._table_types if t.model_fields["name"].default in p.name
+            t for t in self._table_types if t.model_fields["name"].default in str(task)
         ]
-        assert len(tables) > 0, f"No matching table found for {p}!"
-        assert len(tables) < 2, f"More than one matching table found for {p}!"
+        assert len(tables) > 0, f"No matching table found for {task}!"
+        assert len(tables) < 2, f"More than one matching table found for {task}!"
         self.logger.debug(
-            f"{p.name} is from table {tables[0].model_fields['name'].default}"
+            f"{task} is from table {tables[0].model_fields['name'].default}"
         )
         return tables[0]
 
     def iter_stocks(self):
-        current_stock_id = None
-
-        # emit all datapoints per file and stock id
+        # emit all datapoints per stock id
         # This way ampel runs not per datapoint but per object
-        for p in self._paths:
-            for f in p.parent.glob(p.name):
-                self.logger.debug(f"reading {f}")
+        backend = self._timewise_backend
+        for task in self._tasks:
+            self.logger.debug(f"reading {task}")
+            data = backend.load_data(task)
 
-                # find which table the data comes from and use the corresponding dtype
-                table = self.find_table_from_path(f)
-                dtype_mapping = table.columns_dtypes
-                dtype_mapping[self.stock_id_column_name] = int
+            # rename stock id column
+            data.rename_column(self.stock_id_column_name, "stock_id")
 
-                tablegen = pd.read_csv(
-                    f,
-                    header=0,
-                    dtype=dtype_mapping,
-                    engine="c",
-                    chunksize=self.chunk_size,
-                )
+            # add table name
+            data["table_name"] = (
+                self.find_table_from_task(task).model_fields["name"].default
+            )
 
-                # set up result list
-                res = []
-
-                # iterate over every table chunk:
-                for c in tablegen:  # type: pd.DataFrame
-                    c.rename(
-                        columns={self.stock_id_column_name: "stock_id"}, inplace=True
-                    )
-
-                    c["table_name"] = table.model_fields["name"].default
-
-                    # iterate over all stock ids
-                    for stock_id in np.unique(c["stock_id"]):
-                        selection = c[c["stock_id"] == stock_id]
-
-                        if (stock_id == current_stock_id) and len(selection):
-                            res.append(selection)
-
-                        # emit the previous stock id result if present
-                        else:
-                            if res:
-                                yield self.encode_result(res)
-
-                            # set up next result list and update current stock id
-                            res = [selection] if len(selection) else []
-                            current_stock_id = stock_id
-
-                # emit the result for the last stock id
-                if res:
-                    yield self.encode_result(res)
+            # iterate over all stock ids
+            for stock_id in np.unique(data["stock_id"]):
+                selection = data[data["stock_id"] == stock_id]
+                yield self.encode_result(selection)
 
     def __iter__(self):
         return self
 
-    def __next__(self) -> pd.DataFrame:
+    def __next__(self) -> Table:
         return next(self._gen)
