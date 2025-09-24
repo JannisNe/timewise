@@ -25,9 +25,6 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
     # path to timewise download config file
     timewise_config_file: str
 
-    # chunk size for reading files in number of lines
-    chunk_size: int = 100_000
-
     # column name of id
     stock_id_column_name: str
 

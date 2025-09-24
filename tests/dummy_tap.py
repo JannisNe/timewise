@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 DATA_DIR = Path(__file__).parent / "data"
 
 
-def get_table_from_query_and_chunk(query: str, chunk: int | str):
+def get_table_from_query_and_chunk(query: str, chunk: int | str) -> Table:
     normalized_queries = {}
     for t in ["allwise_p3as_mep", "neowiser_p1bs_psd"]:
         fn = DATA_DIR / "queries" / f"positional_{t}_mag_fluxes.txt"
