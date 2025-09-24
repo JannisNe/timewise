@@ -1,0 +1,33 @@
+channel:
+- access:
+  - ZTF_PUB
+  name: wise
+  policy: []
+  version: 0
+mongo:
+  prefix: test_ampel
+  reset: true
+name: timewise
+task:
+- config:
+    compiler_opts: TiCompilerOptions
+    directives:
+    - channel: wise
+      ingest:
+        mux:
+          unit: TiMongoMuxer
+    iter_max: 1000000
+    log_profile: console_debug
+    shaper: TiDataPointShaper
+    supplier:
+      config:
+        dpid: hash
+        loader:
+          config:
+            timewise_config_file: TIMEWISE_CONFIG_PATH
+            stock_id_column_name: ORIGINAL_ID_KEY
+          unit: TimewiseFileLoader
+      unit: TimewiseAlertSupplier
+  multiplier: 1
+  title: t0
+  unit: AlertConsumer
