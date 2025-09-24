@@ -25,7 +25,7 @@ class FileSystemBackend(Backend):
         return self.base_path / f"{task}.ok"
 
     def _data_path(self, task: TaskID) -> Path:
-        return self.base_path / f"{task}.hdf5"
+        return self.base_path / f"{task}.fits"
 
     # ----------------------------
     # Metadata
@@ -74,7 +74,7 @@ class FileSystemBackend(Backend):
         path = self._data_path(task)
         if not path.exists():
             raise FileNotFoundError(f"No data for task {task}")
-        return Table.read(path, format="hdf5")
+        return Table.read(path, format="fits")
 
     def data_exists(self, task: TaskID) -> bool:
         return self._data_path(task).exists()
