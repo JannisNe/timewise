@@ -1,0 +1,8 @@
+--- csv ---
+saving took 113.615845825 s
+used 2.418888943 GB
+loading took 12.404194554099991 s
+--- fits ---
+saving took 28.83531928750001 s
+used 2.08001088 GB
+loading took 1.444265379100011 s
