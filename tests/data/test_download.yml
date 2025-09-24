@@ -44,3 +44,6 @@ download:
         - w1sigflux
         - w2flux
         - w2sigflux
+
+ampel:
+  mongo_db_name: test_ampel
