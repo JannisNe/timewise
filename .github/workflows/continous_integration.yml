@@ -58,7 +58,7 @@ jobs:
 
       - name: build ampel config
         run: |
-          ampel config build -out ampel_config.yml -distributions ampel timewise
+          poetry run ampel config build -out ampel_config.yml -distributions ampel timewise
 
       # Runs a set of commands using the runners shell
       - name: Test the code
