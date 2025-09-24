@@ -1,5 +1,5 @@
 download:
-  input_csv: tests/data/test_sample.csv
+  input_csv: INPUT_CSV
   chunk_size: 32
   max_concurrent_jobs: 1
   poll_interval: 5

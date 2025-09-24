@@ -11,14 +11,14 @@ from timewise.process.ampel import make_ampel_job_file
 
 
 DATA_DIR = Path(__file__).parent / "data"
+INPUT_CSV_PATH = DATA_DIR / "test_sample.csv"
 
 
 @pytest.fixture
 def download_cfg(tmp_path) -> DownloadConfig:
-    input_csv = Path(__file__).parent / "data" / "test_sample.csv"
     return DownloadConfig.model_validate(
         dict(
-            input_csv=input_csv,
+            input_csv=INPUT_CSV_PATH,
             chunk_size=32,
             max_concurrent_jobs=1,
             poll_interval=1,
@@ -72,7 +72,9 @@ def ampel_job_path(tmp_path) -> Path:
     timewise_config_template_path = DATA_DIR / "test_download.yml"
     with timewise_config_template_path.open("r") as f:
         timewise_config = f.read()
-    timewise_config = timewise_config.replace("BASE_PATH", str(tmp_path))
+    timewise_config = timewise_config.replace("BASE_PATH", str(tmp_path)).replace(
+        "INPUT_CSV", str(INPUT_CSV_PATH)
+    )
     timewise_config_path = tmp_path / "timewise_config.yml"
     with timewise_config_path.open("w") as f:
         f.write(timewise_config)
