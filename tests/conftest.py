@@ -68,7 +68,7 @@ def download_cfg(tmp_path) -> DownloadConfig:
 
 
 @pytest.fixture
-def ampel_job_path(tmp_path) -> Path:
+def timewise_config_path(tmp_path) -> Path:
     timewise_config_template_path = DATA_DIR / "test_download.yml"
     with timewise_config_template_path.open("r") as f:
         timewise_config = f.read()
@@ -79,6 +79,11 @@ def ampel_job_path(tmp_path) -> Path:
     with timewise_config_path.open("w") as f:
         f.write(timewise_config)
 
+    return timewise_config_path
+
+
+@pytest.fixture
+def ampel_job_path(timewise_config_path) -> Path:
     dl = Downloader(TimewiseConfig.from_yaml(timewise_config_path).download)
     for q, c in product(dl.cfg.queries, dl.chunker):
         data = get_table_from_query_and_chunk(q.adql, c.chunk_id)

@@ -5,15 +5,16 @@ from astropy.table import Table, vstack
 from ampel.cli.JobCommand import JobCommand
 from pymongo import MongoClient
 
+from timewise.config import TimewiseConfig
 
-DATA_DIR = Path(__file__).parent / "data"
+
 AMPEL_CONFIG_PATH = Path(__file__).parent.parent / "ampel_config.yml"
 
 
 logger = logging.Logger(__name__)
 
 
-def test_ingest(ampel_job_path):
+def test_ingest(ampel_job_path, timewise_config_path):
     cmd = JobCommand()
     parser = cmd.get_parser()
     args = vars(
@@ -28,11 +29,9 @@ def test_ingest(ampel_job_path):
     t0 = client["test_ampel"].get_collection("t0")
     n_in_db = t0.count_documents({})
 
+    bp = TimewiseConfig.from_yaml(timewise_config_path).download.backend.base_path
     file_contents = vstack(
-        [
-            Table.read(f, format="fits")
-            for f in Path("tmp/test/download").glob("download_chunk*.fits")
-        ]
+        [Table.read(f, format="fits") for f in bp.glob("download_chunk*.fits")]
     )
 
     missing = []
