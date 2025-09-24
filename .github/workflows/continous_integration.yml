@@ -56,6 +56,10 @@ jobs:
           poetry run python Install.py sciserver-v2.1.0
           cd ..
 
+      - name: build ampel config
+        run: |
+          ampel config build -out ampel_config.yml
+
       # Runs a set of commands using the runners shell
       - name: Test the code
         env:
