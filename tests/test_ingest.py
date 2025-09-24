@@ -25,7 +25,7 @@ def ampel_job_path(tmp_path) -> Path:
     timewise_config_template_path = DATA_DIR / "test_download.yml"
     with timewise_config_template_path.open("r") as f:
         timewise_config = f.read()
-    timewise_config.replace("BASE_PATH", str(tmp_path))
+    timewise_config = timewise_config.replace("BASE_PATH", str(tmp_path))
     timewise_config_path = tmp_path / "timewise_config.yml"
     with timewise_config_path.open("w") as f:
         f.write(timewise_config)

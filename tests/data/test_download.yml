@@ -6,7 +6,7 @@ download:
 
   backend:
     type: filesystem
-    base_path: TMP_PATH
+    base_path: BASE_PATH
 
   queries:
     - type: positional
