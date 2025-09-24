@@ -5,6 +5,7 @@ import typer
 
 from .io.download import Downloader
 from .config import TimewiseConfig
+from .process.ampel import make_ampel_job_file
 
 from rich.logging import RichHandler
 
@@ -42,8 +43,19 @@ def main(
 
 @app.command()
 def download(
-    config_path: Path = typer.Option(
-        ..., "--config", "-c", exists=True, help="Pipeline config file (YAML/JSON)"
-    ),
+    config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
 ):
     Downloader(TimewiseConfig.from_yaml(config_path).download).run()
+
+
+@app.command(
+    help="Reads the timewise config and replaces TIMEWISE_CONFIG_PATH and ORIGINAL_ID_KEY in the ampel job template"
+)
+def make_ampel_job(
+    config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
+    template_path: Path = typer.Option(
+        None, "--template", "-t", help="Path to custom ampel job template"
+    ),
+):
+    p = make_ampel_job_file(config_path, template_path)
+    typer.echo(f"AMPEL job file: {p}")
