@@ -67,7 +67,7 @@ class FileSystemBackend(Backend):
         tmp = path.with_suffix(".tmp")
         tmp.parent.mkdir(parents=True, exist_ok=True)
         logger.debug(f"writing {path}")
-        content.write(tmp, format="hdf5")
+        content.write(tmp, format="fits")
         tmp.replace(path)
 
     def load_data(self, task: TaskID) -> Table:
