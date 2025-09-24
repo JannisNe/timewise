@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-import pandas as pd
+from astropy.table import Table, vstack
 from ampel.cli.JobCommand import JobCommand
 from pymongo import MongoClient
 
@@ -28,13 +28,16 @@ def test_ingest():
     t0 = client["test_ampel"].get_collection("t0")
     n_in_db = t0.count_documents({})
 
-    file_contents = pd.concat(
-        [pd.read_csv(f) for f in Path("tmp/test/download").glob("download_chunk*.csv")]
+    file_contents = vstack(
+        [
+            Table.read(f, format="fits")
+            for f in Path("tmp/test/download").glob("download_chunk*.fits")
+        ]
     )
 
     missing = []
     duplicates = []
-    for i, r in file_contents.iterrows():
+    for r in file_contents:
         f = {
             "body.ra": r["ra"],
             "body.dec": r["dec"],
