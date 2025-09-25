@@ -17,20 +17,22 @@ from ampel.struct.UnitResult import UnitResult
 from ampel.model.UnitModel import UnitModel
 from ampel.types import DataPointId, StockId, UBson
 
+from ampel.timewise.base.BaseDatapointSelector import BaseDatapointSelector
+
 
 class T1CombineWISEVisits(AbsT1ComputeUnit, AbsT1CombineUnit):
     combine: UnitModel
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._combine: AbsT1CombineUnit = AuxUnitRegister.new_unit(
-            model=self.combine, sub_type=AbsT1CombineUnit
+        self._combine: BaseDatapointSelector = AuxUnitRegister.new_unit(
+            model=self.combine, sub_type=BaseDatapointSelector
         )
 
     def combine(
         self, datapoints: Iterable[DataPoint]
     ) -> Sequence[DataPointId] | T1CombineResult:
-        return self._combine.combine(datapoints)
+        return self._combine.select(datapoints)
 
     def compute(
         self, datapoints: list[DataPoint]
