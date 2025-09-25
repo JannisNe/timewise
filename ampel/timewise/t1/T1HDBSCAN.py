@@ -17,11 +17,10 @@ from pymongo import MongoClient
 from ampel.content.DataPoint import DataPoint
 from ampel.struct.T1CombineResult import T1CombineResult
 from ampel.types import DataPointId
+from ampel.abstract.AbsT1CombineUnit import AbsT1CombineUnit
 
-from ampel.timewise.base.BaseDatapointSelector import BaseDatapointSelector
 
-
-class T1HDBSCAN(BaseDatapointSelector):
+class T1HDBSCAN(AbsT1CombineUnit):
     input_mongo_db_name: str
     original_id_key: str
     whitelist_region_arcsec: float = 1
@@ -31,7 +30,7 @@ class T1HDBSCAN(BaseDatapointSelector):
         super().__init__(**kwargs)
         self._col = MongoClient()[self.input_mongo_db_name]["input"]
 
-    def select(
+    def combine(
         self, datapoints: Iterable[DataPoint]
     ) -> Sequence[DataPointId] | T1CombineResult:
         ra = []
@@ -58,6 +57,9 @@ class T1HDBSCAN(BaseDatapointSelector):
             },
             index=dp_ids,
         )
+
+        self.logger.debug(f"Stocks: {lightcurve.stock_id}")
+
         assert len(lightcurve.stock_id.unique()) == 1
         stock_id = stock_ids[0]
 
@@ -154,22 +156,22 @@ class T1HDBSCAN(BaseDatapointSelector):
                 )
                 self.logger.debug(f"Selected {len(selected_indices)} datapoints")
 
-                # if the closest allwise source is selected, we also select all other detections belonging to that
-                # source in the allwise period
-                if (
-                    closest_allwise_mask_first_entry is not None
-                    and lightcurve.index[closest_allwise_mask_first_entry][0]
-                    in selected_indices
-                ):
-                    closest_allwise_mask_not_first = (
-                        closest_allwise_mask & ~closest_allwise_mask_first_entry
-                    )
-                    closest_allwise_indices_not_first = lightcurve.index[
-                        closest_allwise_mask_not_first
-                    ]
-                    self.logger.debug(
-                        f"Adding remaining {len(closest_allwise_indices_not_first)} from AllWISE period"
-                    )
-                    selected_indices |= set(closest_allwise_indices_not_first)
+        # if the closest allwise source is selected, we also select all other detections belonging to that
+        # source in the allwise period
+        if (
+            closest_allwise_mask_first_entry is not None
+            and lightcurve.index[closest_allwise_mask_first_entry][0]
+            in selected_indices
+        ):
+            closest_allwise_mask_not_first = (
+                closest_allwise_mask & ~closest_allwise_mask_first_entry
+            )
+            closest_allwise_indices_not_first = lightcurve.index[
+                closest_allwise_mask_not_first
+            ]
+            self.logger.debug(
+                f"Adding remaining {len(closest_allwise_indices_not_first)} from AllWISE period"
+            )
+            selected_indices |= set(closest_allwise_indices_not_first)
 
         return list(selected_indices)
