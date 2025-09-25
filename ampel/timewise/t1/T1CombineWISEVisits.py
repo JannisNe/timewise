@@ -41,4 +41,5 @@ class T1CombineWISEVisits(AbsT1ComputeUnit, AbsT1CombineUnit):
         :param datapoints: list of datapoints to combine
         :return: tuple of UBson or UnitResult and StockId
         """
-        pass
+        self.logger.info("Computing something!")
+        return {"computed": True}, datapoints[0]["stock"]
