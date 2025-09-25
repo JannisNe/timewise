@@ -26,6 +26,8 @@ def test_ingest(ampel_job_path, timewise_config_path):
     JobCommand().run(args, unknown_args=())
 
     client = MongoClient()
+    t1 = client["test_ampel"].get_collection("t1")
+    assert t1.count_documents({}) > 0
     t0 = client["test_ampel"].get_collection("t0")
     n_in_db = t0.count_documents({})
 
