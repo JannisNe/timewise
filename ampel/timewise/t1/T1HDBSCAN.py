@@ -13,14 +13,14 @@ from astropy.coordinates.angle_utilities import angular_separation, position_ang
 from sklearn.cluster import HDBSCAN
 from pymongo import MongoClient
 
-from ampel.abstract.AbsT1CombineUnit import AbsT1CombineUnit
 from ampel.content.DataPoint import DataPoint
 from ampel.struct.T1CombineResult import T1CombineResult
 from ampel.types import DataPointId
-from ampel.base.AmpelBaseModel import AmpelBaseModel
+
+from ampel.timewise.base.BaseDatapointSelector import BaseDatapointSelector
 
 
-class T1HDBSCAN(AbsT1CombineUnit, AmpelBaseModel):
+class T1HDBSCAN(BaseDatapointSelector):
     input_mongo_db_name: str
     original_id_key: str
     whitelist_region_arcsec: float = 1
@@ -30,7 +30,7 @@ class T1HDBSCAN(AbsT1CombineUnit, AmpelBaseModel):
         super().__init__(**kwargs)
         self._col = MongoClient()[self.input_mongo_db_name]["input"]
 
-    def combine(
+    def select(
         self, datapoints: Iterable[DataPoint]
     ) -> Sequence[DataPointId] | T1CombineResult:
         ra = np.array([dp["body"]["ra"] for dp in datapoints])
