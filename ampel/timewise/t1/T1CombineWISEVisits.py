@@ -21,12 +21,12 @@ from ampel.timewise.base.BaseDatapointSelector import BaseDatapointSelector
 
 
 class T1CombineWISEVisits(AbsT1ComputeUnit, AbsT1CombineUnit):
-    combine: UnitModel
+    select: UnitModel
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._combine: BaseDatapointSelector = AuxUnitRegister.new_unit(
-            model=self.combine, sub_type=BaseDatapointSelector
+            model=self.select, sub_type=BaseDatapointSelector
         )
 
     def combine(
