@@ -10,6 +10,7 @@ from typing import Iterable, Sequence
 
 import numpy as np
 from astropy.coordinates.angle_utilities import angular_separation, position_angle
+import pandas as pd
 from sklearn.cluster import HDBSCAN
 from pymongo import MongoClient
 
@@ -33,13 +34,31 @@ class T1HDBSCAN(BaseDatapointSelector):
     def select(
         self, datapoints: Iterable[DataPoint]
     ) -> Sequence[DataPointId] | T1CombineResult:
-        ra = np.array([dp["body"]["ra"] for dp in datapoints])
-        dec = np.array([dp["body"]["dec"] for dp in datapoints])
-        mjd = np.array([dp["body"]["mjd"] for dp in datapoints])
+        ra = []
+        dec = []
+        mjd = []
+        stock_ids = []
+        dp_ids = []
+        allwise = []
+        for dp in datapoints:
+            ra.append(dp["body"]["ra"])
+            dec.append(dp["body"]["dec"])
+            mjd.append(dp["body"]["mjd"])
+            stock_ids.append(dp["stock"])
+            dp_ids.append(dp["id"])
+            allwise.append(any(["allwise" in t for t in dp["tag"]]))
 
-        # get the stock id for this object
-        stock_ids = [dp["stock"] for dp in datapoints]
-        assert len(np.unique(stock_ids)) == 1
+        lightcurve = pd.DataFrame(
+            {
+                "ra": ra,
+                "dec": dec,
+                "mjd": mjd,
+                "stock_id": stock_ids,
+                "allwise": allwise,
+            },
+            index=dp_ids,
+        )
+        assert len(lightcurve.stock_id.unique()) == 1
         stock_id = stock_ids[0]
 
         # query the database that holds the parent sample
@@ -64,7 +83,7 @@ class T1HDBSCAN(BaseDatapointSelector):
         # for all available single-exposure images in all bands simultaneously, while the NEOWISE magnitudes are
         # obtained by PSF fit to individual exposures directly. Effect: all allwise data points that belong to the same
         # object have the same position. We take only the closest one and treat it as one datapoint in the clustering.
-        allwise_time_mask = mjd < 55594
+        allwise_time_mask = lightcurve.allwise
         if any(allwise_time_mask):
             allwise_sep_min = np.min(_angular_separation[allwise_time_mask])
             closest_allwise_mask = (
@@ -81,7 +100,9 @@ class T1HDBSCAN(BaseDatapointSelector):
             data_mask = np.ones_like(_angular_separation, dtype=bool)
 
         # no matter which cluster they belong to, we want to keep all datapoints within 1 arcsec
-        one_arcsec_mask = _angular_separation < np.radians(self.whitelist_region / 3600)
+        one_arcsec_mask = _angular_separation < np.radians(
+            self.whitelist_region_arcsec / 3600
+        )
         selected_indices = set(lightcurve.index[data_mask & one_arcsec_mask])
 
         # if there are more than one datapoints, we use a clustering algorithm to potentially find a cluster with
@@ -118,7 +139,7 @@ class T1HDBSCAN(BaseDatapointSelector):
                 self.logger.debug(
                     "No cluster found. Selecting all noise datapoints within 1 arcsec."
                 )
-            elif min(cluster_separations) > np.radians(whitelist_region / 3600):
+            elif min(cluster_separations) > np.radians(self.whitelist_region / 3600):
                 self.logger.debug(f"Closest cluster is at {cluster_separations} arcsec")
 
             # if there is a cluster within 1 arcsec, we select all datapoints belonging to that cluster
@@ -151,18 +172,4 @@ class T1HDBSCAN(BaseDatapointSelector):
                     )
                     selected_indices |= set(closest_allwise_indices_not_first)
 
-        # because in most cases we will have more good indices than bad indices, we store the bad indices instead
-        bad_indices = lightcurve.index[~lightcurve.index.isin(selected_indices)]
-
-        if return_all:
-            return_closest_allwise_mask = (
-                list(closest_allwise_mask) if closest_allwise_mask is not None else None
-            )
-            return (
-                list(bad_indices),
-                cluster_res,
-                data_mask,
-                return_closest_allwise_mask,
-            )
-        else:
-            return list(bad_indices)
+        return list(selected_indices)
