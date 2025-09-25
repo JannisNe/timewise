@@ -6,26 +6,32 @@
 # Date:                24.09.2025
 # Last Modified Date:  24.09.2025
 # Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
-
+from typing import Iterable, Sequence
 
 from ampel.abstract.AbsT1ComputeUnit import AbsT1ComputeUnit
 from ampel.abstract.AbsT1CombineUnit import AbsT1CombineUnit
 from ampel.base.AuxUnitRegister import AuxUnitRegister
 from ampel.content.DataPoint import DataPoint
+from ampel.struct.T1CombineResult import T1CombineResult
 from ampel.struct.UnitResult import UnitResult
 from ampel.model.UnitModel import UnitModel
-from ampel.types import StockId, UBson
+from ampel.types import DataPointId, StockId, UBson
 
 
-class T1CombineWISEVisits(AbsT1ComputeUnit):
-    selector: UnitModel
+class T1CombineWISEVisits(AbsT1ComputeUnit, AbsT1CombineUnit):
+    combine: UnitModel
     posterior_threshold: float
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._selector: AbsT1CombineUnit = AuxUnitRegister.new_unit(
-            model=self.selector, sub_type=AbsT1CombineUnit
+        self._combine: AbsT1CombineUnit = AuxUnitRegister.new_unit(
+            model=self.combine, sub_type=AbsT1CombineUnit
         )
+
+    def combine(
+        self, datapoints: Iterable[DataPoint]
+    ) -> Sequence[DataPointId] | T1CombineResult:
+        return self._combine.combine(datapoints)
 
     def compute(
         self, datapoints: list[DataPoint]
@@ -34,4 +40,4 @@ class T1CombineWISEVisits(AbsT1ComputeUnit):
         :param datapoints: list of datapoints to combine
         :return: tuple of UBson or UnitResult and StockId
         """
-        selected_ids = self._selector.combine(datapoints)
+        pass
