@@ -17,10 +17,14 @@ task:
         mux:
           combine:
           - state_t2:
-            unit: T1HDBSCAN
+            - unit: T2StackVisits
+            unit: T1CombineWISEVisits
             config:
-              original_id_key: ORIGINAL_ID_KEY
-              input_mongo_db_name: INPUT_MONGODB_NAME
+              select:
+                unit: T1HDBSCAN
+                config:
+                  original_id_key: ORIGINAL_ID_KEY
+                  input_mongo_db_name: INPUT_MONGODB_NAME
           unit: TiMongoMuxer
     iter_max: 1000000
     log_profile: console_debug
