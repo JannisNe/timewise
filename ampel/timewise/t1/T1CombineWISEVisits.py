@@ -20,7 +20,6 @@ from ampel.types import DataPointId, StockId, UBson
 
 class T1CombineWISEVisits(AbsT1ComputeUnit, AbsT1CombineUnit):
     combine: UnitModel
-    posterior_threshold: float
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

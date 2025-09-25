@@ -17,16 +17,18 @@ from ampel.abstract.AbsT1CombineUnit import AbsT1CombineUnit
 from ampel.content.DataPoint import DataPoint
 from ampel.struct.T1CombineResult import T1CombineResult
 from ampel.types import DataPointId
+from ampel.base.AmpelBaseModel import AmpelBaseModel
 
 
-class T1HDBSCAN(AbsT1CombineUnit):
-    whitelist_region: float
-    mongo_db_name: str
+class T1HDBSCAN(AbsT1CombineUnit, AmpelBaseModel):
+    input_mongo_db_name: str
     original_id_key: str
+    whitelist_region_arcsec: float = 1
+    cluster_distance_arcsec: float = 0.5
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._col = MongoClient()[self.mongo_db_name]["input"]
+        self._col = MongoClient()[self.input_mongo_db_name]["input"]
 
     def combine(
         self, datapoints: Iterable[DataPoint]
@@ -97,14 +99,13 @@ class T1HDBSCAN(AbsT1CombineUnit):
             cartesian = cartesian_full[data_mask]
 
             # we are now ready to do the clustering
-            cluster_distance_arcsec = (
-                0.5  # distance of clusters to be considered as one [arcsec]
-            )
             cluster_res = HDBSCAN(
                 store_centers="centroid",
                 min_cluster_size=max(min(20, len(cartesian)), 2),
                 allow_single_cluster=True,
-                cluster_selection_epsilon=np.radians(cluster_distance_arcsec / 3600),
+                cluster_selection_epsilon=np.radians(
+                    self.cluster_distance_arcsec / 3600
+                ),
             ).fit(cartesian)
 
             # we select the closest cluster within 1 arcsec
