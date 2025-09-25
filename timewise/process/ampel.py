@@ -51,8 +51,8 @@ class AmpelPrepper:
         ampel_job = (
             template.replace("TIMEWISE_CONFIG_PATH", str(cfg_path))
             .replace("ORIGINAL_ID_KEY", self.orig_id_key)
-            .replace("MONGODB_NAME", self.mongo_db_name)
             .replace("INPUT_MONGODB_NAME", self.input_mongo_db_name)
+            .replace("MONGODB_NAME", self.mongo_db_name)
         )
 
         ampel_job_path = cfg_path.parent / f"{cfg_path.stem}_ampel_job.yml"
