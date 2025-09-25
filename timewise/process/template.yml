@@ -18,13 +18,13 @@ task:
           combine:
           - state_t2:
             - unit: T2StackVisits
-            unit: T1CombineWISEVisits
+            compute:
+              unit: T1StackVisits
+              config: 1
+            unit: T1HDBSCAN
             config:
-              select:
-                unit: T1HDBSCAN
-                config:
-                  original_id_key: ORIGINAL_ID_KEY
-                  input_mongo_db_name: INPUT_MONGODB_NAME
+              original_id_key: ORIGINAL_ID_KEY
+              input_mongo_db_name: INPUT_MONGODB_NAME
           unit: TiMongoMuxer
     iter_max: 1000000
     log_profile: console_debug
@@ -40,4 +40,8 @@ task:
       unit: TimewiseAlertSupplier
   multiplier: 1
   title: t0
+  template:
+    live:
+      - resolve_run_time_aliases
+      - hash_t2_config
   unit: AlertConsumer
