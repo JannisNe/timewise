@@ -146,7 +146,9 @@ class T1HDBSCAN(AbsT1CombineUnit):
                 self.logger.debug(
                     "No cluster found. Selecting all noise datapoints within 1 arcsec."
                 )
-            elif min(cluster_separations) > np.radians(self.whitelist_region / 3600):
+            elif min(cluster_separations) > np.radians(
+                self.whitelist_region_arcsec / 3600
+            ):
                 self.logger.debug(f"Closest cluster is at {cluster_separations} arcsec")
 
             # if there is a cluster within 1 arcsec, we select all datapoints belonging to that cluster
