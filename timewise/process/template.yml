@@ -20,7 +20,6 @@ task:
             - unit: T2StackVisits
             compute:
               unit: T1StackVisits
-              config: 1
             unit: T1HDBSCAN
             config:
               original_id_key: ORIGINAL_ID_KEY
