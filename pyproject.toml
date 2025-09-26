@@ -29,10 +29,10 @@ dependencies = [
     "scikit-learn>=1.3.0,<2.0.0",
     "jupyterlab[jupyter]>=4.0.6,<5.0.0",
     "jupyter[jupyter]>=1.0.0,<2.0.0",
-    "ampel-core (>=0.10.4.post0,<0.11.0)",
-    "ampel-alerts (>=0.10.1,<0.11.0)",
+    "ampel-alerts (==0.10.3a5)",
     "typer (>=0.17.4,<0.18.0)",
     "ampel-photometry (>=0.10.1,<0.11.0)",
+    "ampel-core @ git+ssh://git@github.com/JannisNe/Ampel-core.git@t1compute-fixes",
 ]
 
 [project.scripts]
@@ -59,3 +59,5 @@ source = ["timewise", "ampel"]
 omit = ["timewise/v0"]
 parallel = true
 concurrency = ["thread", "multiprocessing"]
+[tool.poetry.dependencies]
+ampel-core = {develop = true}
