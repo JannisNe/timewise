@@ -16,7 +16,7 @@ DATA_DIR = Path(__file__).parent
 
 
 class TestParentSample(ParentSampleBase):
-    default_keymap = {"ra": "ra_in", "dec": "dec_in", "id": "name"}
+    default_keymap = {"ra": "ra", "dec": "dec", "id": "name"}
     base_name = "test_sample"
 
     def __init__(self):
