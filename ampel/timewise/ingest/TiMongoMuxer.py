@@ -39,8 +39,8 @@ class TiMongoMuxer(AbsT0Muxer):
         "channel": 1,
         "stock": 1,
         "body.mjd": 1,
-        "body.w1flux": 1,
-        "body.w2flux": 1,
+        "body.w1_flux": 1,
+        "body.w2_flux": 1,
         "body.ra": 1,
         "body.dec": 1,
     }
