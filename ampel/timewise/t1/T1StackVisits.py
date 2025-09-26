@@ -42,8 +42,8 @@ class T1StackVisits(AbsT1ComputeUnit):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+    @staticmethod
     def calculate_epochs(
-        self,
         f: pd.Series,
         e: pd.Series,
         visit_mask: npt.ArrayLike,
