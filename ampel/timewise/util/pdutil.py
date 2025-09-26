@@ -2,10 +2,13 @@ from typing import Iterable, List
 import pandas as pd
 import numpy as np
 from ampel.types import StockId
+from ampel.content.DataPoint import DataPoint
 
 
 def datapoints_to_dataframe(
-    datapoints: Iterable[dict], columns: list[str]
+    datapoints: Iterable[DataPoint],
+    columns: list[str],
+    check_tables: list[str] | None = None,
 ) -> tuple[pd.DataFrame, List[List[StockId]]]:
     """
     Convert a list of Ampel DataPoints into a pandas DataFrame.
@@ -16,6 +19,8 @@ def datapoints_to_dataframe(
         List of DataPoints (each must have a "body" dict).
     columns : list of str
         Keys from datapoint["body"] to include as DataFrame columns.
+    check_tables: list of str
+        check if the tables are in the tags
 
     Returns
     -------
@@ -29,7 +34,11 @@ def datapoints_to_dataframe(
     for dp in datapoints:
         body = dp.get("body", {})
         # Build one row with only requested keys
-        row = {col: body.get(col, None) for col in columns}
+        row = {col: body[col] for col in columns}
+        # check if the tables are in tags
+        if check_tables is not None:
+            for table in check_tables:
+                row[table] = table in dp["tag"]
         # build the index from datapoint ids
         ids.append(dp["id"])
         records.append(row)

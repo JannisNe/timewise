@@ -35,7 +35,7 @@ class T1HDBSCAN(AbsT1CombineUnit):
         self, datapoints: Iterable[DataPoint]
     ) -> Sequence[DataPointId] | T1CombineResult:
         lightcurve, stock_ids = datapoints_to_dataframe(
-            datapoints, ["ra", "dec", "mjd"]
+            datapoints, ["ra", "dec", "mjd"], check_tables=["allwise_p3as_mep"]
         )
 
         # make sure that the is one stock id that fits all dps
