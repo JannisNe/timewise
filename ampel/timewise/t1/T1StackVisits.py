@@ -37,9 +37,9 @@ class T1StackVisits(AbsT1ComputeUnit):
 
     # zero points come from https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#conv2flux
     # published in Jarret et al. (2011): https://ui.adsabs.harvard.edu/abs/2011ApJ...735..112J/abstract
-    magnitude_zeropoints: Dict[str, float] = {"w1": 20.752, "w2": 19.596}
+    magnitude_zeropoints: Dict[str, float] = {"W1": 20.752, "W2": 19.596}
     # in Jy
-    flux_zeropoints = {"w1": 309.54, "w2": 171.787}
+    flux_zeropoints = {"W1": 309.54, "W2": 171.787}
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -263,7 +263,7 @@ class T1StackVisits(AbsT1ComputeUnit):
         )
 
         # -------------------------   loop through bands   -------------------------- #
-        for b in ["w1", "w2"]:
+        for b in ["W1", "W2"]:
             # loop through magnitude and flux and save the respective datapoints
 
             outlier_masks = dict()
@@ -379,14 +379,14 @@ class T1StackVisits(AbsT1ComputeUnit):
             "ra",
             "dec",
             "mjd",
-            "w1_flux",
-            "w1_flux_error",
-            "w1_mag",
-            "w1_mag_error",
-            "w2_flux",
-            "w2_flux_error",
-            "w2_mag",
-            "w2_mag_error",
+            "W1_flux",
+            "W1_flux_error",
+            "W1_mag",
+            "W1_mag_error",
+            "W2_flux",
+            "W2_flux_error",
+            "W2_mag",
+            "W2_mag_error",
         ]
         raw_lightcurve, stock_ids = datapoints_to_dataframe(datapoints, columns)
         stacked_lightcurve = self.stack_visits(raw_lightcurve)
