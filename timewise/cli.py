@@ -47,9 +47,7 @@ def download(
     Downloader(TimewiseConfig.from_yaml(config_path).download).run()
 
 
-@app.command(
-    help="Reads the timewise config and replaces TIMEWISE_CONFIG_PATH and ORIGINAL_ID_KEY in the ampel job template"
-)
+@app.command(help="Prepares the AMPEL job file so AMPEL can be run manually")
 def prepare_ampel(
     config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
 ):
@@ -57,3 +55,13 @@ def prepare_ampel(
     ampel_prepper = cfg.build_ampel_prepper()
     p = ampel_prepper.prepare(config_path)
     typer.echo(f"AMPEL job file: {p}")
+
+
+@app.command(help="Processes the lightcurves using AMPEL")
+def process(
+    config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
+    ampel_config_path: Path = typer.Argument(help="AMPEL config YAML"),
+):
+    cfg = TimewiseConfig.from_yaml(config_path)
+    prepper = cfg.build_ampel_prepper()
+    prepper.run(config_path, ampel_config_path)
