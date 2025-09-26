@@ -44,4 +44,5 @@ def datapoints_to_dataframe(
         records.append(row)
         stock_ids.append(np.atleast_1d(dp["stock"]).tolist())
 
-    return pd.DataFrame.from_records(records, columns=columns, index=ids), stock_ids
+    colnames = columns if check_tables is None else columns + check_tables
+    return pd.DataFrame.from_records(records, columns=colnames, index=ids), stock_ids
