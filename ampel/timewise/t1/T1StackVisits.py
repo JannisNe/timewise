@@ -20,7 +20,7 @@ from ampel.types import StockId, UBson
 
 
 class T1StackVisits(AbsT1ComputeUnit):
-    clean_outliers_when_binning: bool = True
+    clean_outliers_when_stacking: bool = True
 
     mean_key: str = "_mean"
     median_key: str = "_median"
@@ -59,7 +59,7 @@ class T1StackVisits(AbsT1ComputeUnit):
         npt.ArrayLike,
     ]:
         """
-        Calculates the binned epochs of a lightcurve.
+        Calculates the visits within a raw lightcurve.
 
         :param f: the fluxes
         :type f: np.array
@@ -208,7 +208,7 @@ class T1StackVisits(AbsT1ComputeUnit):
         """
         Create a map datapoint to visit
 
-        :param lightcurve: the unbinned lightcurve
+        :param lightcurve: the raw lightcurve
         :type lightcurve: pd.DataFrame
         :returns: visit map
         :rtype: npt.ArrayLike
@@ -233,7 +233,7 @@ class T1StackVisits(AbsT1ComputeUnit):
         visit_mask = np.digitize(lightcurve.mjd, epoch_bins) - 1
         return visit_mask
 
-    def bin_lightcurve(self, lightcurve: pd.DataFrame):
+    def stack_visits(self, lightcurve: pd.DataFrame):
         """
         Combine the data by visits of the satellite of one region in the sky.
         The visits typically consist of some tens of observations. The individual visits are separated by about
@@ -241,11 +241,11 @@ class T1StackVisits(AbsT1ComputeUnit):
         The mean flux for one visit is calculated by the weighted mean of the data.
         The error on that mean is calculated by the root-mean-squared and corrected by the t-value.
         Outliers per visit are identified if they are more than 100 times the rms away from the mean. These outliers
-        are removed from the calculation of the mean and the error if self.clean_outliers_when_binning is True.
+        are removed from the calculation of the mean and the error if self.clean_outliers_when_stacking is True.
 
-        :param lightcurve: the unbinned lightcurve
+        :param lightcurve: the raw lightcurve
         :type lightcurve: pandas.DataFrame
-        :return: the binned lightcurve
+        :return: the stacked lightcurve
         :rtype: pandas.DataFrame
         """
 
@@ -253,10 +253,10 @@ class T1StackVisits(AbsT1ComputeUnit):
         visit_map = self.get_visit_map(lightcurve)
         counts = np.bincount(visit_map)
 
-        binned_data = dict()
+        stacked_data = dict()
 
         # -------------------------   calculate mean mjd   -------------------------- #
-        binned_data["mean_mjd"] = (
+        stacked_data["mean_mjd"] = (
             np.bincount(visit_map, weights=lightcurve.mjd) / counts
         )
 
@@ -274,7 +274,7 @@ class T1StackVisits(AbsT1ComputeUnit):
 
                 # we will flag outliers based on the flux only
                 remove_outliers = (
-                    lum_ext == self.flux_key_ext and self.clean_outliers_when_binning
+                    lum_ext == self.flux_key_ext and self.clean_outliers_when_stacking
                 )
                 outlier_mask = outlier_masks.get(self.flux_key_ext, None)
 
@@ -295,10 +295,10 @@ class T1StackVisits(AbsT1ComputeUnit):
                         f"removed {n_outliers} outliers by brightness for {b} {lum_ext}"
                     )
 
-                binned_data[f"{b}{self.mean_key}{lum_ext}"] = mean
-                binned_data[f"{b}{lum_ext}{self.rms_key}"] = u
-                binned_data[f"{b}{lum_ext}{self.upper_limit_key}"] = bin_ulim_bool
-                binned_data[f"{b}{lum_ext}{self.Npoints_key}"] = n_points
+                stacked_data[f"{b}{self.mean_key}{lum_ext}"] = mean
+                stacked_data[f"{b}{lum_ext}{self.rms_key}"] = u
+                stacked_data[f"{b}{lum_ext}{self.upper_limit_key}"] = bin_ulim_bool
+                stacked_data[f"{b}{lum_ext}{self.Npoints_key}"] = n_points
 
                 outlier_masks[lum_ext] = outlier_mask
                 use_masks[lum_ext] = use_mask
@@ -354,14 +354,16 @@ class T1StackVisits(AbsT1ComputeUnit):
                     outlier_mask=outlier_masks[self.flux_key_ext],
                 )
             )
-            binned_data[f"{b}{self.mean_key}{self.flux_density_key_ext}"] = mean_fd
-            binned_data[f"{b}{self.flux_density_key_ext}{self.rms_key}"] = u_fd
-            binned_data[f"{b}{self.flux_density_key_ext}{self.upper_limit_key}"] = ul_fd
-            binned_data[f"{b}{self.flux_density_key_ext}{self.Npoints_key}"] = (
+            stacked_data[f"{b}{self.mean_key}{self.flux_density_key_ext}"] = mean_fd
+            stacked_data[f"{b}{self.flux_density_key_ext}{self.rms_key}"] = u_fd
+            stacked_data[f"{b}{self.flux_density_key_ext}{self.upper_limit_key}"] = (
+                ul_fd
+            )
+            stacked_data[f"{b}{self.flux_density_key_ext}{self.Npoints_key}"] = (
                 n_points_fd
             )
 
-        return pd.DataFrame(binned_data)
+        return pd.DataFrame(stacked_data)
 
     def compute(
         self, datapoints: list[DataPoint]
@@ -370,4 +372,26 @@ class T1StackVisits(AbsT1ComputeUnit):
         :param datapoints: list of datapoints to combine
         :return: tuple of UBson or UnitResult and StockId
         """
-        return {"computed": True}, datapoints[0]["stock"]
+        ra = []
+        dec = []
+        mjd = []
+        stock_ids = []
+        dp_ids = []
+        allwise = []
+        for dp in datapoints:
+            ra.append(dp["body"]["ra"])
+            dec.append(dp["body"]["dec"])
+            mjd.append(dp["body"]["mjd"])
+            stock_ids.append(np.atleast_1d(dp["stock"]))
+            dp_ids.append(dp["id"])
+            allwise.append(any(["allwise" in t for t in dp["tag"]]))
+
+        lightcurve = pd.DataFrame(
+            {
+                "ra": ra,
+                "dec": dec,
+                "mjd": mjd,
+                "allwise": allwise,
+            },
+            index=dp_ids,
+        )
