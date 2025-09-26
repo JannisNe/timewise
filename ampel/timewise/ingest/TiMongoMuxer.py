@@ -2,7 +2,7 @@
 # File:                ampel/timewise/ingest/TiMongoMuxer.py
 # License:             BSD-3-Clause
 # Author:              Jannis Necker
-# Date:                10.09.2025
+# Date:                19.09.2025
 # Last Modified Date:  27.09.2025
 # Last Modified By:    Jannis Necker
 
@@ -31,9 +31,6 @@ class TiMongoMuxer(AbsT0Muxer):
     It checks for duplicate datapoints.
     """
 
-    # Be idempotent for the sake it (not required for prod)
-    idempotent: bool = False
-
     # Standard projection used when checking DB for existing PPS/ULS
     projection = {
         "_id": 0,
@@ -54,11 +51,6 @@ class TiMongoMuxer(AbsT0Muxer):
         # used to check potentially already inserted pps
         self._photo_col = self.context.db.get_collection("t0")
         self._projection_spec = unflatten_dict(self.projection)
-        self._run_id = (
-            self.updates_buffer.run_id[0]
-            if isinstance(self.updates_buffer.run_id, list)
-            else self.updates_buffer.run_id
-        )
 
     def process(
         self, dps: list[DataPoint], stock_id: None | StockId = None
