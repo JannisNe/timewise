@@ -71,7 +71,7 @@ class T1HDBSCAN(AbsT1CombineUnit):
         # for all available single-exposure images in all bands simultaneously, while the NEOWISE magnitudes are
         # obtained by PSF fit to individual exposures directly. Effect: all allwise data points that belong to the same
         # object have the same position. We take only the closest one and treat it as one datapoint in the clustering.
-        allwise_time_mask = lightcurve.allwise
+        allwise_time_mask = lightcurve.allwise_p3as_mep
         if any(allwise_time_mask):
             allwise_sep_min = np.min(_angular_separation[allwise_time_mask])
             closest_allwise_mask = (
