@@ -32,7 +32,7 @@ dependencies = [
     "ampel-alerts (==0.10.3a5)",
     "typer (>=0.17.4,<0.18.0)",
     "ampel-photometry (>=0.10.1,<0.11.0)",
-    "ampel-core @ git+https://github.com/JannisNe/Ampel-core.git",
+    "ampel-core @ git+https://github.com/JannisNe/Ampel-core.git#t1compute-fixes",
 ]
 
 [project.scripts]
