@@ -16,8 +16,7 @@ task:
       ingest:
         mux:
           combine:
-          - state_t2:
-            - unit: T2StackVisits
+          - state_t2: []
             compute:
               unit: T1StackVisits
             unit: T1HDBSCAN

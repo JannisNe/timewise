@@ -6,4 +6,3 @@ unit:
 - ampel.timewise.ingest.TiCompilerOptions
 - ampel.timewise.t1.T1StackVisits
 - ampel.timewise.t1.T1HDBSCAN
-- ampel.timewise.t2.T2StackVisits
