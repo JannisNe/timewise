@@ -10,7 +10,6 @@ from typing import Iterable, Sequence
 
 import numpy as np
 from astropy.coordinates.angle_utilities import angular_separation, position_angle
-import pandas as pd
 from sklearn.cluster import HDBSCAN
 from pymongo import MongoClient
 
@@ -18,6 +17,8 @@ from ampel.content.DataPoint import DataPoint
 from ampel.struct.T1CombineResult import T1CombineResult
 from ampel.types import DataPointId
 from ampel.abstract.AbsT1CombineUnit import AbsT1CombineUnit
+
+from ampel.timewise.util.pdutil import datapoints_to_dataframe
 
 
 class T1HDBSCAN(AbsT1CombineUnit):
@@ -33,28 +34,8 @@ class T1HDBSCAN(AbsT1CombineUnit):
     def combine(
         self, datapoints: Iterable[DataPoint]
     ) -> Sequence[DataPointId] | T1CombineResult:
-        ra = []
-        dec = []
-        mjd = []
-        stock_ids = []
-        dp_ids = []
-        allwise = []
-        for dp in datapoints:
-            ra.append(dp["body"]["ra"])
-            dec.append(dp["body"]["dec"])
-            mjd.append(dp["body"]["mjd"])
-            stock_ids.append(np.atleast_1d(dp["stock"]))
-            dp_ids.append(dp["id"])
-            allwise.append(any(["allwise" in t for t in dp["tag"]]))
-
-        lightcurve = pd.DataFrame(
-            {
-                "ra": ra,
-                "dec": dec,
-                "mjd": mjd,
-                "allwise": allwise,
-            },
-            index=dp_ids,
+        lightcurve, stock_ids = datapoints_to_dataframe(
+            datapoints, ["ra", "dec", "mjd"]
         )
 
         # make sure that the is one stock id that fits all dps
@@ -73,8 +54,8 @@ class T1HDBSCAN(AbsT1CombineUnit):
         source_ra = d["ra"]
         source_dec = d["dec"]
 
-        lc_ra_rad = np.deg2rad(ra)
-        lc_dec_rad = np.deg2rad(dec)
+        lc_ra_rad = np.deg2rad(lightcurve.ra)
+        lc_dec_rad = np.deg2rad(lightcurve.dec)
         source_ra_rad = np.deg2rad(source_ra)
         source_dec_rad = np.deg2rad(source_dec)
 

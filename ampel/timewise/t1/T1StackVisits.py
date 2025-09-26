@@ -18,6 +18,8 @@ from ampel.content.DataPoint import DataPoint
 from ampel.struct.UnitResult import UnitResult
 from ampel.types import StockId, UBson
 
+from ampel.timewise.util.pdutil import datapoints_to_dataframe
+
 
 class T1StackVisits(AbsT1ComputeUnit):
     clean_outliers_when_stacking: bool = True
@@ -372,26 +374,20 @@ class T1StackVisits(AbsT1ComputeUnit):
         :param datapoints: list of datapoints to combine
         :return: tuple of UBson or UnitResult and StockId
         """
-        ra = []
-        dec = []
-        mjd = []
-        stock_ids = []
-        dp_ids = []
-        allwise = []
-        for dp in datapoints:
-            ra.append(dp["body"]["ra"])
-            dec.append(dp["body"]["dec"])
-            mjd.append(dp["body"]["mjd"])
-            stock_ids.append(np.atleast_1d(dp["stock"]))
-            dp_ids.append(dp["id"])
-            allwise.append(any(["allwise" in t for t in dp["tag"]]))
 
-        lightcurve = pd.DataFrame(
-            {
-                "ra": ra,
-                "dec": dec,
-                "mjd": mjd,
-                "allwise": allwise,
-            },
-            index=dp_ids,
-        )
+        columns = [
+            "ra",
+            "dec",
+            "mjd",
+            "w1_flux",
+            "w1_flux_error",
+            "w1_mag",
+            "w1_mag_error",
+            "w2_flux",
+            "w2_flux_error",
+            "w2_mag",
+            "w2_mag_error",
+        ]
+        raw_lightcurve, stock_ids = datapoints_to_dataframe(datapoints, columns)
+        stacked_lightcurve = self.stack_visits(raw_lightcurve)
+        return stacked_lightcurve.to_dict(orient="records"), datapoints[0]["stock"]
