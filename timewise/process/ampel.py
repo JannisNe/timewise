@@ -3,6 +3,7 @@ import logging
 
 import pandas as pd
 from pymongo import MongoClient, ASCENDING
+from ampel.cli.JobCommand import JobCommand
 
 
 logger = logging.getLogger(__name__)
@@ -65,3 +66,15 @@ class AmpelPrepper:
     def prepare(self, cfg_path: Path) -> Path:
         self.import_input()
         return self.make_ampel_job_file(cfg_path)
+
+    def run(self, timewise_cfg_path: Path, ampel_config_path: Path):
+        ampel_job_path = self.prepare(timewise_cfg_path)
+        cmd = JobCommand()
+        parser = cmd.get_parser()
+        args = vars(
+            parser.parse_args(
+                ["--schema", str(ampel_job_path), "--config", str(ampel_config_path)]
+            )
+        )
+        logger.debug(args)
+        cmd.run(args, unknown_args=())
