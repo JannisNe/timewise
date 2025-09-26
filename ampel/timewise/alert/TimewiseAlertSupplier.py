@@ -9,7 +9,10 @@
 
 import sys
 from hashlib import blake2b
-from typing import Literal, List
+from typing import Literal, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from astropy.table import Table
 
 from bson import encode
 import numpy as np
@@ -44,7 +47,7 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
         :raises StopIteration: when alert_loader dries out.
         :raises AttributeError: if alert_loader was not set properly before this method is called
         """
-        table = self._deserialize(next(self.alert_loader))  # type: Table
+        table: Table = self._deserialize(next(self.alert_loader))
 
         stock_ids = np.unique(table["stock_id"])
         assert len(stock_ids) == 1
@@ -58,7 +61,18 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
         columns_to_rename = [c for c in table.columns if c.endswith("_ep")]
         if len(columns_to_rename):
             new_columns_names = [c.replace("_ep", "") for c in columns_to_rename]
-            table.rename_columns(columns_to_rename, new_columns_names)
+
+            try:
+                # in this case only the allwise column eith the _ep extension exists
+                # and we can simply rename the columns
+                table.rename_columns(columns_to_rename, new_columns_names)
+            except KeyError:
+                # In this case, the columns already exists because the neowise data is present
+                # we have to insert the values form the columns with the _ep extension into the
+                # respective neowise columns
+                for c, nc in zip(columns_to_rename, new_columns_names):
+                    table[nc][table[nc].mask] = table[c][table[nc].mask]
+                    table.remove_column(c)
 
         for row in table:
             # convert table row to dict, convert data types from numpy to native python
