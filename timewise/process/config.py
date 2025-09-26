@@ -3,6 +3,8 @@ import logging
 
 from pydantic import BaseModel
 
+from .prepare import AmpelPrepper
+
 
 logger = logging.getLogger(__name__)
 DEFAULT_TEMPLATE_PATH = Path(__file__).parent / "template.yml"
@@ -16,3 +18,13 @@ class AmpelConfig(BaseModel):
     @property
     def input_mongo_db_name(self) -> str:
         return self.mongo_db_name + "_input"
+
+    def build_prepper(self, original_id_key: str, input_csv: Path) -> AmpelPrepper:
+        return AmpelPrepper(
+            mongo_db_name=self.mongo_db_name,
+            orig_id_key=original_id_key,
+            input_csv=input_csv,
+            input_mongo_db_name=self.input_mongo_db_name,
+            template_path=self.template_path,
+            uri=self.uri,
+        )

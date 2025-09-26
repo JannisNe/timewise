@@ -29,11 +29,6 @@ class TimewiseConfig(BaseModel):
         return self
 
     def build_ampel_prepper(self) -> AmpelPrepper:
-        return AmpelPrepper(
-            mongo_db_name=self.ampel.mongo_db_name,
-            orig_id_key=self.download.queries[0].original_id_key,
-            input_csv=self.download.input_csv,
-            input_mongo_db_name=self.ampel.input_mongo_db_name,
-            template_path=self.ampel.template_path,
-            uri=self.ampel.uri,
+        return self.ampel.build_prepper(
+            self.download.queries[0].original_id_key, self.download.input_csv
         )
