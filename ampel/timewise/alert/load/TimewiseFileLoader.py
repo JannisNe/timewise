@@ -9,7 +9,7 @@
 from typing import Dict, get_args
 
 import numpy as np
-from astropy.table import Table
+from astropy.table import Table, vstack
 from ampel.abstract.AbsAlertLoader import AbsAlertLoader
 from timewise.tables import TableType
 from timewise.config import TimewiseConfig
@@ -36,7 +36,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         dl = Downloader(timewise_config.download)
         self._timewise_backend = dl.backend
 
-        self._tasks = [task for task in dl.iter_tasks()]
+        self._tasks = [tasks for tasks in dl.iter_tasks_per_chunk()]
 
         if self.logger:
             self.logger.info(f"Registering {len(self._tasks)} task(s) to load")
@@ -64,17 +64,23 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         # emit all datapoints per stock id
         # This way ampel runs not per datapoint but per object
         backend = self._timewise_backend
-        for task in self._tasks:
-            self.logger.debug(f"reading {task}")
-            data = backend.load_data(task)
+        for tasks in self._tasks:
+            data = []
+            for task in tasks:
+                self.logger.debug(f"reading {task}")
+                idata = backend.load_data(task)
+
+                # add table name
+                idata["table_name"] = (
+                    self.find_table_from_task(task).model_fields["name"].default
+                )
+
+                data.append(idata)
+
+            data = vstack(data)
 
             # rename stock id column
             data.rename_column(self.stock_id_column_name, "stock_id")
-
-            # add table name
-            data["table_name"] = (
-                self.find_table_from_task(task).model_fields["name"].default
-            )
 
             # iterate over all stock ids
             for stock_id in np.unique(data["stock_id"]):

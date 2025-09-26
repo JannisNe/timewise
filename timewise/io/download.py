@@ -2,7 +2,7 @@ import time
 import threading
 import logging
 from queue import Empty
-from typing import Dict
+from typing import Dict, Iterator
 from itertools import product
 
 import pandas as pd
@@ -58,10 +58,14 @@ class Downloader:
             namespace="download", key=f"chunk{chunk.chunk_id:04d}_{query.hash}"
         )
 
-    def iter_tasks(self) -> TaskID:
+    def iter_tasks(self) -> Iterator[TaskID]:
         for chunk in self.chunker:
             for q in self.cfg.queries:
                 yield self.get_task_id(chunk, q)
+
+    def iter_tasks_per_chunk(self) -> Iterator[list[TaskID]]:
+        for chunk in self.chunker:
+            yield [self.get_task_id(chunk, q) for q in self.cfg.queries]
 
     def load_job_meta(self):
         backend = self.backend
