@@ -1,2 +1,2 @@
 from .config import AmpelConfig
-from .ampel import AmpelPrepper
+from .prepare import AmpelPrepper
