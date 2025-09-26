@@ -10,6 +10,7 @@ from typing import Dict
 
 import numpy as np
 import pandas as pd
+from numpy import typing as npt
 from scipy import stats
 
 from ampel.abstract.AbsT1ComputeUnit import AbsT1ComputeUnit
@@ -42,8 +43,21 @@ class T1StackVisits(AbsT1ComputeUnit):
         super().__init__(**kwargs)
 
     def calculate_epochs(
-        self, f, e, visit_mask, counts, remove_outliers, outlier_mask=None
-    ):
+        self,
+        f: pd.Series,
+        e: pd.Series,
+        visit_mask: npt.ArrayLike,
+        counts: npt.ArrayLike,
+        remove_outliers: bool,
+        outlier_mask: npt.ArrayLike | None = None,
+    ) -> tuple[
+        npt.ArrayLike,
+        npt.ArrayLike,
+        npt.ArrayLike,
+        npt.ArrayLike,
+        npt.ArrayLike,
+        npt.ArrayLike,
+    ]:
         """
         Calculates the binned epochs of a lightcurve.
 
@@ -88,7 +102,7 @@ class T1StackVisits(AbsT1ComputeUnit):
 
         # ---------------------   flag upper limits   ---------------------- #
         bin_n_ulims = np.bincount(visit_mask, weights=u_lims, minlength=len(counts))
-        bin_ulim_bool = (counts - bin_n_ulims) == 0
+        bin_ulim_bool = (counts - bin_n_ulims) == 0  # type: npt.ArrayLike
         use_mask_ul = ~u_lims | (u_lims & bin_ulim_bool[visit_mask])
 
         n_loops = 0
@@ -98,7 +112,7 @@ class T1StackVisits(AbsT1ComputeUnit):
             # make a mask of values to use
             use_mask = ~outlier_mask & use_mask_ul & ~nan_mask
             n_points = np.bincount(visit_mask, weights=use_mask)
-            zero_points_mask = n_points == 0
+            zero_points_mask = n_points == 0  # type: npt.ArrayLike
 
             # -------------------------   calculate median   ------------------------- #
             median = np.zeros_like(counts, dtype=float)
@@ -190,14 +204,14 @@ class T1StackVisits(AbsT1ComputeUnit):
         return median, u, bin_ulim_bool, outlier_mask, use_mask, n_points
 
     @staticmethod
-    def get_visit_map(lightcurve):
+    def get_visit_map(lightcurve: pd.DataFrame) -> npt.ArrayLike:
         """
         Create a map datapoint to visit
 
         :param lightcurve: the unbinned lightcurve
         :type lightcurve: pd.DataFrame
         :returns: visit map
-        :rtype: np.ndarray
+        :rtype: npt.ArrayLike
         """
         # -------------------------   find epoch intervals   -------------------------- #
         sorted_mjds = np.sort(lightcurve.mjd)
@@ -219,7 +233,7 @@ class T1StackVisits(AbsT1ComputeUnit):
         visit_mask = np.digitize(lightcurve.mjd, epoch_bins) - 1
         return visit_mask
 
-    def bin_lightcurve(self, lightcurve):
+    def bin_lightcurve(self, lightcurve: pd.DataFrame):
         """
         Combine the data by visits of the satellite of one region in the sky.
         The visits typically consist of some tens of observations. The individual visits are separated by about
