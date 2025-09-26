@@ -4,6 +4,7 @@ import logging
 from pydantic import BaseModel
 
 from .prepare import AmpelPrepper
+from .results import ResultsExtractor
 
 
 logger = logging.getLogger(__name__)
@@ -28,3 +29,6 @@ class AmpelConfig(BaseModel):
             template_path=self.template_path,
             uri=self.uri,
         )
+
+    def build_extractor(self) -> ResultsExtractor:
+        return ResultsExtractor(mongo_db_uri=self.uri, mongo_db_name=self.mongo_db_name)
