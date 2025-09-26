@@ -7,6 +7,10 @@
 # Last Modified Date:  24.09.2025
 # Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
 
+import numpy as np
+import pandas as pd
+from scipy import stats
+
 from ampel.abstract.AbsT1ComputeUnit import AbsT1ComputeUnit
 from ampel.content.DataPoint import DataPoint
 from ampel.struct.UnitResult import UnitResult
@@ -14,6 +18,17 @@ from ampel.types import StockId, UBson
 
 
 class T1StackVisits(AbsT1ComputeUnit):
+    mean_key: str = "_mean"
+    median_key: str = "_median"
+    rms_key: str = "_rms"
+    upper_limit_key: str = "_ul"
+    Npoints_key: str = "_Npoints"
+    zeropoint_key_ext: str = "_zeropoint"
+    flux_key_ext = "_flux"
+    flux_density_key_ext = "_flux_density"
+    mag_key_ext = "_mag"
+    error_key_ext = "_error"
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -253,7 +268,7 @@ class T1StackVisits(AbsT1ComputeUnit):
                 n_outliers = np.sum(outlier_mask)
 
                 if n_outliers > 0:
-                    logger.debug(
+                    self.logger.debug(
                         f"removed {n_outliers} outliers by brightness for {b} {lum_ext}"
                     )
 
