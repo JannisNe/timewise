@@ -40,7 +40,13 @@ class TiMongoMuxer(AbsT0Muxer):
         "stock": 1,
         "body.mjd": 1,
         "body.w1_flux": 1,
+        "body.w1_flux_error": 1,
+        "body.w1_mag": 1,
+        "body.w1_mag_error": 1,
         "body.w2_flux": 1,
+        "body.w2_flux_error": 1,
+        "body.w2_mag": 1,
+        "body.w2_mag_error": 1,
         "body.ra": 1,
         "body.dec": 1,
     }
