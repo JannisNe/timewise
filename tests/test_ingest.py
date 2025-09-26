@@ -1,29 +1,19 @@
 import logging
-from pathlib import Path
 
 from astropy.table import Table, vstack
-from ampel.cli.JobCommand import JobCommand
 from pymongo import MongoClient
 
 from timewise.config import TimewiseConfig
 
 
-AMPEL_CONFIG_PATH = Path(__file__).parent.parent / "ampel_config.yml"
+from tests.constants import AMPEL_CONFIG_PATH
 
 
 logger = logging.Logger(__name__)
 
 
-def test_ingest(ampel_job_path, timewise_config_path):
-    cmd = JobCommand()
-    parser = cmd.get_parser()
-    args = vars(
-        parser.parse_args(
-            ["--schema", str(ampel_job_path), "--config", str(AMPEL_CONFIG_PATH)]
-        )
-    )
-    logger.debug(args)
-    JobCommand().run(args, unknown_args=())
+def test_ingest(ampel_prepper, timewise_config_path):
+    ampel_prepper.run(timewise_config_path, AMPEL_CONFIG_PATH)
 
     client = MongoClient()
     t1 = client["test_ampel"].get_collection("t1")

@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 from astropy.table import Table
 
-from test_queries import normalize_sql
+from tests.test_queries import normalize_sql
 
 
 logger = logging.getLogger(__name__)

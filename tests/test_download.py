@@ -8,7 +8,7 @@ from timewise.types import TAPJobMeta
 from timewise.io import Downloader
 from timewise.chunking import Chunker
 
-from dummy_tap import DummyTAPService, get_table_from_query_and_chunk
+from tests.dummy_tap import DummyTAPService, get_table_from_query_and_chunk
 
 
 def test_chunking(download_cfg):

@@ -6,10 +6,9 @@ import pytest
 from tests.dummy_tap import get_table_from_query_and_chunk
 from timewise.io import Downloader, DownloadConfig
 from timewise.config import TimewiseConfig
+from timewise.process import AmpelPrepper
 
-
-DATA_DIR = Path(__file__).parent / "data"
-INPUT_CSV_PATH = DATA_DIR / "test_sample.csv"
+from tests.constants import DATA_DIR, INPUT_CSV_PATH
 
 
 @pytest.fixture
@@ -81,7 +80,7 @@ def timewise_config_path(tmp_path) -> Path:
 
 
 @pytest.fixture
-def ampel_job_path(timewise_config_path) -> Path:
+def ampel_prepper(timewise_config_path) -> AmpelPrepper:
     cfg = TimewiseConfig.from_yaml(timewise_config_path)
     dl = Downloader(cfg.download)
     for q, c in product(dl.cfg.queries, dl.chunker):
@@ -89,5 +88,4 @@ def ampel_job_path(timewise_config_path) -> Path:
         task = dl.get_task_id(c, q)
         dl.backend.save_data(task, data)
 
-    ampel_prepper = cfg.build_ampel_prepper()
-    return ampel_prepper.prepare(timewise_config_path)
+    return cfg.build_ampel_prepper()

@@ -1,9 +1,8 @@
 import pytest
-from pathlib import Path
 from pydantic import TypeAdapter
 from timewise.query import QueryType
 
-DATA_DIR = Path(__file__).parent / "data" / "queries"
+from tests.constants import DATA_DIR
 
 query_inputs = [
     (
@@ -132,7 +131,7 @@ def normalize_sql(s: str) -> str:
 @pytest.mark.parametrize("config_dict,ref_path", query_inputs)
 def test_query_build_matches_reference(config_dict, ref_path):
     # Load reference text
-    ref_file = DATA_DIR / ref_path
+    ref_file = DATA_DIR / "queries" / ref_path
     expected = normalize_sql(ref_file.read_text())
 
     # Instantiate query from config

@@ -61,3 +61,7 @@ parallel = true
 concurrency = ["thread", "multiprocessing"]
 [tool.poetry.dependencies]
 ampel-core = {develop = true}
+
+[tool.pytest]
+testpaths = "tests"
+pythonpath = "."
