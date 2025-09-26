@@ -58,7 +58,7 @@ class T1HDBSCAN(AbsT1CombineUnit):
             index=dp_ids,
         )
 
-        self.logger.debug(f"Stocks: {lightcurve.stock_id}")
+        self.logger.debug(f"Stocks: {lightcurve.stock_id.tolist()}")
 
         assert len(lightcurve.stock_id.unique()) == 1
         stock_id = stock_ids[0]
