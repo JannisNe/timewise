@@ -64,3 +64,12 @@ def process(
     cfg = TimewiseConfig.from_yaml(config_path)
     prepper = cfg.build_ampel_prepper()
     prepper.run(config_path, ampel_config_path)
+
+
+@app.command(help="")
+def run_chain(
+    config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
+    ampel_config_path: Path = typer.Argument(help="AMPEL config YAML"),
+):
+    download(config_path)
+    process(config_path, ampel_config_path)
