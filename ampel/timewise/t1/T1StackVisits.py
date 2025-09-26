@@ -6,6 +6,7 @@
 # Date:                24.09.2025
 # Last Modified Date:  24.09.2025
 # Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -30,6 +31,12 @@ class T1StackVisits(AbsT1ComputeUnit):
     flux_density_key_ext = "_flux_density"
     mag_key_ext = "_mag"
     error_key_ext = "_error"
+
+    # zero points come from https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#conv2flux
+    # published in Jarret et al. (2011): https://ui.adsabs.harvard.edu/abs/2011ApJ...735..112J/abstract
+    magnitude_zeropoints: Dict[str, float] = {"w1": 20.752, "w2": 19.596}
+    # in Jy
+    flux_zeropoints = {"w1": 309.54, "w2": 171.787}
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -240,7 +247,7 @@ class T1StackVisits(AbsT1ComputeUnit):
         )
 
         # -------------------------   loop through bands   -------------------------- #
-        for b in self.bands:
+        for b in ["w1", "w2"]:
             # loop through magnitude and flux and save the respective datapoints
 
             outlier_masks = dict()
@@ -306,18 +313,16 @@ class T1StackVisits(AbsT1ComputeUnit):
                 ]
             )
             # if there are only non-detections then fall back to default zeropoint
-            zps_median[n_valid_zps == 0] = self.magnitude_zeropoints["Mag"][b]
+            zps_median[n_valid_zps == 0] = self.magnitude_zeropoints[b]
             # if the visit only has upper limits then use the fall-back zeropoint
-            zps_median[bin_ulim_bools[self.flux_key_ext]] = self.magnitude_zeropoints[
-                "Mag"
-            ][b]
+            zps_median[bin_ulim_bools[self.flux_key_ext]] = self.magnitude_zeropoints[b]
 
             # ---------------   calculate flux density from instrument flux   ---------------- #
             # get the instrument flux [digital numbers], i.e. source count
             inst_fluxes_e = lightcurve[f"{b}{self.flux_key_ext}{self.error_key_ext}"]
 
             # calculate the proportionality constant between flux density and source count
-            mag_zp = self.magnitude_zeropoints["F_nu"][b].to("mJy").value
+            mag_zp = self.flux_zeropoints[b] * 1e3  # in mJy
             flux_dens_const = mag_zp * 10 ** (-zps_median / 2.5)
 
             # calculate flux densities from instrument counts
