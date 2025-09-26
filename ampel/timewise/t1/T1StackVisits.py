@@ -18,6 +18,8 @@ from ampel.types import StockId, UBson
 
 
 class T1StackVisits(AbsT1ComputeUnit):
+    clean_outliers_when_binning: bool = True
+
     mean_key: str = "_mean"
     median_key: str = "_median"
     rms_key: str = "_rms"
