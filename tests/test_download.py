@@ -5,14 +5,13 @@ import pytest
 import pyvo as vo
 
 from timewise.types import TAPJobMeta
-from timewise.io import Downloader
 from timewise.chunking import Chunker
 
 from tests.dummy_tap import DummyTAPService, get_table_from_query_and_chunk
 
 
 def test_chunking(download_cfg):
-    dl = Downloader(download_cfg)
+    dl = download_cfg.build_downloader()
     chunks = Chunker(
         input_csv=download_cfg.input_csv, chunk_size=download_cfg.chunk_size
     )
@@ -25,14 +24,14 @@ def test_chunking(download_cfg):
 
 
 def test_downloader_fails(download_cfg):
-    dl = Downloader(download_cfg)
+    dl = download_cfg.build_downloader()
     dl.service = DummyTAPService(
         baseurl="", chunksize=download_cfg.chunk_size, fail_submit=True
     )
     with pytest.raises(vo.DALServiceError, match="failed submit"):
         dl.run()
 
-    dl = Downloader(download_cfg)
+    dl = download_cfg.build_downloader()
     dl.service = DummyTAPService(
         baseurl="", chunksize=download_cfg.chunk_size, fail_fetch=True
     )
@@ -41,7 +40,7 @@ def test_downloader_fails(download_cfg):
 
 
 def test_downloader_creates_files(download_cfg):
-    dl = Downloader(download_cfg)
+    dl = download_cfg.build_downloader()
     dl.service = DummyTAPService(baseurl="", chunksize=download_cfg.chunk_size)
     dl.run()
 

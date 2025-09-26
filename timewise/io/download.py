@@ -4,6 +4,7 @@ import logging
 from queue import Empty
 from typing import Dict, Iterator
 from itertools import product
+from pathlib import Path
 
 import pandas as pd
 import numpy as np
@@ -11,8 +12,9 @@ from astropy.table import Table
 from pyvo.utils.http import create_session
 
 from .stable_tap import StableTAPService
-from .config import DownloadConfig
+from ..backend import BackendType
 from ..types import TAPJobMeta, TaskID, TYPE_MAP
+from ..query import QueryType
 from ..query.base import Query
 from ..util.error_threading import ErrorQueue, ExceptionSafeThread
 from ..chunking import Chunker, Chunk
@@ -22,9 +24,25 @@ logger = logging.getLogger(__name__)
 
 
 class Downloader:
-    def __init__(self, cfg: DownloadConfig):
-        self.cfg = cfg
+    def __init__(
+        self,
+        service_url: str,
+        input_csv: Path,
+        chunk_size: int,
+        backend: BackendType,
+        queries: list[QueryType],
+        max_concurrent_jobs: int,
+        poll_interval: float,
+    ):
+        self.backend = backend
+        self.queries = queries
+        self.input_csv = input_csv
+        self.max_concurrent_jobs = max_concurrent_jobs
+        self.poll_interval = poll_interval
 
+        # ----------------------------
+        # concurrency setup
+        # ----------------------------
         # Shared state
         self.job_lock = threading.Lock()
         # (chunk_id, query_hash) -> job meta
@@ -41,13 +59,15 @@ class Downloader:
         self.all_chunks_queued = False
         self.all_chunks_submitted = False
 
+        # ----------------------------
+        # TAP setup
+        # ----------------------------
         self.session = create_session()
         self.service: StableTAPService = StableTAPService(
-            cfg.service_url, session=self.session
+            service_url, session=self.session
         )
 
-        self.backend = cfg.backend
-        self.chunker = Chunker(input_csv=cfg.input_csv, chunk_size=cfg.chunk_size)
+        self.chunker = Chunker(input_csv=input_csv, chunk_size=chunk_size)
 
     # ----------------------------
     # helpers
@@ -60,12 +80,12 @@ class Downloader:
 
     def iter_tasks(self) -> Iterator[TaskID]:
         for chunk in self.chunker:
-            for q in self.cfg.queries:
+            for q in self.queries:
                 yield self.get_task_id(chunk, q)
 
     def iter_tasks_per_chunk(self) -> Iterator[list[TaskID]]:
         for chunk in self.chunker:
-            yield [self.get_task_id(chunk, q) for q in self.cfg.queries]
+            yield [self.get_task_id(chunk, q) for q in self.queries]
 
     def load_job_meta(self):
         backend = self.backend
@@ -89,10 +109,8 @@ class Downloader:
         start = min(chunk.row_numbers) + 1  # plus one to always skip header line
         nrows = max(chunk.row_numbers) - start + 2  # plus one: skip header, plus one:
 
-        columns = pd.read_csv(self.cfg.input_csv, nrows=0).columns
-        return pd.read_csv(
-            self.cfg.input_csv, skiprows=start, nrows=nrows, names=columns
-        )
+        columns = pd.read_csv(self.input_csv, nrows=0).columns
+        return pd.read_csv(self.input_csv, skiprows=start, nrows=nrows, names=columns)
 
     def submit_tap_job(self, query: Query, chunk: Chunk) -> TAPJobMeta:
         adql = query.adql
@@ -164,7 +182,7 @@ class Downloader:
                         for j in self.jobs.values()
                         if j.get("status") in ("QUEUED", "EXECUTING", "RUNNING")
                     )
-                if running < self.cfg.max_concurrent_jobs:
+                if running < self.max_concurrent_jobs:
                     break
                 time.sleep(1.0)
 
@@ -233,7 +251,7 @@ class Downloader:
                     logger.info("All tasks done! Exiting polling thread")
                     break
 
-            time.sleep(self.cfg.poll_interval)
+            time.sleep(self.poll_interval)
 
     # ----------------------------
     # Main run loop
@@ -248,7 +266,7 @@ class Downloader:
 
         # enqueue all chunks & queries
         backend = self.backend
-        for chunk, q in product(self.chunker, self.cfg.queries):
+        for chunk, q in product(self.chunker, self.queries):
             task = self.get_task_id(chunk, q)
 
             # skip if the download is done, or the job is queued

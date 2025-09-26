@@ -3,7 +3,6 @@ from pathlib import Path
 
 import typer
 
-from .io import Downloader
 from .config import TimewiseConfig
 
 from rich.logging import RichHandler
@@ -44,7 +43,7 @@ def main(
 def download(
     config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
 ):
-    Downloader(TimewiseConfig.from_yaml(config_path).download).run()
+    TimewiseConfig.from_yaml(config_path).download.build_downloader().run()
 
 
 @app.command(help="Prepares the AMPEL job file so AMPEL can be run manually")

@@ -13,7 +13,6 @@ from astropy.table import Table, vstack
 from ampel.abstract.AbsAlertLoader import AbsAlertLoader
 from timewise.tables import TableType
 from timewise.config import TimewiseConfig
-from timewise.io import Downloader
 from timewise.types import TaskID
 
 
@@ -33,7 +32,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
 
         self.logger.debug(f"loading timewise config file {self.timewise_config_file}")
         timewise_config = TimewiseConfig.from_yaml(self.timewise_config_file)
-        dl = Downloader(timewise_config.download)
+        dl = timewise_config.download.build_downloader()
         self._timewise_backend = dl.backend
 
         self._tasks = [tasks for tasks in dl.iter_tasks_per_chunk()]

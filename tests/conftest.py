@@ -4,7 +4,7 @@ from itertools import product
 import pytest
 
 from tests.dummy_tap import get_table_from_query_and_chunk
-from timewise.io import Downloader, DownloadConfig
+from timewise.io import DownloadConfig
 from timewise.config import TimewiseConfig
 from timewise.process import AmpelPrepper
 
@@ -82,8 +82,8 @@ def timewise_config_path(tmp_path) -> Path:
 @pytest.fixture
 def ampel_prepper(timewise_config_path) -> AmpelPrepper:
     cfg = TimewiseConfig.from_yaml(timewise_config_path)
-    dl = Downloader(cfg.download)
-    for q, c in product(dl.cfg.queries, dl.chunker):
+    dl = cfg.download.build_downloader()
+    for q, c in product(dl.queries, dl.chunker):
         data = get_table_from_query_and_chunk(q.adql, c.chunk_id)
         task = dl.get_task_id(c, q)
         dl.backend.save_data(task, data)

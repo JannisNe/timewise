@@ -4,6 +4,7 @@ from typing import List
 import pandas as pd
 from pydantic import BaseModel, Field, model_validator
 
+from .download import Downloader
 from ..query import QueryType
 from ..backend import BackendType
 from ..types import TYPE_MAP
@@ -49,3 +50,14 @@ class DownloadConfig(BaseModel):
             )
 
         return self
+
+    def build_downloader(self) -> Downloader:
+        return Downloader(
+            service_url=self.service_url,
+            input_csv=self.input_csv,
+            chunk_size=self.chunk_size,
+            backend=self.backend,
+            queries=self.queries,
+            max_concurrent_jobs=self.max_concurrent_jobs,
+            poll_interval=self.poll_interval,
+        )
