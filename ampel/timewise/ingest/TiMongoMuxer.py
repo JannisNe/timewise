@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-# File:                Ampel-ZTF/ampel/ztf/ingest/ZiMongoMuxer.py
+# File:                ampel/timewise/ingest/TiMongoMuxer.py
 # License:             BSD-3-Clause
-# Author:              valery brinnel <firstname.lastname@gmail.com>
-# Date:                14.12.2017
-# Last Modified Date:  25.05.2021
-# Last Modified By:    valery brinnel <firstname.lastname@gmail.com>
+# Author:              Jannis Necker
+# Date:                10.09.2025
+# Last Modified Date:  27.09.2025
+# Last Modified By:    Jannis Necker
 
 from bisect import bisect_right
 from contextlib import suppress
