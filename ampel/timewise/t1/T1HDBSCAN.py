@@ -43,7 +43,7 @@ class T1HDBSCAN(AbsT1CombineUnit):
             ra.append(dp["body"]["ra"])
             dec.append(dp["body"]["dec"])
             mjd.append(dp["body"]["mjd"])
-            stock_ids.append(dp["stock"])
+            stock_ids.append(np.atleast_1d(dp["stock"]))
             dp_ids.append(dp["id"])
             allwise.append(any(["allwise" in t for t in dp["tag"]]))
 
@@ -52,16 +52,21 @@ class T1HDBSCAN(AbsT1CombineUnit):
                 "ra": ra,
                 "dec": dec,
                 "mjd": mjd,
-                "stock_id": stock_ids,
                 "allwise": allwise,
             },
             index=dp_ids,
         )
 
-        self.logger.debug(f"Stocks: {lightcurve.stock_id.tolist()}")
-
-        assert len(lightcurve.stock_id.unique()) == 1
-        stock_id = stock_ids[0]
+        # make sure that the is one stock id that fits all dps
+        # this is a redundant check, the muxer should take care of it
+        unique_stocks = np.unique(np.array(stock_ids).flatten())
+        stock_in_all_dps = [
+            all([s in sids for sids in stock_ids]) for s in unique_stocks
+        ]
+        # make sure only one stock is in all datapoints
+        assert sum(stock_in_all_dps) == 1
+        stock_id = unique_stocks[stock_in_all_dps][0].item()
+        self.logger.debug(f"stock: {stock_id}")
 
         # query the database that holds the parent sample
         d = self._col.find_one({self.original_id_key: stock_id})
