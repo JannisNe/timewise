@@ -9,6 +9,8 @@
 from typing import Iterable, Sequence
 
 import numpy as np
+from numpy import typing as npt
+from ampel.base.AuxUnitRegister import AuxUnitRegister
 from astropy.coordinates.angle_utilities import angular_separation, position_angle
 from sklearn.cluster import HDBSCAN
 from pymongo import MongoClient
@@ -17,19 +19,30 @@ from ampel.content.DataPoint import DataPoint
 from ampel.struct.T1CombineResult import T1CombineResult
 from ampel.types import DataPointId
 from ampel.abstract.AbsT1CombineUnit import AbsT1CombineUnit
+from ampel.model.PlotProperties import PlotProperties
+
+from ampel.model.UnitModel import UnitModel
 
 from ampel.timewise.util.pdutil import datapoints_to_dataframe
+from ampel.timewise.util.DiagnosticPlotter import DiagnosticPlotter
 
 
-class T1HDBSCAN(AbsT1CombineUnit):
+class T1HDBSCAN(AbsT1CombineUnit, DiagnosticPlotter):
     input_mongo_db_name: str
     original_id_key: str
     whitelist_region_arcsec: float = 1
     cluster_distance_arcsec: float = 0.5
 
+    plot: bool = False
+    plot_properties: PlotProperties | None = None
+    plotter: UnitModel = {"unit": "DiagnosticPlotter"}
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._col = MongoClient()[self.input_mongo_db_name]["input"]
+        self._plotter = AuxUnitRegister.new_unit(
+            model=self.plotter, sub_type=DiagnosticPlotter
+        )
 
     def combine(
         self, datapoints: Iterable[DataPoint]
@@ -95,7 +108,7 @@ class T1HDBSCAN(AbsT1CombineUnit):
 
         # if there are more than one datapoints, we use a clustering algorithm to potentially find a cluster with
         # its center within 1 arcsec
-        cluster_res = None
+        labels = []
         if data_mask.sum() > 1:
             # instead of the polar coordinates separation and position angle we use cartesian coordinates because the
             # clustering algorithm works better with them
@@ -116,9 +129,11 @@ class T1HDBSCAN(AbsT1CombineUnit):
                     self.cluster_distance_arcsec / 3600
                 ),
             ).fit(cartesian)
+            centroids = cluster_res.__getattribute__("centroids_")  # type: npt.ArrayLike
+            labels = cluster_res.__getattribute__("labels_")  # type: npt.ArrayLike
 
             # we select the closest cluster within 1 arcsec
-            cluster_separations = np.sqrt(np.sum(cluster_res.centroids_**2, axis=1))
+            cluster_separations = np.sqrt(np.sum(centroids**2, axis=1))
             self.logger.debug(f"Found {len(cluster_separations)} clusters")
 
             # if there is no cluster or no cluster within 1 arcsec,
@@ -136,7 +151,7 @@ class T1HDBSCAN(AbsT1CombineUnit):
             # in addition to the datapoints within 1 arcsec
             else:
                 closest_label = cluster_separations.argmin()
-                selected_cluster_mask = cluster_res.labels_ == closest_label
+                selected_cluster_mask = labels == closest_label
 
                 # now we have to trace back the selected datapoints to the original lightcurve
                 selected_indices |= set(
@@ -162,4 +177,17 @@ class T1HDBSCAN(AbsT1CombineUnit):
             )
             selected_indices |= set(closest_allwise_indices_not_first)
 
-        return list(selected_indices)
+        selected_indices = list(selected_indices)
+        res = T1CombineResult(dps=selected_indices)
+
+        if self.plot:
+            all_labels = np.array([-1] * len(lightcurve))
+            all_labels[data_mask] = labels
+            svg_rec = self._plotter.make_plot(
+                lightcurve, all_labels, source_ra, source_dec, selected_indices
+            )
+            res.add_meta("plot", svg_rec)
+
+        return res
+
+

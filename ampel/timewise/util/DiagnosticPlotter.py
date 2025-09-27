@@ -2,12 +2,21 @@ from typing import Literal, Dict
 from functools import partial
 
 import pandas as pd
+import numpy as np
+from numpy import typing as npt
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from matplotlib.markers import MarkerStyle
+from matplotlib.transforms import Affine2D
 
 from ampel.base.AmpelBaseModel import AmpelBaseModel
+from ampel.plot.create import create_plot_record
+from ampel.types import DataPointId
 
 from timewise.plot import plot_lightcurve, plot_panstarrs_cutout, plot_sdss_cutout
 from timewise.plot.lightcurve import BAND_PLOT_COLORS
+from timewise.process import keys
+from timewise.util.visits import get_visit_map
 
 
 class DiagnosticPlotter(AmpelBaseModel):
@@ -39,3 +48,150 @@ class DiagnosticPlotter(AmpelBaseModel):
         else:
             raise NotImplementedError  # should never happen
         return plot_cutout(ra=ra, dec=dec, arcsec=radius_arcsec, ax=ax)
+
+    def make_plot(
+        self,
+        lightcurve: pd.DataFrame,
+        labels: npt.ArrayLike,
+        source_ra: float,
+        source_dec: float,
+        selected_indices: list[DataPointId],
+    ):
+        fig, axs = plt.subplots(
+            nrows=2, gridspec_kw={"height_ratios": [3, 2]}, figsize=(5, 8)
+        )
+
+        self._plotter.plot_cutout(
+            ra=source_ra, dec=source_dec, ax=axs[0], radius_arcsec=20
+        )
+
+        selected_mask = lightcurve.index.isin(selected_indices)
+        self._plotter.plot_lightcurve(
+            raw_lightcurve=lightcurve[~selected_mask],
+            lum_key=keys.MAG_EXT,
+            ax=axs[-1],
+            save=False,
+            colors={"W1": "gray", "W2": "lightgray"},
+        )
+
+        # set markers for clusters
+        markers_strings = list(Line2D.filled_markers) + [
+            "$1$",
+            "$2$",
+            "$3$",
+            "$4$",
+            "$5$",
+            "$6$",
+            "$7$",
+            "$8$",
+            "$9$",
+        ]
+        markers_straight = [MarkerStyle(im) for im in markers_strings]
+        rot = Affine2D().rotate_deg(180)
+        markers_rotated = [MarkerStyle(im, transform=rot) for im in markers_strings]
+        markers = markers_straight + markers_rotated
+
+        # calculate ra and dec relative to center of cutout
+        ra = (lightcurve.ra - source_ra) * 3600
+        dec = (lightcurve.dec - source_dec) * 3600
+
+        # get visit map
+        visit_map = get_visit_map(lightcurve)
+
+        # for each visit plot the datapoints on the cutout
+        # for each visit plot the datapoints on the cutout
+        for visit in np.unique(visit_map):
+            m = visit_map == visit
+            label = str(visit)
+            axs[0].plot(
+                [],
+                [],
+                marker=markers[visit],
+                label=label,
+                mec="k",
+                mew=1,
+                mfc="none",
+                ls="",
+            )
+
+            for im, mec, zorder in zip(
+                [selected_mask, ~selected_mask], ["k", "none"], [1, 0]
+            ):
+                mask = m & im
+
+                for i_label in np.unique(labels):
+                    label_mask = labels == i_label
+                    final_mask = mask & label_mask
+                    datapoints_label = lightcurve[final_mask]
+                    color = f"C{i_label}" if i_label != -1 else "grey"
+
+                    if ("sigra" in datapoints_label.columns) and (
+                        "sigdec" in datapoints_label.columns
+                    ):
+                        has_sig = (
+                            ~datapoints_label.sigra.isna()
+                            & ~datapoints_label.sigdec.isna()
+                        )
+                        _ra = ra[final_mask]
+                        _dec = dec[final_mask]
+
+                        axs[0].errorbar(
+                            _ra[has_sig],
+                            _dec[has_sig],
+                            xerr=datapoints_label.sigra[has_sig] / 3600,
+                            yerr=datapoints_label.sigdec[has_sig] / 3600,
+                            marker=markers[visit],
+                            ls="",
+                            color=color,
+                            zorder=zorder,
+                            ms=10,
+                            mec=mec,
+                            mew=0.1,
+                        )
+                        axs[0].scatter(
+                            _ra[~has_sig],
+                            _dec[~has_sig],
+                            marker=markers[visit],
+                            color=color,
+                            zorder=zorder,
+                            edgecolors=mec,
+                            linewidths=0.1,
+                        )
+                    else:
+                        axs[0].scatter(
+                            ra[mask],
+                            dec[mask],
+                            marker=markers[visit],
+                            color=color,
+                            zorder=zorder,
+                            edgecolors=mec,
+                            linewidths=0.1,
+                        )
+
+        # indicate the whitelist region of 1 arcsec with a circle
+        circle = plt.Circle(
+            (0, 0),
+            self.whitelist_region_arcsec,
+            color="g",
+            fill=False,
+            ls="-",
+            lw=3,
+            zorder=0,
+        )
+        axs[0].add_artist(circle)
+
+        # formatting
+        title = axs[0].get_title()
+        axs[-1].set_ylabel("Apparent Vega Magnitude")
+        axs[-1].grid(ls=":", alpha=0.5)
+        axs[0].set_title("")
+        axs[0].legend(
+            ncol=5,
+            bbox_to_anchor=(0, 1, 1, 0),
+            loc="lower left",
+            mode="expand",
+            title=title,
+        )
+        axs[0].set_aspect(1, adjustable="box")
+
+        return create_plot_record(fig, self.plot_properties)
