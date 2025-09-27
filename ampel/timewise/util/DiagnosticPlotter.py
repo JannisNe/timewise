@@ -61,12 +61,10 @@ class DiagnosticPlotter(AmpelBaseModel):
             nrows=2, gridspec_kw={"height_ratios": [3, 2]}, figsize=(5, 8)
         )
 
-        self._plotter.plot_cutout(
-            ra=source_ra, dec=source_dec, ax=axs[0], radius_arcsec=20
-        )
+        self.plot_cutout(ra=source_ra, dec=source_dec, ax=axs[0], radius_arcsec=20)
 
         selected_mask = lightcurve.index.isin(selected_indices)
-        self._plotter.plot_lightcurve(
+        self.plot_lightcurve(
             raw_lightcurve=lightcurve[~selected_mask],
             lum_key=keys.MAG_EXT,
             ax=axs[-1],
