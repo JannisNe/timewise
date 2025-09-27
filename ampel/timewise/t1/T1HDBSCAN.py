@@ -158,10 +158,12 @@ class T1HDBSCAN(AbsT1CombineUnit):
                 self.logger.debug(
                     "No cluster found. Selecting all noise datapoints within 1 arcsec."
                 )
-            elif min(cluster_separations) > np.radians(
+            elif (_min := min(cluster_separations)) > np.radians(
                 self.whitelist_region_arcsec / 3600
             ):
-                self.logger.debug(f"Closest cluster is at {cluster_separations} arcsec")
+                self.logger.debug(
+                    f"Closest cluster is at {np.degrees(_min) * 3600} arcsec"
+                )
 
             # if there is a cluster within 1 arcsec, we select all datapoints belonging to that cluster
             # in addition to the datapoints within 1 arcsec
@@ -200,7 +202,12 @@ class T1HDBSCAN(AbsT1CombineUnit):
             all_labels = np.array([-1] * len(lightcurve))
             all_labels[data_mask] = labels
             svg_rec = self._plotter.make_plot(
-                lightcurve, all_labels, source_ra, source_dec, selected_indices
+                lightcurve,
+                all_labels,
+                source_ra,
+                source_dec,
+                selected_indices,
+                highlight_radius=self.whitelist_region_arcsec,
             )
             res.add_meta("plot", svg_rec)
 
