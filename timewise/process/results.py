@@ -16,11 +16,13 @@ class ResultsExtractor:
     def client(self) -> MongoClient:
         return MongoClient(self.mongo_db_uri)
 
-    def extract_stacked_lightcurves(self, stock_ids: list[StockId]) -> pd.DataFrame:
+    def extract_stacked_lightcurve(self, stock_id: StockId) -> pd.DataFrame:
         col = self.client[self.mongo_db_name]["t1"]
         records = []
-        index = []
-        for i in col.find({"stock": {"$in": stock_ids}}):
-            records.append(i["body"])
-            index.append(i["stock"])
-        return pd.DataFrame(records, index=index)
+        for i, ic in enumerate(col.find({"stock": stock_id, "unit": "T1StackVisits"})):
+            assert i == 0, f"More than one stacked lightcurve found for {stock_id}!"
+            assert len(ic["body"]) == 1, (
+                f"None or more than one stacking result found for {stock_id}!"
+            )
+            records = ic["body"][0]
+        return pd.DataFrame(records)
