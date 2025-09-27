@@ -4,6 +4,8 @@ import logging
 from astropy.table import Table, vstack
 from pymongo import MongoClient
 import pandas as pd
+import pytest
+import numpy as np
 
 from timewise.config import TimewiseConfig
 
@@ -52,7 +54,11 @@ def test_ingest(ampel_prepper, timewise_config_path):
     assert n_in_db == len(file_contents)
 
 
-def test_stacking(ampel_prepper, timewise_config_path):
+@pytest.mark.parametrize("mode", ["masked", "unmasked"])
+def test_stacking(ampel_prepper, timewise_config_path, mode):
+    if mode == "unmasked":
+        ampel_prepper.template_path = DATA_DIR / "template_stack_all.yml"
+
     ampel_prepper.run(timewise_config_path, AMPEL_CONFIG_PATH)
     # ----------------------------
     # check t1 collection
@@ -66,10 +72,11 @@ def test_stacking(ampel_prepper, timewise_config_path):
 
     input_data = pd.read_csv(cfg.download.input_csv)
 
-    reference_path = DATA_DIR / "photometry" / "timewise_data_product_tap.json"
+    reference_path = DATA_DIR / "photometry" / f"timewise_data_product_tap_{mode}.json"
     with reference_path.open("r") as f:
         reference_data = json.load(f)
 
+    records = []
     for i in input_data.orig_id.astype(int):
         stacked_lc = extractor.extract_stacked_lightcurve(i)
         reference_lc = pd.DataFrame(reference_data[str(i)]["timewise_lightcurve"])
@@ -81,16 +88,26 @@ def test_stacking(ampel_prepper, timewise_config_path):
         m = diff > 1e-10
         n_bad_epochs = (m.any(axis=1) | m.isna().any(axis=1)).sum()
 
-        datapoints_diff = min(
-            [
-                (
-                    stacked_lc[f"{b}_flux_density_Npoints"]
-                    - reference_lc[f"{b}_flux_density_Npoints"]
-                ).sum()
-                for b in ["W1", "W2"]
-            ]
+        try:
+            datapoints_diff = min(
+                [
+                    (
+                        stacked_lc[f"{b}_flux_density_Npoints"]
+                        - reference_lc[f"{b}_flux_density_Npoints"]
+                    ).sum()
+                    for b in ["W1", "W2"]
+                ]
+            )
+        except KeyError:
+            datapoints_diff = np.nan
+
+        records.append(
+            {
+                "n_epochs_diff": n_epochs_diff,
+                "n_bad_epochs": n_bad_epochs,
+                "datapoints_diff": datapoints_diff,
+            }
         )
 
-        logger.info(
-            f"\n --- {i} --- \n{n_epochs_diff} difference\n{n_bad_epochs} bad epochs\n{datapoints_diff} missing datapoints"
-        )
+    res = pd.DataFrame(records, index=input_data.orig_id.astype(int))
+    logger.info("\n" + res.to_string())
