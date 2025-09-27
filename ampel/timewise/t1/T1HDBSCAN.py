@@ -27,7 +27,7 @@ from ampel.timewise.util.pdutil import datapoints_to_dataframe
 from ampel.timewise.util.DiagnosticPlotter import DiagnosticPlotter
 
 
-class T1HDBSCAN(AbsT1CombineUnit, DiagnosticPlotter):
+class T1HDBSCAN(AbsT1CombineUnit):
     input_mongo_db_name: str
     original_id_key: str
     whitelist_region_arcsec: float = 1
