@@ -77,8 +77,15 @@ def test_stacking(ampel_prepper, timewise_config_path, mode):
         reference_data = json.load(f)
 
     records = []
+    index = []
     for i in input_data.orig_id.astype(int):
         stacked_lc = extractor.extract_stacked_lightcurve(i)
+
+        if "timewise_lightcurve" not in reference_data[str(i)]:
+            # in this case all datapoints were masked so we just have to make sure that the
+            # stacked lightcurve also contains no data
+            assert len(stacked_lc) == 0
+            continue
         reference_lc = pd.DataFrame(reference_data[str(i)]["timewise_lightcurve"])
         reference_lc.set_index(reference_lc.index.astype(int), inplace=True)
 
@@ -108,6 +115,7 @@ def test_stacking(ampel_prepper, timewise_config_path, mode):
                 "datapoints_diff": datapoints_diff,
             }
         )
+        index.append(i)
 
-    res = pd.DataFrame(records, index=input_data.orig_id.astype(int))
+    res = pd.DataFrame(records, index=index)
     logger.info("\n" + res.to_string())
