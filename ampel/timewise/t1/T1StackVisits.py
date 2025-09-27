@@ -20,6 +20,8 @@ from ampel.types import StockId, UBson
 
 from ampel.timewise.util.pdutil import datapoints_to_dataframe
 
+from timewise.process import keys
+
 
 class T1StackVisits(AbsT1ComputeUnit):
     clean_outliers_when_stacking: bool = True
@@ -270,15 +272,15 @@ class T1StackVisits(AbsT1ComputeUnit):
             use_masks = dict()
             bin_ulim_bools = dict()
 
-            for lum_ext in [self.flux_key_ext, self.mag_key_ext]:
+            for lum_ext in [keys.FLUX_EXT, keys.MAG_EXT]:
                 f = lightcurve[f"{b}{lum_ext}"]
-                e = lightcurve[f"{b}{lum_ext}{self.error_key_ext}"]
+                e = lightcurve[f"{b}{lum_ext}{keys.ERROR_EXT}"]
 
                 # we will flag outliers based on the flux only
                 remove_outliers = (
-                    lum_ext == self.flux_key_ext and self.clean_outliers_when_stacking
+                    lum_ext == keys.FLUX_EXT and self.clean_outliers_when_stacking
                 )
-                outlier_mask = outlier_masks.get(self.flux_key_ext, None)
+                outlier_mask = outlier_masks.get(keys.FLUX_EXT, None)
 
                 mean, u, bin_ulim_bool, outlier_mask, use_mask, n_points = (
                     self.calculate_epochs(
@@ -297,10 +299,10 @@ class T1StackVisits(AbsT1ComputeUnit):
                         f"removed {n_outliers} outliers by brightness for {b} {lum_ext}"
                     )
 
-                stacked_data[f"{b}{self.mean_key}{lum_ext}"] = mean
-                stacked_data[f"{b}{lum_ext}{self.rms_key}"] = u
-                stacked_data[f"{b}{lum_ext}{self.upper_limit_key}"] = bin_ulim_bool
-                stacked_data[f"{b}{lum_ext}{self.Npoints_key}"] = n_points
+                stacked_data[f"{b}{keys.MEAN}{lum_ext}"] = mean
+                stacked_data[f"{b}{lum_ext}{keys.RMS}"] = u
+                stacked_data[f"{b}{lum_ext}{keys.UPPER_LIMIT}"] = bin_ulim_bool
+                stacked_data[f"{b}{lum_ext}{keys.NPOINTS}"] = n_points
 
                 outlier_masks[lum_ext] = outlier_mask
                 use_masks[lum_ext] = use_mask
@@ -309,10 +311,10 @@ class T1StackVisits(AbsT1ComputeUnit):
             # -------  calculate the zeropoints per exposure ------- #
             # this might look wrong since we use the flux mask on the magnitudes but it s right
             # for each flux measurement we need the corresponding magnitude to get the zeropoint
-            mags = lightcurve[f"{b}{self.mag_key_ext}"]
-            inst_fluxes = lightcurve[f"{b}{self.flux_key_ext}"]
+            mags = lightcurve[f"{b}{keys.MAG_EXT}"]
+            inst_fluxes = lightcurve[f"{b}{keys.FLUX_EXT}"]
             pos_m = inst_fluxes > 0  # select only positive fluxes, i.e. detections
-            zp_mask = pos_m & use_masks[self.flux_key_ext]
+            zp_mask = pos_m & use_masks[keys.FLUX_EXT]
 
             # calculate zero points
             zps = np.zeros_like(inst_fluxes)
@@ -331,11 +333,11 @@ class T1StackVisits(AbsT1ComputeUnit):
             # if there are only non-detections then fall back to default zeropoint
             zps_median[n_valid_zps == 0] = self.magnitude_zeropoints[b]
             # if the visit only has upper limits then use the fall-back zeropoint
-            zps_median[bin_ulim_bools[self.flux_key_ext]] = self.magnitude_zeropoints[b]
+            zps_median[bin_ulim_bools[keys.FLUX_EXT]] = self.magnitude_zeropoints[b]
 
             # ---------------   calculate flux density from instrument flux   ---------------- #
             # get the instrument flux [digital numbers], i.e. source count
-            inst_fluxes_e = lightcurve[f"{b}{self.flux_key_ext}{self.error_key_ext}"]
+            inst_fluxes_e = lightcurve[f"{b}{keys.FLUX_EXT}{keys.ERROR_EXT}"]
 
             # calculate the proportionality constant between flux density and source count
             mag_zp = self.flux_zeropoints[b] * 1e3  # in mJy
@@ -353,17 +355,13 @@ class T1StackVisits(AbsT1ComputeUnit):
                     visit_map,
                     counts,
                     remove_outliers=False,
-                    outlier_mask=outlier_masks[self.flux_key_ext],
+                    outlier_mask=outlier_masks[keys.FLUX_EXT],
                 )
             )
-            stacked_data[f"{b}{self.mean_key}{self.flux_density_key_ext}"] = mean_fd
-            stacked_data[f"{b}{self.flux_density_key_ext}{self.rms_key}"] = u_fd
-            stacked_data[f"{b}{self.flux_density_key_ext}{self.upper_limit_key}"] = (
-                ul_fd
-            )
-            stacked_data[f"{b}{self.flux_density_key_ext}{self.Npoints_key}"] = (
-                n_points_fd
-            )
+            stacked_data[f"{b}{keys.MEAN}{keys.FLUX_DENSITY_EXT}"] = mean_fd
+            stacked_data[f"{b}{keys.FLUX_DENSITY_EXT}{keys.RMS}"] = u_fd
+            stacked_data[f"{b}{keys.FLUX_DENSITY_EXT}{keys.UPPER_LIMIT}"] = ul_fd
+            stacked_data[f"{b}{keys.FLUX_DENSITY_EXT}{keys.NPOINTS}"] = n_points_fd
 
         return pd.DataFrame(stacked_data)
 
