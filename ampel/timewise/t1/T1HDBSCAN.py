@@ -177,6 +177,10 @@ class T1HDBSCAN(AbsT1CombineUnit):
                 )
                 self.logger.debug(f"Selected {len(selected_indices)} datapoints")
 
+        else:
+            # if there is only one datapoint we give him a label manually
+            labels = [-1]
+
         # if the closest allwise source is selected, we also select all other detections belonging to that
         # source in the allwise period
         if (
