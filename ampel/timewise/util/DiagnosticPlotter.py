@@ -12,6 +12,7 @@ from matplotlib.transforms import Affine2D
 from ampel.base.AmpelBaseModel import AmpelBaseModel
 from ampel.plot.create import create_plot_record
 from ampel.types import DataPointId
+from ampel.model.PlotProperties import PlotProperties
 
 from timewise.plot import plot_lightcurve, plot_panstarrs_cutout, plot_sdss_cutout
 from timewise.plot.lightcurve import BAND_PLOT_COLORS
@@ -20,19 +21,20 @@ from timewise.util.visits import get_visit_map
 
 
 class DiagnosticPlotter(AmpelBaseModel):
+    plot_properties: PlotProperties
     cutout: Literal["sdss", "panstarrs"] = "panstarrs"
     band_colors: Dict[str, str] = BAND_PLOT_COLORS
+    lum_key: str = keys.MAG_EXT
 
     def plot_lightcurve(
         self,
-        lum_key: str,
         stacked_lightcurve: pd.DataFrame | None = None,
         raw_lightcurve: pd.DataFrame | None = None,
         ax: plt.Axes | None = None,
         **kwargs,
     ):
         return plot_lightcurve(
-            lum_key=lum_key,
+            lum_key=self.lum_key,
             stacked_lightcurve=stacked_lightcurve,
             raw_lightcurve=raw_lightcurve,
             ax=ax,
@@ -56,6 +58,7 @@ class DiagnosticPlotter(AmpelBaseModel):
         source_ra: float,
         source_dec: float,
         selected_indices: list[DataPointId],
+        highlight_radius: float | None = None,
     ):
         fig, axs = plt.subplots(
             nrows=2, gridspec_kw={"height_ratios": [3, 2]}, figsize=(5, 8)
@@ -66,14 +69,13 @@ class DiagnosticPlotter(AmpelBaseModel):
         selected_mask = lightcurve.index.isin(selected_indices)
         plot_lightcurve(
             raw_lightcurve=lightcurve[~selected_mask],
-            lum_key=keys.MAG_EXT,
+            lum_key=self.lum_key,
             ax=axs[-1],
             save=False,
             colors={"W1": "gray", "W2": "lightgray"},
         )
         self.plot_lightcurve(
             raw_lightcurve=lightcurve[selected_mask],
-            lum_key=keys.MAG_EXT,
             ax=axs[-1],
             save=False,
         )
@@ -172,17 +174,17 @@ class DiagnosticPlotter(AmpelBaseModel):
                             linewidths=0.1,
                         )
 
-        # indicate the whitelist region of 1 arcsec with a circle
-        circle = plt.Circle(
-            (0, 0),
-            self.whitelist_region_arcsec,
-            color="g",
-            fill=False,
-            ls="-",
-            lw=3,
-            zorder=0,
-        )
-        axs[0].add_artist(circle)
+        if highlight_radius:
+            circle = plt.Circle(
+                (0, 0),
+                highlight_radius,
+                color="g",
+                fill=False,
+                ls="-",
+                lw=3,
+                zorder=0,
+            )
+            axs[0].add_artist(circle)
 
         # formatting
         title = axs[0].get_title()

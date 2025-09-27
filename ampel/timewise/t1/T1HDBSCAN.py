@@ -19,12 +19,11 @@ from ampel.content.DataPoint import DataPoint
 from ampel.struct.T1CombineResult import T1CombineResult
 from ampel.types import DataPointId
 from ampel.abstract.AbsT1CombineUnit import AbsT1CombineUnit
-from ampel.model.PlotProperties import PlotProperties
-
 from ampel.model.UnitModel import UnitModel
 
 from ampel.timewise.util.pdutil import datapoints_to_dataframe
 from ampel.timewise.util.DiagnosticPlotter import DiagnosticPlotter
+from timewise.process import keys
 
 
 class T1HDBSCAN(AbsT1CombineUnit):
@@ -34,8 +33,17 @@ class T1HDBSCAN(AbsT1CombineUnit):
     cluster_distance_arcsec: float = 0.5
 
     plot: bool = False
-    plot_properties: PlotProperties | None = None
-    plotter: UnitModel = {"unit": "DiagnosticPlotter"}
+    plotter: UnitModel = {
+        "unit": "DiagnosticPlotter",
+        "config": {
+            "plot_properties": {
+                "file_name": {
+                    "format_str": "%s_hdbscan_selection.svg",
+                    "arg_keys": ["stock"],
+                }
+            }
+        },
+    }
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -47,8 +55,16 @@ class T1HDBSCAN(AbsT1CombineUnit):
     def combine(
         self, datapoints: Iterable[DataPoint]
     ) -> Sequence[DataPointId] | T1CombineResult:
+        columns = ["ra", "dec", "mjd"]
+        if self.plot:
+            for i in range(1, 3):
+                columns += [
+                    f"W{i}{self._plotter.lum_key}",
+                    f"W{i}{self._plotter.lum_key}{keys.ERROR_EXT}",
+                ]
+
         lightcurve, stock_ids = datapoints_to_dataframe(
-            datapoints, ["ra", "dec", "mjd"], check_tables=["allwise_p3as_mep"]
+            datapoints, columns, check_tables=["allwise_p3as_mep"]
         )
 
         # make sure that the is one stock id that fits all dps

@@ -59,6 +59,7 @@ def test_stacking(ampel_prepper, timewise_config_path, mode):
     if mode == "unmasked":
         ampel_prepper.template_path = DATA_DIR / "template_stack_all.yml"
 
+    ampel_prepper.mongo_db_name = ampel_prepper.mongo_db_name + "_" + mode
     ampel_prepper.run(timewise_config_path, AMPEL_CONFIG_PATH)
     # ----------------------------
     # check t1 collection
