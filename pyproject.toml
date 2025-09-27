@@ -33,6 +33,9 @@ dependencies = [
     "typer (>=0.17.4,<0.18.0)",
     "ampel-photometry (>=0.10.1,<0.11.0)",
     "ampel-core @ git+https://github.com/JannisNe/Ampel-core.git#t1compute-fixes",
+    "ampel-plot (>=0.9.1,<0.10.0)",
+    "ampel-plot-browse @ git+https://github.com/AmpelProject/Ampel-plot.git@master#subdirectory=ampel-plot-browse",
+    "ampel-plot-cli @ git+https://github.com/AmpelProject/Ampel-plot.git@master#subdirectory=ampel-plot-cli",
 ]
 
 [project.scripts]
