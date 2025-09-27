@@ -64,12 +64,18 @@ class DiagnosticPlotter(AmpelBaseModel):
         self.plot_cutout(ra=source_ra, dec=source_dec, ax=axs[0], radius_arcsec=20)
 
         selected_mask = lightcurve.index.isin(selected_indices)
-        self.plot_lightcurve(
+        plot_lightcurve(
             raw_lightcurve=lightcurve[~selected_mask],
             lum_key=keys.MAG_EXT,
             ax=axs[-1],
             save=False,
             colors={"W1": "gray", "W2": "lightgray"},
+        )
+        self.plot_lightcurve(
+            raw_lightcurve=lightcurve[selected_mask],
+            lum_key=keys.MAG_EXT,
+            ax=axs[-1],
+            save=False,
         )
 
         # set markers for clusters
