@@ -21,6 +21,7 @@ from ampel.types import StockId, UBson
 from ampel.timewise.util.pdutil import datapoints_to_dataframe
 
 from timewise.process import keys
+from timewise.util.visits import get_visit_map
 
 
 class T1StackVisits(AbsT1ComputeUnit):
@@ -254,7 +255,7 @@ class T1StackVisits(AbsT1ComputeUnit):
         """
 
         # -------------------------   create visit mask   -------------------------- #
-        visit_map = self.get_visit_map(lightcurve)
+        visit_map = get_visit_map(lightcurve)
         counts = np.bincount(visit_map)
 
         stacked_data = dict()
