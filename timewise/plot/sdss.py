@@ -69,12 +69,12 @@ def plot_sdss_cutout(
             im,
             origin="upper",
             extent=(
-                [
+                (
                     ra + ang_deg / 2,
                     ra - ang_deg / 2,
                     dec - ang_deg / 2,
                     dec + ang_deg / 2,
-                ]
+                )
             ),
             cmap="gray",
         )
