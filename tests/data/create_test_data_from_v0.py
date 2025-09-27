@@ -9,6 +9,7 @@ import logging
 import shutil
 from pathlib import Path
 import pandas as pd
+import json
 from timewise.parent_sample_base import ParentSampleBase
 
 logger = logging.getLogger("timewise.tests.data.create_test_data_from_v0")
@@ -56,3 +57,9 @@ if __name__ == "__main__":
 
     masked_stacked = wise_data_masked.lightcurve_dir / "timewise_data_product_tap.json"
     shutil.copy(masked_stacked, PHOT_DIR / f"{masked_stacked.stem}_masked.json")
+
+    for i in range(2):
+        fn = DATA_DIR / "masks" / f"position_mask_c{i}.json"
+        fn.parent.mkdir(parents=True, exist_ok=True)
+        with open(fn, "w") as f:
+            json.dump(wise_data_masked.get_position_mask("tap", i), f)
