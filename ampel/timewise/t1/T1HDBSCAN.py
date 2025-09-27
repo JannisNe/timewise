@@ -129,8 +129,8 @@ class T1HDBSCAN(AbsT1CombineUnit, DiagnosticPlotter):
                     self.cluster_distance_arcsec / 3600
                 ),
             ).fit(cartesian)
-            centroids = cluster_res.__getattribute__("centroids_")  # type: npt.ArrayLike
-            labels = cluster_res.__getattribute__("labels_")  # type: npt.ArrayLike
+            centroids: npt.ArrayLike = cluster_res.__getattribute__("centroids_")
+            labels: npt.ArrayLike = cluster_res.__getattribute__("labels_")
 
             # we select the closest cluster within 1 arcsec
             cluster_separations = np.sqrt(np.sum(centroids**2, axis=1))
@@ -189,5 +189,3 @@ class T1HDBSCAN(AbsT1CombineUnit, DiagnosticPlotter):
             res.add_meta("plot", svg_rec)
 
         return res
-
-
