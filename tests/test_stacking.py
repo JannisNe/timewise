@@ -1,7 +1,9 @@
+import json
 import logging
 
 from astropy.table import Table, vstack
 from pymongo import MongoClient
+import pandas as pd
 
 from timewise.config import TimewiseConfig
 
@@ -9,7 +11,7 @@ from timewise.config import TimewiseConfig
 from tests.constants import AMPEL_CONFIG_PATH, DATA_DIR
 
 
-logger = logging.Logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def test_ingest(ampel_prepper, timewise_config_path):
@@ -49,8 +51,46 @@ def test_ingest(ampel_prepper, timewise_config_path):
     assert len(duplicates) == 0, f"Duplicate documents!\n{duplicates}"
     assert n_in_db == len(file_contents)
 
+
+def test_stacking(ampel_prepper, timewise_config_path):
+    ampel_prepper.run(timewise_config_path, AMPEL_CONFIG_PATH)
     # ----------------------------
     # check t1 collection
     # ----------------------------
+    client = MongoClient()
     t1 = client["test_ampel"].get_collection("t1")
     assert t1.count_documents({}) > 0
+
+    cfg = TimewiseConfig.from_yaml(timewise_config_path)
+    extractor = cfg.ampel.build_extractor()
+
+    input_data = pd.read_csv(cfg.download.input_csv)
+
+    reference_path = DATA_DIR / "photometry" / "timewise_data_product_tap.json"
+    with reference_path.open("r") as f:
+        reference_data = json.load(f)
+
+    for i in input_data.orig_id.astype(int):
+        stacked_lc = extractor.extract_stacked_lightcurve(i)
+        reference_lc = pd.DataFrame(reference_data[str(i)]["timewise_lightcurve"])
+        reference_lc.set_index(reference_lc.index.astype(int), inplace=True)
+
+        n_epochs_diff = len(reference_lc) - len(stacked_lc)
+
+        diff = reference_lc.astype(float) - stacked_lc.astype(float)
+        m = diff > 1e-10
+        n_bad_epochs = (m.any(axis=1) | m.isna().any(axis=1)).sum()
+
+        datapoints_diff = min(
+            [
+                (
+                    stacked_lc[f"{b}_flux_density_Npoints"]
+                    - reference_lc[f"{b}_flux_density_Npoints"]
+                ).sum()
+                for b in ["W1", "W2"]
+            ]
+        )
+
+        logger.info(
+            f"\n --- {i} --- \n{n_epochs_diff} difference\n{n_bad_epochs} bad epochs\n{datapoints_diff} missing datapoints"
+        )
