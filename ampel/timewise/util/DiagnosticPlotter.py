@@ -165,8 +165,8 @@ class DiagnosticPlotter(AmpelBaseModel):
                         )
                     else:
                         axs[0].scatter(
-                            ra[mask],
-                            dec[mask],
+                            ra[final_mask],
+                            dec[final_mask],
                             marker=markers[visit],
                             color=color,
                             zorder=zorder,
