@@ -31,7 +31,7 @@ class AmpelInterface:
 
     def import_input(self):
         # if collection already exists, assume import was already done
-        if "input" in self.db.list_collection_names():
+        if "input" in self.client[self.input_mongo_db_name].list_collection_names():
             logger.debug(
                 f"'input' collection already exists in '{self.input_mongo_db_name}'."
             )
