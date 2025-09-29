@@ -59,7 +59,8 @@ def test_stacking(ampel_prepper, timewise_config_path, mode):
     if mode == "unmasked":
         ampel_prepper.template_path = DATA_DIR / "template_stack_all.yml"
 
-    ampel_prepper.mongo_db_name = ampel_prepper.mongo_db_name + "_" + mode
+    mongo_db_name = ampel_prepper.mongo_db_name + "_" + mode
+    ampel_prepper.mongo_db_name = mongo_db_name
     ampel_prepper.run(timewise_config_path, AMPEL_CONFIG_PATH)
     # ----------------------------
     # check t1 collection
@@ -69,6 +70,7 @@ def test_stacking(ampel_prepper, timewise_config_path, mode):
     assert t1.count_documents({}) > 0
 
     cfg = TimewiseConfig.from_yaml(timewise_config_path)
+    cfg.ampel.mongo_db_name = mongo_db_name
     extractor = cfg.ampel.build_extractor()
 
     input_data = pd.read_csv(cfg.download.input_csv)
@@ -85,7 +87,7 @@ def test_stacking(ampel_prepper, timewise_config_path, mode):
         if "timewise_lightcurve" not in reference_data[str(i)]:
             # in this case all datapoints were masked so we just have to make sure that the
             # stacked lightcurve also contains no data
-            assert len(stacked_lc) == 0
+            assert len(stacked_lc) == 0, f"Found too many datapoints for {i}"
             continue
         reference_lc = pd.DataFrame(reference_data[str(i)]["timewise_lightcurve"])
         reference_lc.set_index(reference_lc.index.astype(int), inplace=True)
