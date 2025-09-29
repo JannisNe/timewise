@@ -9,7 +9,6 @@ from numpy import typing as npt
 
 from timewise.config import TimewiseConfig
 
-
 from tests.constants import AMPEL_CONFIG_PATH, DATA_DIR
 
 
@@ -67,7 +66,8 @@ def test_stacking(ampel_interface, timewise_config_path, mode):
     t1 = ampel_interface.t1
     assert t1.count_documents({}) > 0
 
-    input_csv_path = TimewiseConfig.from_yaml(timewise_config_path).download.input_csv
+    cfg = TimewiseConfig.from_yaml(timewise_config_path)
+    input_csv_path = cfg.download.input_csv
     input_data = pd.read_csv(input_csv_path)
 
     reference_path = DATA_DIR / "photometry" / f"timewise_data_product_tap_{mode}.json"
@@ -77,6 +77,63 @@ def test_stacking(ampel_interface, timewise_config_path, mode):
     records = []
     index = []
     for i in input_data.orig_id.astype(int):
+        if mode == "masked":
+            # ----------------------------
+            # check masking
+            # ----------------------------
+
+            # load reference
+            chunk_id = i // cfg.download.chunk_size
+            reference_phot_files = [
+                DATA_DIR / "photometry" / f"raw_photometry_{t}__chunk{chunk_id}.csv"
+                for t in ["allwise_p3as_mep", "neowiser_p1bs_psd"]
+            ]
+            all_reference_photometry = pd.concat(
+                [pd.read_csv(fn) for fn in reference_phot_files]
+            )
+            reference_mask_file = DATA_DIR / "masks" / f"position_mask_c{chunk_id}.json"
+            with open(reference_mask_file, "r") as f:
+                reference_bad_mask = json.load(f)
+            reference_mask = all_reference_photometry.orig_id == i
+            if (si := str(i)) in reference_bad_mask:
+                reference_mask = reference_mask & ~all_reference_photometry.index.isin(
+                    reference_bad_mask[si]
+                )
+            reference_photometry = all_reference_photometry.loc[
+                reference_mask
+            ].reset_index()
+
+            # load result
+            t1_result = t1.find_one({"stock": i})
+            dp_ids = t1_result["dps"]
+            selected_photometry = ampel_interface.extract_datapoints(i).loc[dp_ids]
+
+            index_map = []
+            for j, r in reference_photometry.iterrows():
+                m = (
+                    (r.ra == selected_photometry.ra)
+                    & (r.dec == selected_photometry.dec)
+                    & (r.mjd == selected_photometry.mjd)
+                )
+                assert m.sum() == 1, (
+                    f"None or more than one match found for datapoint {j}, stock {i}"
+                )
+                index_map.append((j, selected_photometry.index[m][0]))
+            index_map = np.array(index_map)
+
+            cols = ["ra", "dec", "mjd"]
+            diff = (
+                reference_photometry.loc[index_map[:, 0]].set_index(index_map[:, 1])[
+                    cols
+                ]
+                - selected_photometry[cols]
+            )
+            assert all(diff.sum() == 0)
+
+        # ----------------------------
+        # check stacking result
+        # ----------------------------
+
         stacked_lc = ampel_interface.extract_stacked_lightcurve(i)
 
         if "timewise_lightcurve" not in reference_data[str(i)]:
