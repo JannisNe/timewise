@@ -106,3 +106,11 @@ class AmpelInterface:
             )
             records = ic["body"][0]
         return pd.DataFrame(records)
+
+    def extract_datapoints(self, stock_id: StockId) -> pd.DataFrame:
+        records = []
+        index = []
+        for ic in self.t0.find({"stock": stock_id}):
+            records.append(ic["body"])
+            index.append(ic["id"])
+        return pd.DataFrame(records, index=index)
