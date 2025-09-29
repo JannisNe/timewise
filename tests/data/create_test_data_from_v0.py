@@ -7,9 +7,9 @@ from timewise.wise_data_by_visit import WiseDataByVisit
 
 import logging
 import shutil
+import json
 from pathlib import Path
 import pandas as pd
-import json
 from timewise.parent_sample_base import ParentSampleBase
 
 logger = logging.getLogger("timewise.tests.data.create_test_data_from_v0")
@@ -44,9 +44,9 @@ if __name__ == "__main__":
         min_sep_arcsec=6,
         n_chunks=2,
     )
-    # wise_data_masked.get_photometric_data(
-    #     service="tap", nthreads=2, chunks=[0, 1], mask_by_position=True
-    # )
+    wise_data_masked.get_photometric_data(
+        service="tap", nthreads=2, chunks=[0, 1], mask_by_position=True
+    )
 
     raw_phot = wise_data._cache_photometry_dir.glob("raw_photometry_*.csv")
     for f in raw_phot:
@@ -63,3 +63,5 @@ if __name__ == "__main__":
         fn.parent.mkdir(parents=True, exist_ok=True)
         with open(fn, "w") as f:
             json.dump(wise_data_masked.get_position_mask("tap", i), f)
+
+    wise_data_masked.plot_diagnostic_binning("tap", 1)
