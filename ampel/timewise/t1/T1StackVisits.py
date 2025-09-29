@@ -17,6 +17,7 @@ from ampel.abstract.AbsT1ComputeUnit import AbsT1ComputeUnit
 from ampel.content.DataPoint import DataPoint
 from ampel.struct.UnitResult import UnitResult
 from ampel.types import StockId, UBson
+from ampel.model.PlotProperties import PlotProperties
 
 from ampel.timewise.util.pdutil import datapoints_to_dataframe
 
@@ -27,16 +28,7 @@ from timewise.util.visits import get_visit_map
 class T1StackVisits(AbsT1ComputeUnit):
     clean_outliers_when_stacking: bool = True
 
-    mean_key: str = "_mean"
-    median_key: str = "_median"
-    rms_key: str = "_rms"
-    upper_limit_key: str = "_ul"
-    Npoints_key: str = "_Npoints"
-    zeropoint_key_ext: str = "_zeropoint"
-    flux_key_ext = "_flux"
-    flux_density_key_ext = "_flux_density"
-    mag_key_ext = "_mag"
-    error_key_ext = "_error"
+    plot_properties: PlotProperties | None = None
 
     # zero points come from https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#conv2flux
     # published in Jarret et al. (2011): https://ui.adsabs.harvard.edu/abs/2011ApJ...735..112J/abstract
@@ -207,36 +199,6 @@ class T1StackVisits(AbsT1ComputeUnit):
                 raise Exception(f"{n_loops}!")
 
         return median, u, bin_ulim_bool, outlier_mask, use_mask, n_points
-
-    @staticmethod
-    def get_visit_map(lightcurve: pd.DataFrame) -> npt.ArrayLike:
-        """
-        Create a map datapoint to visit
-
-        :param lightcurve: the raw lightcurve
-        :type lightcurve: pd.DataFrame
-        :returns: visit map
-        :rtype: npt.ArrayLike
-        """
-        # -------------------------   find epoch intervals   -------------------------- #
-        sorted_mjds = np.sort(lightcurve.mjd)
-        epoch_bounds_mask = (sorted_mjds[1:] - sorted_mjds[:-1]) > 100
-        epoch_bins = np.array(
-            [
-                lightcurve.mjd.min() * 0.99
-            ]  # this makes sure that the first datapoint gets selected
-            + list(
-                ((sorted_mjds[1:] + sorted_mjds[:-1]) / 2)[epoch_bounds_mask]
-            )  # finding the middle between
-            +
-            # two visits
-            [
-                lightcurve.mjd.max() * 1.01
-            ]  # this just makes sure that the last datapoint gets selected as well
-        )
-
-        visit_mask = np.digitize(lightcurve.mjd, epoch_bins) - 1
-        return visit_mask
 
     def stack_visits(self, lightcurve: pd.DataFrame):
         """
