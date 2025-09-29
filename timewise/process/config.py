@@ -3,8 +3,7 @@ import logging
 
 from pydantic import BaseModel
 
-from .prepare import AmpelPrepper
-from .results import ResultsExtractor
+from .interface import AmpelInterface
 
 
 logger = logging.getLogger(__name__)
@@ -20,8 +19,8 @@ class AmpelConfig(BaseModel):
     def input_mongo_db_name(self) -> str:
         return self.mongo_db_name + "_input"
 
-    def build_prepper(self, original_id_key: str, input_csv: Path) -> AmpelPrepper:
-        return AmpelPrepper(
+    def build_interface(self, original_id_key: str, input_csv: Path) -> AmpelInterface:
+        return AmpelInterface(
             mongo_db_name=self.mongo_db_name,
             orig_id_key=original_id_key,
             input_csv=input_csv,
@@ -29,6 +28,3 @@ class AmpelConfig(BaseModel):
             template_path=self.template_path,
             uri=self.uri,
         )
-
-    def build_extractor(self) -> ResultsExtractor:
-        return ResultsExtractor(mongo_db_uri=self.uri, mongo_db_name=self.mongo_db_name)

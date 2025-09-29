@@ -17,11 +17,11 @@ from tests.constants import AMPEL_CONFIG_PATH, DATA_DIR
 logger = logging.getLogger(__name__)
 
 
-def test_ingest(ampel_prepper, timewise_config_path):
+def test_ingest(ampel_interface, timewise_config_path):
     # switch out the template so only ingestion is run
     ingestion_only_template = DATA_DIR / "template_ingest_only.yml"
-    ampel_prepper.template_path = ingestion_only_template
-    ampel_prepper.run(timewise_config_path, AMPEL_CONFIG_PATH)
+    ampel_interface.template_path = ingestion_only_template
+    ampel_interface.run(timewise_config_path, AMPEL_CONFIG_PATH)
 
     client = MongoClient()
 
@@ -56,13 +56,13 @@ def test_ingest(ampel_prepper, timewise_config_path):
 
 
 @pytest.mark.parametrize("mode", ["masked", "unmasked"])
-def test_stacking(ampel_prepper, timewise_config_path, mode):
+def test_stacking(ampel_interface, timewise_config_path, mode):
     if mode == "unmasked":
-        ampel_prepper.template_path = DATA_DIR / "template_stack_all.yml"
+        ampel_interface.template_path = DATA_DIR / "template_stack_all.yml"
 
-    mongo_db_name = ampel_prepper.mongo_db_name + "_" + mode
-    ampel_prepper.mongo_db_name = mongo_db_name
-    ampel_prepper.run(timewise_config_path, AMPEL_CONFIG_PATH)
+    mongo_db_name = ampel_interface.mongo_db_name + "_" + mode
+    ampel_interface.mongo_db_name = mongo_db_name
+    ampel_interface.run(timewise_config_path, AMPEL_CONFIG_PATH)
     # ----------------------------
     # check t1 collection
     # ----------------------------

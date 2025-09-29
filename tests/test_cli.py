@@ -21,7 +21,7 @@ def test_make_ampel_job(timewise_config_path):
     assert Path(res.output.split(" file: ")[-1].strip()).exists()
 
 
-def test_run_ampel(timewise_config_path, ampel_prepper):
+def test_run_ampel(timewise_config_path, ampel_interface):
     runner = CliRunner()
     res = runner.invoke(
         app, ["process", str(timewise_config_path), str(AMPEL_CONFIG_PATH)]

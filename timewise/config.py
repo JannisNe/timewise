@@ -5,7 +5,7 @@ import numpy as np
 from pydantic import BaseModel, model_validator
 
 from .io import DownloadConfig
-from .process import AmpelConfig, AmpelPrepper
+from .process import AmpelConfig, AmpelInterface
 
 
 class TimewiseConfig(BaseModel):
@@ -28,7 +28,7 @@ class TimewiseConfig(BaseModel):
         )
         return self
 
-    def build_ampel_prepper(self) -> AmpelPrepper:
-        return self.ampel.build_prepper(
+    def build_ampel_interface(self) -> AmpelInterface:
+        return self.ampel.build_interface(
             self.download.queries[0].original_id_key, self.download.input_csv
         )

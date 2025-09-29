@@ -51,8 +51,8 @@ def prepare_ampel(
     config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
 ):
     cfg = TimewiseConfig.from_yaml(config_path)
-    ampel_prepper = cfg.build_ampel_prepper()
-    p = ampel_prepper.prepare(config_path)
+    ampel_interface = cfg.build_ampel_interface()
+    p = ampel_interface.prepare(config_path)
     typer.echo(f"AMPEL job file: {p}")
 
 
@@ -62,8 +62,8 @@ def process(
     ampel_config_path: Path = typer.Argument(help="AMPEL config YAML"),
 ):
     cfg = TimewiseConfig.from_yaml(config_path)
-    prepper = cfg.build_ampel_prepper()
-    prepper.run(config_path, ampel_config_path)
+    ampel_interface = cfg.build_ampel_interface()
+    ampel_interface.run(config_path, ampel_config_path)
 
 
 @app.command(help="")
