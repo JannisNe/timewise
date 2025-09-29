@@ -3,6 +3,8 @@ import logging
 
 import pandas as pd
 from pymongo import MongoClient, ASCENDING
+from pymongo.collection import Collection
+from pymongo.database import Database
 from ampel.cli.JobCommand import JobCommand
 from ampel.types import StockId
 
@@ -28,18 +30,15 @@ class AmpelInterface:
         self.uri = uri
 
     def import_input(self):
-        client = MongoClient(host=self.uri)
-        db = client[self.input_mongo_db_name]
-
         # if collection already exists, assume import was already done
-        if "input" in db.list_collection_names():
+        if "input" in self.db.list_collection_names():
             logger.debug(
                 f"'input' collection already exists in '{self.input_mongo_db_name}'."
             )
             return
 
         logger.debug(f"importing {self.input_csv} into {self.input_mongo_db_name}")
-        col = client[self.input_mongo_db_name]["input"]
+        col = self.client[self.input_mongo_db_name]["input"]
 
         # create an index from stock id
         col.create_index([(self.orig_id_key, ASCENDING)], unique=True)
@@ -84,10 +83,23 @@ class AmpelInterface:
     def client(self) -> MongoClient:
         return MongoClient(self.uri)
 
+    @property
+    def db(self) -> Database:
+        return self.client[self.mongo_db_name]
+
+    @property
+    def t0(self) -> Collection:
+        return self.db["t0"]
+
+    @property
+    def t1(self) -> Collection:
+        return self.db["t1"]
+
     def extract_stacked_lightcurve(self, stock_id: StockId) -> pd.DataFrame:
-        col = self.client[self.mongo_db_name]["t1"]
         records = []
-        for i, ic in enumerate(col.find({"stock": stock_id, "unit": "T1StackVisits"})):
+        for i, ic in enumerate(
+            self.t1.find({"stock": stock_id, "unit": "T1StackVisits"})
+        ):
             assert i == 0, f"More than one stacked lightcurve found for {stock_id}!"
             assert len(ic["body"]) == 1, (
                 f"None or more than one stacking result found for {stock_id}!"

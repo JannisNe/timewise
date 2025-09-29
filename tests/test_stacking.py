@@ -2,7 +2,6 @@ import json
 import logging
 
 from astropy.table import Table, vstack
-from pymongo import MongoClient
 import pandas as pd
 import pytest
 import numpy as np
@@ -23,12 +22,10 @@ def test_ingest(ampel_interface, timewise_config_path):
     ampel_interface.template_path = ingestion_only_template
     ampel_interface.run(timewise_config_path, AMPEL_CONFIG_PATH)
 
-    client = MongoClient()
-
     # ----------------------------
     # check t0 collection
     # ----------------------------
-    t0 = client["test_ampel"].get_collection("t0")
+    t0 = ampel_interface.t0
     n_in_db = t0.count_documents({})
 
     bp = TimewiseConfig.from_yaml(timewise_config_path).download.backend.base_path
@@ -67,7 +64,7 @@ def test_stacking(ampel_interface, timewise_config_path, mode):
     # ----------------------------
     # check t1 collection
     # ----------------------------
-    t1 = ampel_interface.client.get_collection("t1")
+    t1 = ampel_interface.t1
     assert t1.count_documents({}) > 0
 
     input_csv_path = TimewiseConfig.from_yaml(timewise_config_path).download.input_csv
