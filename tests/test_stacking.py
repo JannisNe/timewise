@@ -63,18 +63,15 @@ def test_stacking(ampel_interface, timewise_config_path, mode):
     mongo_db_name = ampel_interface.mongo_db_name + "_" + mode
     ampel_interface.mongo_db_name = mongo_db_name
     ampel_interface.run(timewise_config_path, AMPEL_CONFIG_PATH)
+
     # ----------------------------
     # check t1 collection
     # ----------------------------
-    client = MongoClient()
-    t1 = client["test_ampel"].get_collection("t1")
+    t1 = ampel_interface.client.get_collection("t1")
     assert t1.count_documents({}) > 0
 
-    cfg = TimewiseConfig.from_yaml(timewise_config_path)
-    cfg.ampel.mongo_db_name = mongo_db_name
-    extractor = cfg.ampel.build_extractor()
-
-    input_data = pd.read_csv(cfg.download.input_csv)
+    input_csv_path = TimewiseConfig.from_yaml(timewise_config_path).download.input_csv
+    input_data = pd.read_csv(input_csv_path)
 
     reference_path = DATA_DIR / "photometry" / f"timewise_data_product_tap_{mode}.json"
     with reference_path.open("r") as f:
@@ -83,7 +80,7 @@ def test_stacking(ampel_interface, timewise_config_path, mode):
     records = []
     index = []
     for i in input_data.orig_id.astype(int):
-        stacked_lc = extractor.extract_stacked_lightcurve(i)
+        stacked_lc = ampel_interface.extract_stacked_lightcurve(i)
 
         if "timewise_lightcurve" not in reference_data[str(i)]:
             # in this case all datapoints were masked so we just have to make sure that the
