@@ -6,6 +6,7 @@ from pymongo import MongoClient
 import pandas as pd
 import pytest
 import numpy as np
+from numpy import typing as npt
 
 from timewise.config import TimewiseConfig
 
@@ -122,3 +123,7 @@ def test_stacking(ampel_prepper, timewise_config_path, mode):
 
     res = pd.DataFrame(records, index=index)
     logger.info("\n" + res.to_string())
+
+    all_zero: npt.ArrayLike = res.sum() == 0
+
+    assert all(all_zero)
