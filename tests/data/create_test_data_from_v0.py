@@ -2,7 +2,7 @@
 # It will produce test data downloads for the test sample.
 from timewise import __version__
 
-assert __version__ == "0.5.3"
+assert __version__ == "0.5.4"
 from timewise.wise_data_by_visit import WiseDataByVisit
 
 import logging
