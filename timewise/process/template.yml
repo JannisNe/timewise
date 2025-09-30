@@ -26,7 +26,6 @@ task:
               plot: true
           unit: TiMongoMuxer
     iter_max: 1000000
-    log_profile: console_debug
     shaper: TiDataPointShaper
     supplier:
       config:
