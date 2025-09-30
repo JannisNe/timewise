@@ -1,18 +1,14 @@
-from typing import Literal, Dict
+from typing import Literal, Dict, Any, Sequence
 from functools import partial
 
 import pandas as pd
 import numpy as np
 from numpy import typing as npt
+from pydantic import BaseModel
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from matplotlib.markers import MarkerStyle
 from matplotlib.transforms import Affine2D
-
-from ampel.base.AmpelBaseModel import AmpelBaseModel
-from ampel.plot.create import create_plot_record
-from ampel.types import DataPointId
-from ampel.model.PlotProperties import PlotProperties
 
 from timewise.plot import plot_lightcurve, plot_panstarrs_cutout, plot_sdss_cutout
 from timewise.plot.lightcurve import BAND_PLOT_COLORS
@@ -20,8 +16,7 @@ from timewise.process import keys
 from timewise.util.visits import get_visit_map
 
 
-class DiagnosticPlotter(AmpelBaseModel):
-    plot_properties: PlotProperties
+class DiagnosticPlotter(BaseModel):
     cutout: Literal["sdss", "panstarrs"] = "panstarrs"
     band_colors: Dict[str, str] = BAND_PLOT_COLORS
     lum_key: str = keys.MAG_EXT
@@ -57,9 +52,9 @@ class DiagnosticPlotter(AmpelBaseModel):
         labels: npt.ArrayLike,
         source_ra: float,
         source_dec: float,
-        selected_indices: list[DataPointId],
+        selected_indices: list[Any],
         highlight_radius: float | None = None,
-    ):
+    ) -> tuple[plt.Figure, Sequence[plt.Axes]]:
         fig, axs = plt.subplots(
             nrows=2, gridspec_kw={"height_ratios": [3, 2]}, figsize=(5, 8)
         )
@@ -200,4 +195,4 @@ class DiagnosticPlotter(AmpelBaseModel):
         )
         axs[0].set_aspect(1, adjustable="box")
 
-        return create_plot_record(fig, self.plot_properties)
+        return fig, axs

@@ -22,7 +22,7 @@ from ampel.abstract.AbsT1CombineUnit import AbsT1CombineUnit
 from ampel.model.UnitModel import UnitModel
 
 from ampel.timewise.util.pdutil import datapoints_to_dataframe
-from ampel.timewise.util.DiagnosticPlotter import DiagnosticPlotter
+from ampel.timewise.util.AuxDiagnosticPlotter import AuxDiagnosticPlotter
 from timewise.process import keys
 
 
@@ -34,7 +34,7 @@ class T1HDBSCAN(AbsT1CombineUnit):
 
     plot: bool = False
     plotter: UnitModel = {
-        "unit": "DiagnosticPlotter",
+        "unit": "AuxDiagnosticPlotter",
         "config": {
             "plot_properties": {
                 "file_name": {
@@ -49,7 +49,7 @@ class T1HDBSCAN(AbsT1CombineUnit):
         super().__init__(**kwargs)
         self._col = MongoClient()[self.input_mongo_db_name]["input"]
         self._plotter = AuxUnitRegister.new_unit(
-            model=self.plotter, sub_type=DiagnosticPlotter
+            model=self.plotter, sub_type=AuxDiagnosticPlotter
         )
 
     def combine(
