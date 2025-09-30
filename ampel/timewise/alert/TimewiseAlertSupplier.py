@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 from bson import encode
 import numpy as np
+from numpy.ma.core import MaskedConstant
 
 from ampel.alert.AmpelAlert import AmpelAlert
 from ampel.alert.BaseAlertSupplier import BaseAlertSupplier
@@ -76,7 +77,11 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
 
         for row in table:
             # convert table row to dict, convert data types from numpy to native python
-            pp = {k: v.item() for k, v in dict(row).items()}
+            # Respect masked fields and convert to None
+            pp = {
+                k: None if isinstance(v, MaskedConstant) else v.item()
+                for k, v in dict(row).items()
+            }
             pp_hash = blake2b(encode(pp), digest_size=7).digest()
             if self.counter:
                 pp["candid"] = self.counter
