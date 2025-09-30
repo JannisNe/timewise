@@ -1372,7 +1372,7 @@ class WISEDataBase(abc.ABC):
         if len(fns) == 0:
             raise ValueError(f"No unbinned lightcurves found for chunk {chunk_number}!")
 
-        lightcurves = pd.concat([pd.read_csv(fn) for fn in fns])
+        lightcurves = pd.concat([pd.read_csv(fn) for fn in fns]).reset_index()
 
         if clear:
             for fn in fns:
