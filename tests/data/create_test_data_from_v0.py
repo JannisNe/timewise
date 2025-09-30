@@ -1,5 +1,8 @@
 # This script has to be executed with timewise v0.5.3.
 # It will produce test data downloads for the test sample.
+# Note that this will have to be run twice. The first run
+# exits before the TAP jobs complete and fetches the result
+# on the second run.
 from timewise import __version__
 
 assert __version__ == "0.5.4"
@@ -37,7 +40,7 @@ if __name__ == "__main__":
         n_chunks=2,
     )
     wise_data.get_photometric_data(
-        service="tap", nthreads=2, chunks=[0, 1], skip_download=True
+        service="tap", nthreads=2, chunks=[0, 1], skip_download=False
     )
 
     wise_data_masked = WiseDataByVisit(
@@ -48,10 +51,10 @@ if __name__ == "__main__":
     )
     wise_data_masked.get_photometric_data(
         service="tap",
-        nthreads=2,
+        nthreads=1,
         chunks=[0, 1],
         mask_by_position=True,
-        skip_download=True,
+        skip_download=False,
     )
 
     raw_phot = wise_data_masked._cache_photometry_dir.glob("raw_photometry_*.csv")
