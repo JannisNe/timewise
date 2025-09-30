@@ -6,7 +6,7 @@ import numpy as np
 from timewise.process import keys
 
 
-BAND_PLOT_COLORS = {"W1": "r", "W2": "b"}
+BAND_PLOT_COLORS = {"w1": "r", "w2": "b"}
 
 
 def plot_lightcurve(
@@ -27,7 +27,7 @@ def plot_lightcurve(
     else:
         fig = plt.gcf()
 
-    for b in ["W1", "W2"]:
+    for b in ["w1", "w2"]:
         try:
             if isinstance(stacked_lightcurve, pd.DataFrame):
                 ul_mask = np.array(
@@ -57,14 +57,14 @@ def plot_lightcurve(
 
             if isinstance(raw_lightcurve, pd.DataFrame):
                 m = ~raw_lightcurve[f"{b}{lum_key}"].isna()
-                ul_mask = raw_lightcurve[f"{b}{lum_key}{keys.ERROR_EXT}"].isna()
+                ul_mask = raw_lightcurve[f"{b}{keys.ERROR_EXT}{lum_key}"].isna()
 
                 tot_m = m & ~ul_mask
                 if np.any(tot_m):
                     ax.errorbar(
                         raw_lightcurve.mjd[tot_m],
                         raw_lightcurve[f"{b}{lum_key}"][tot_m],
-                        yerr=raw_lightcurve[f"{b}{lum_key}{keys.ERROR_EXT}"][tot_m],
+                        yerr=raw_lightcurve[f"{b}{keys.ERROR_EXT}{lum_key}"][tot_m],
                         label=f"{b} unbinned",
                         ls="",
                         marker="o",

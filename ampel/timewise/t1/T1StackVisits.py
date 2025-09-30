@@ -32,9 +32,9 @@ class T1StackVisits(AbsT1ComputeUnit):
 
     # zero points come from https://wise2.ipac.caltech.edu/docs/release/allsky/expsup/sec4_4h.html#conv2flux
     # published in Jarret et al. (2011): https://ui.adsabs.harvard.edu/abs/2011ApJ...735..112J/abstract
-    magnitude_zeropoints: Dict[str, float] = {"W1": 20.752, "W2": 19.596}
+    magnitude_zeropoints: Dict[str, float] = {"w1": 20.752, "w2": 19.596}
     # in Jy
-    flux_zeropoints = {"W1": 309.54, "W2": 171.787}
+    flux_zeropoints = {"w1": 309.54, "w2": 171.787}
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -228,7 +228,7 @@ class T1StackVisits(AbsT1ComputeUnit):
         )
 
         # -------------------------   loop through bands   -------------------------- #
-        for b in ["W1", "W2"]:
+        for b in ["w1", "w2"]:
             # loop through magnitude and flux and save the respective datapoints
 
             outlier_masks = dict()
@@ -237,7 +237,7 @@ class T1StackVisits(AbsT1ComputeUnit):
 
             for lum_ext in [keys.FLUX_EXT, keys.MAG_EXT]:
                 f = lightcurve[f"{b}{lum_ext}"]
-                e = lightcurve[f"{b}{lum_ext}{keys.ERROR_EXT}"]
+                e = lightcurve[f"{b}{keys.ERROR_EXT}{lum_ext}"]
 
                 # we will flag outliers based on the flux only
                 remove_outliers = (
@@ -300,7 +300,7 @@ class T1StackVisits(AbsT1ComputeUnit):
 
             # ---------------   calculate flux density from instrument flux   ---------------- #
             # get the instrument flux [digital numbers], i.e. source count
-            inst_fluxes_e = lightcurve[f"{b}{keys.FLUX_EXT}{keys.ERROR_EXT}"]
+            inst_fluxes_e = lightcurve[f"{b}{keys.ERROR_EXT}{keys.FLUX_EXT}"]
 
             # calculate the proportionality constant between flux density and source count
             mag_zp = self.flux_zeropoints[b] * 1e3  # in mJy
@@ -340,15 +340,10 @@ class T1StackVisits(AbsT1ComputeUnit):
             "ra",
             "dec",
             "mjd",
-            "W1_flux",
-            "W1_flux_error",
-            "W1_mag",
-            "W1_mag_error",
-            "W2_flux",
-            "W2_flux_error",
-            "W2_mag",
-            "W2_mag_error",
         ]
+        for i in range(1, 3):
+            for l in [keys.MAG_EXT, keys.FLUX_EXT]:
+                columns.extend([f"w{i}{l}", f"w{i}{keys.ERROR_EXT}{l}"])
         raw_lightcurve, stock_ids = datapoints_to_dataframe(datapoints, columns)
         stacked_lightcurve = self.stack_visits(raw_lightcurve)
         return stacked_lightcurve.to_dict(orient="records"), datapoints[0]["stock"]

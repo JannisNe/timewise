@@ -67,7 +67,7 @@ class DiagnosticPlotter(BaseModel):
             lum_key=self.lum_key,
             ax=axs[-1],
             save=False,
-            colors={"W1": "gray", "W2": "lightgray"},
+            colors={"w1": "gray", "w2": "lightgray"},
         )
         self.plot_lightcurve(
             raw_lightcurve=lightcurve[selected_mask],

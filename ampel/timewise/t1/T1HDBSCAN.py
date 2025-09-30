@@ -59,8 +59,8 @@ class T1HDBSCAN(AbsT1CombineUnit):
         if self.plot:
             for i in range(1, 3):
                 columns += [
-                    f"W{i}{self._plotter.lum_key}",
-                    f"W{i}{self._plotter.lum_key}{keys.ERROR_EXT}",
+                    f"w{i}{self._plotter.lum_key}",
+                    f"w{i}{keys.ERROR_EXT}{self._plotter.lum_key}",
                 ]
 
         lightcurve, stock_ids = datapoints_to_dataframe(
