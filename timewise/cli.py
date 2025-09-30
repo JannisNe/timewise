@@ -1,4 +1,5 @@
 import logging
+from typing import Annotated
 from pathlib import Path
 
 import typer
@@ -31,9 +32,9 @@ def main(
 
     # Rich logging
     logging.basicConfig(
-        level=level,
         handlers=[RichHandler(rich_tracebacks=True, markup=True)],
     )
+    logging.getLogger("timewise").setLevel(level)
 
     # Store log level in context for subcommands
     ctx.obj = {"log_level": level}
@@ -66,10 +67,34 @@ def process(
     ampel_interface.run(config_path, ampel_config_path)
 
 
-@app.command(help="")
+@app.command(help="Write stacked lightcurves to disk")
+def export(
+    config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
+    output_directory: Path = typer.Argument(help="output directory"),
+    indices: Annotated[
+        list[int],
+        typer.Option(
+            "-i", "--indices", help="Indices to export, defaults to all indices"
+        ),
+    ] = None,
+):
+    TimewiseConfig.from_yaml(config_path).build_ampel_interface().export_many(
+        output_directory, indices
+    )
+
+
+@app.command(help="Run download, process and export")
 def run_chain(
     config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
     ampel_config_path: Path = typer.Argument(help="AMPEL config YAML"),
+    output_directory: Path = typer.Argument(help="output directory"),
+    indices: Annotated[
+        list[int],
+        typer.Option(
+            "-i", "--indices", help="Indices to export, defaults to all indices"
+        ),
+    ] = None,
 ):
     download(config_path)
     process(config_path, ampel_config_path)
+    export(config_path, output_directory, indices)

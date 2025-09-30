@@ -1,6 +1,8 @@
 from pathlib import Path
 import logging
+from typing import Iterable
 
+import numpy as np
 import pandas as pd
 from pymongo import MongoClient, ASCENDING
 from pymongo.collection import Collection
@@ -114,3 +116,16 @@ class AmpelInterface:
             records.append(ic["body"])
             index.append(ic["id"])
         return pd.DataFrame(records, index=index)
+
+    def export_stacked_lightcurve(self, stock_id: StockId, filename: Path):
+        logger.debug(f"Exporting stacked lightcurve for {stock_id} to {filename}")
+        self.extract_stacked_lightcurve(stock_id).to_csv(filename)
+
+    def export_many(
+        self, directory: Path, stock_ids: Iterable[StockId] | StockId | None = None
+    ):
+        if stock_ids is None:
+            stock_ids = pd.read_csv(self.input_csv)[self.orig_id_key]
+        directory.mkdir(exist_ok=True, parents=True)
+        for s in np.atleast_1d(stock_ids):
+            self.export_stacked_lightcurve(s.item(), directory / f"{s}.csv")
