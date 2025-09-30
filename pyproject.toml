@@ -62,6 +62,7 @@ source = ["timewise", "ampel"]
 omit = ["timewise/v0"]
 parallel = true
 concurrency = ["thread", "multiprocessing"]
+
 [tool.poetry.dependencies]
 ampel-core = {develop = true}
 
