@@ -105,6 +105,13 @@ def test_stacking(ampel_interface, timewise_config_path, mode):
 
             # load result
             t1_result = t1.find_one({"stock": i})
+
+            if t1_result is None:
+                # In this case, all datapoints were masked. We just have to check that
+                # this is also the case in the reference
+                assert len(reference_photometry) == 0
+                continue
+
             dp_ids = t1_result["dps"]
             selected_photometry = ampel_interface.extract_datapoints(i).loc[dp_ids]
 
