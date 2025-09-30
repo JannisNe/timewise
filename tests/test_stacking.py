@@ -90,7 +90,7 @@ def test_stacking(ampel_interface, timewise_config_path, mode):
             ]
             all_reference_photometry = pd.concat(
                 [pd.read_csv(fn) for fn in reference_phot_files]
-            )
+            ).reset_index()
             reference_mask_file = DATA_DIR / "masks" / f"position_mask_c{chunk_id}.json"
             with open(reference_mask_file, "r") as f:
                 reference_bad_mask = json.load(f)
