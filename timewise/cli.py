@@ -1,15 +1,21 @@
 import logging
-from typing import Annotated
+from typing import Annotated, Literal, List
 from pathlib import Path
 
 import typer
 
 from .config import TimewiseConfig
+from .plot.diagnostic import make_plot
 
 from rich.logging import RichHandler
 
 
 app = typer.Typer(help="Timewsie CLI")
+
+config_path_type = Annotated[
+    Path, typer.Argument(help="Pipeline config file (YAML/JSON)")
+]
+ampel_config_path_type = Annotated[Path, typer.Argument(help="AMPEL config YAML")]
 
 
 # --- Global callback (runs before every command) ---
@@ -42,14 +48,14 @@ def main(
 
 @app.command(help="Download WISE photometry from IRSA")
 def download(
-    config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
+    config_path: config_path_type,
 ):
     TimewiseConfig.from_yaml(config_path).download.build_downloader().run()
 
 
 @app.command(help="Prepares the AMPEL job file so AMPEL can be run manually")
 def prepare_ampel(
-    config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
+    config_path: config_path_type,
 ):
     cfg = TimewiseConfig.from_yaml(config_path)
     ampel_interface = cfg.build_ampel_interface()
@@ -59,8 +65,8 @@ def prepare_ampel(
 
 @app.command(help="Processes the lightcurves using AMPEL")
 def process(
-    config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
-    ampel_config_path: Path = typer.Argument(help="AMPEL config YAML"),
+    config_path: config_path_type,
+    ampel_config_path: ampel_config_path_type,
 ):
     cfg = TimewiseConfig.from_yaml(config_path)
     ampel_interface = cfg.build_ampel_interface()
@@ -69,8 +75,8 @@ def process(
 
 @app.command(help="Write stacked lightcurves to disk")
 def export(
-    config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
-    output_directory: Path = typer.Argument(help="output directory"),
+    config_path: config_path_type,
+    output_directory: Annotated[Path, typer.Argument(help="output directory")],
     indices: Annotated[
         list[int],
         typer.Option(
@@ -85,9 +91,9 @@ def export(
 
 @app.command(help="Run download, process and export")
 def run_chain(
-    config_path: Path = typer.Argument(help="Pipeline config file (YAML/JSON)"),
-    ampel_config_path: Path = typer.Argument(help="AMPEL config YAML"),
-    output_directory: Path = typer.Argument(help="output directory"),
+    config_path: config_path_type,
+    ampel_config_path: ampel_config_path_type,
+    output_directory: Annotated[Path, typer.Argument(help="output directory")],
     indices: Annotated[
         list[int],
         typer.Option(
@@ -98,3 +104,21 @@ def run_chain(
     download(config_path)
     process(config_path, ampel_config_path)
     export(config_path, output_directory, indices)
+
+
+@app.command(help="Make diagnostic plots")
+def plot(
+    config_path: config_path_type,
+    indices: Annotated[
+        List[int],
+        typer.Argument(help="Identifiers of the objects for which to create plots"),
+    ],
+    output_directory: Annotated[Path, typer.Argument(help="Output directory")],
+    cutout: Annotated[
+        Literal["sdss", "panstarrs"],
+        typer.Option("-c", "--cutout", help="Which survey to use for cutouts"),
+    ] = "panstarrs",
+):
+    make_plot(
+        config_path, indices=indices, cutout=cutout, output_directory=output_directory
+    )
