@@ -1,5 +1,7 @@
-from typing import Literal, Dict, Any, Sequence
+from typing import Literal, Dict, Any, Sequence, List
 from functools import partial
+from pathlib import Path
+import logging
 
 import pandas as pd
 import numpy as np
@@ -14,6 +16,10 @@ from timewise.plot import plot_lightcurve, plot_panstarrs_cutout, plot_sdss_cuto
 from timewise.plot.lightcurve import BAND_PLOT_COLORS
 from timewise.process import keys
 from timewise.util.visits import get_visit_map
+from timewise.config import TimewiseConfig
+
+
+logger = logging.getLogger(__name__)
 
 
 class DiagnosticPlotter(BaseModel):
@@ -48,7 +54,8 @@ class DiagnosticPlotter(BaseModel):
 
     def make_plot(
         self,
-        lightcurve: pd.DataFrame,
+        stacked_lightcurve: pd.DataFrame | None,
+        raw_lightcurve: pd.DataFrame | None,
         labels: npt.ArrayLike,
         source_ra: float,
         source_dec: float,
@@ -61,16 +68,17 @@ class DiagnosticPlotter(BaseModel):
 
         self.plot_cutout(ra=source_ra, dec=source_dec, ax=axs[0], radius_arcsec=20)
 
-        selected_mask = lightcurve.index.isin(selected_indices)
+        selected_mask = raw_lightcurve.index.isin(selected_indices)
         plot_lightcurve(
-            raw_lightcurve=lightcurve[~selected_mask],
+            raw_lightcurve=raw_lightcurve[~selected_mask],
             lum_key=self.lum_key,
             ax=axs[-1],
             save=False,
             colors={"w1": "gray", "w2": "lightgray"},
         )
         self.plot_lightcurve(
-            raw_lightcurve=lightcurve[selected_mask],
+            stacked_lightcurve=stacked_lightcurve,
+            raw_lightcurve=raw_lightcurve[selected_mask],
             ax=axs[-1],
             save=False,
         )
@@ -93,11 +101,11 @@ class DiagnosticPlotter(BaseModel):
         markers = markers_straight + markers_rotated
 
         # calculate ra and dec relative to center of cutout
-        ra = (lightcurve.ra - source_ra) * 3600
-        dec = (lightcurve.dec - source_dec) * 3600
+        ra = (raw_lightcurve.ra - source_ra) * 3600
+        dec = (raw_lightcurve.dec - source_dec) * 3600
 
         # get visit map
-        visit_map = get_visit_map(lightcurve)
+        visit_map = get_visit_map(raw_lightcurve)
 
         # for each visit plot the datapoints on the cutout
         # for each visit plot the datapoints on the cutout
@@ -123,7 +131,7 @@ class DiagnosticPlotter(BaseModel):
                 for i_label in np.unique(labels):
                     label_mask = labels == i_label
                     final_mask = mask & label_mask
-                    datapoints_label = lightcurve[final_mask]
+                    datapoints_label = raw_lightcurve[final_mask]
                     color = f"C{i_label}" if i_label != -1 else "grey"
 
                     if ("sigra" in datapoints_label.columns) and (
@@ -196,3 +204,36 @@ class DiagnosticPlotter(BaseModel):
         axs[0].set_aspect(1, adjustable="box")
 
         return fig, axs
+
+
+def make_plot(
+    config_path: Path,
+    cutout: Literal["sdss", "panstarrs"],
+    indices: List[int],
+    output_directory: Path,
+):
+    cfg = TimewiseConfig.from_yaml(config_path)
+    ampel_interface = cfg.build_ampel_interface()
+    input_data = pd.read_csv(cfg.download.input_csv).set_index(
+        ampel_interface.orig_id_key
+    )
+    plotter = DiagnosticPlotter(cutout=cutout)
+    for index in indices:
+        stacked_lightcurve = ampel_interface.extract_stacked_lightcurve(stock_id=index)
+        raw_lightcurve = ampel_interface.extract_datapoints(stock_id=index)
+        selected_dp_ids = ampel_interface.extract_selected_datapoint_ids(stock_id=index)
+        labels = [0] * len(raw_lightcurve)
+        source = input_data.loc[index]
+
+        fig, axs = plotter.make_plot(
+            stacked_lightcurve=stacked_lightcurve,
+            raw_lightcurve=raw_lightcurve,
+            labels=labels,
+            source_ra=source.ra,
+            source_dec=source.dec,
+            selected_indices=selected_dp_ids,
+        )
+        fn = output_directory / f"{index}.pdf"
+        logger.info(f"Saving plot to {fn}")
+        fig.savefig(fn)
+        plt.close()

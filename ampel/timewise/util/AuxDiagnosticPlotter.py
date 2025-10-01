@@ -35,7 +35,7 @@ class AuxDiagnosticPlotter(AmpelBaseModel):
         highlight_radius: float | None = None,
     ) -> NewSVGRecord:
         fig, axs = self._plotter.make_plot(
-            lightcurve=lightcurve,
+            raw_lightcurve=lightcurve,
             labels=labels,
             source_ra=source_ra,
             source_dec=source_dec,
