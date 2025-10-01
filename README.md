@@ -5,7 +5,7 @@
 
 
 ![](timewise.png)
-# `timewise`: Build IR Lightcurve from WISE data
+# Infrared light curves from WISE data
 
 This package downloads WISE data for positions on the sky and stacks single-exposure photometry per visit
 
