@@ -1,6 +1,6 @@
 from pathlib import Path
 import logging
-from typing import Iterable
+from typing import Iterable, List
 
 import numpy as np
 import pandas as pd
@@ -8,7 +8,7 @@ from pymongo import MongoClient, ASCENDING
 from pymongo.collection import Collection
 from pymongo.database import Database
 from ampel.cli.JobCommand import JobCommand
-from ampel.types import StockId
+from ampel.types import DataPointId, StockId
 
 
 logger = logging.getLogger(__name__)
@@ -116,6 +116,9 @@ class AmpelInterface:
             records.append(ic["body"])
             index.append(ic["id"])
         return pd.DataFrame(records, index=index)
+
+    def extract_selected_datapoint_ids(self, stock_id: StockId) -> List[DataPointId]:
+        return self.t1.find_one({"stock": stock_id})["dps"]
 
     def export_stacked_lightcurve(self, stock_id: StockId, filename: Path):
         logger.debug(f"Exporting stacked lightcurve for {stock_id} to {filename}")
