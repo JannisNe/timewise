@@ -70,15 +70,15 @@ def plot_sdss_cutout(
             origin="upper",
             extent=(
                 (
-                    ra + ang_deg / 2,
-                    ra - ang_deg / 2,
-                    dec - ang_deg / 2,
-                    dec + ang_deg / 2,
+                    arcsec / 2,
+                    -arcsec / 2,
+                    -arcsec / 2,
+                    arcsec / 2,
                 )
             ),
             cmap="gray",
         )
-        ax.scatter(ra, dec, marker="x", color="red")
+        ax.scatter(0, 0, marker="x", color="red")
 
     except Exception as e:
         if "outside the SDSS footprint" in str(e):
