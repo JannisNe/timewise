@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 class DiagnosticPlotter(BaseModel):
     cutout: Literal["sdss", "panstarrs"] = "panstarrs"
     band_colors: Dict[str, str] = BAND_PLOT_COLORS
-    lum_key: str = keys.MAG_EXT
+    lum_key: str = keys.FLUX_EXT
 
     def plot_lightcurve(
         self,
@@ -75,6 +75,7 @@ class DiagnosticPlotter(BaseModel):
             ax=axs[-1],
             save=False,
             colors={"w1": "gray", "w2": "lightgray"},
+            add_to_label=" ignored",
         )
         self.plot_lightcurve(
             stacked_lightcurve=stacked_lightcurve,

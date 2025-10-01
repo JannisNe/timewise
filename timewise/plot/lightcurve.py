@@ -15,6 +15,7 @@ def plot_lightcurve(
     raw_lightcurve: pd.DataFrame | None = None,
     ax: plt.Axes | None = None,
     colors: Dict[str, str] | None = None,
+    add_to_label: str = "",
     **kwargs,
 ) -> tuple[plt.Figure, plt.Axes]:
     assert (stacked_lightcurve is not None) or (raw_lightcurve is not None)
@@ -37,7 +38,7 @@ def plot_lightcurve(
                     stacked_lightcurve[keys.MEAN + "_mjd"][~ul_mask],
                     stacked_lightcurve[f"{b}{keys.MEAN}{lum_key}"][~ul_mask],
                     yerr=stacked_lightcurve[f"{b}{lum_key}{keys.RMS}"][~ul_mask],
-                    label=b,
+                    label=f"{b}{add_to_label} stacked",
                     ls="",
                     marker="s",
                     c=colors[b],
@@ -65,7 +66,7 @@ def plot_lightcurve(
                         raw_lightcurve.mjd[tot_m],
                         raw_lightcurve[f"{b}{lum_key}"][tot_m],
                         yerr=raw_lightcurve[f"{b}{keys.ERROR_EXT}{lum_key}"][tot_m],
-                        label=f"{b} unbinned",
+                        label=f"{b}{add_to_label}",
                         ls="",
                         marker="o",
                         c=colors[b],
@@ -75,7 +76,9 @@ def plot_lightcurve(
 
                 single_ul_m = m & ul_mask
                 if np.any(single_ul_m):
-                    label = f"{b} unbinned upper limits" if not np.any(tot_m) else ""
+                    label = (
+                        f"{b}{add_to_label} upper limits" if not np.any(tot_m) else ""
+                    )
                     ax.scatter(
                         raw_lightcurve.mjd[single_ul_m],
                         raw_lightcurve[f"{b}{lum_key}"][single_ul_m],
