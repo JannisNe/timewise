@@ -1,4 +1,3 @@
-import json
 import logging
 
 from astropy.table import Table, vstack
@@ -9,7 +8,8 @@ from numpy import typing as npt
 
 from timewise.config import TimewiseConfig
 
-from tests.constants import AMPEL_CONFIG_PATH, DATA_DIR, V0_KEYMAP
+from tests.constants import AMPEL_CONFIG_PATH, DATA_DIR
+from tests.util import get_raw_reference_photometry, get_stacked_reference_photometry
 
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,11 @@ def test_ingest(ampel_interface, timewise_config_path):
 
 
 @pytest.mark.parametrize("mode", ["masked", "unmasked"])
-def test_stacking(ampel_interface, timewise_config_path, mode):
+def test_stacking(
+    ampel_interface,
+    timewise_config_path,
+    mode,
+):
     if mode == "unmasked":
         ampel_interface.template_path = DATA_DIR / "template_stack_all.yml"
 
@@ -70,10 +74,6 @@ def test_stacking(ampel_interface, timewise_config_path, mode):
     input_csv_path = cfg.download.input_csv
     input_data = pd.read_csv(input_csv_path)
 
-    reference_path = DATA_DIR / "photometry" / f"timewise_data_product_tap_{mode}.json"
-    with reference_path.open("r") as f:
-        reference_data = json.load(f)
-
     records = []
     index = []
     for i in input_data.orig_id.astype(int):
@@ -83,30 +83,7 @@ def test_stacking(ampel_interface, timewise_config_path, mode):
             # ----------------------------
 
             # load reference
-            chunk_id = i // cfg.download.chunk_size
-            reference_phot_files = [
-                DATA_DIR / "photometry" / f"raw_photometry_{t}__chunk{chunk_id}.csv"
-                for t in ["allwise_p3as_mep", "neowiser_p1bs_psd"]
-            ]
-            all_reference_photometry = pd.concat(
-                [pd.read_csv(fn) for fn in reference_phot_files]
-            ).reset_index()
-            reference_mask_file = DATA_DIR / "masks" / f"position_mask_c{chunk_id}.json"
-            with open(reference_mask_file, "r") as f:
-                reference_bad_mask = json.load(f)
-            reference_mask = all_reference_photometry.orig_id == i
-            if (si := str(i)) in reference_bad_mask:
-                reference_mask = reference_mask & ~all_reference_photometry.index.isin(
-                    reference_bad_mask[si]
-                )
-            reference_photometry = all_reference_photometry.loc[
-                reference_mask
-            ].reset_index()
-
-            # rename columns to v1
-            for ol, nl in V0_KEYMAP:
-                if ol in reference_photometry.columns:
-                    reference_photometry.rename(columns={ol: nl}, inplace=True)
+            reference_photometry = get_raw_reference_photometry(i)
 
             # load result
             t1_result = t1.find_one({"stock": i})
@@ -147,22 +124,15 @@ def test_stacking(ampel_interface, timewise_config_path, mode):
         # ----------------------------
 
         stacked_lc = ampel_interface.extract_stacked_lightcurve(i)
+        reference_lc = get_stacked_reference_photometry(i, mode)
 
-        if "timewise_lightcurve" not in reference_data[str(i)]:
+        if reference_lc is None:
             # in this case all datapoints were masked so we just have to make sure that the
             # stacked lightcurve also contains no data
             assert len(stacked_lc) == 0, f"Found too many datapoints for {i}"
             continue
-        reference_lc = pd.DataFrame(reference_data[str(i)]["timewise_lightcurve"])
-        reference_lc.set_index(reference_lc.index.astype(int), inplace=True)
-
-        # rename columns to v1
-        for ol, nl in V0_KEYMAP:
-            if ol in reference_lc.columns:
-                reference_lc.rename(columns={ol: nl}, inplace=True)
 
         n_epochs_diff = len(reference_lc) - len(stacked_lc)
-
         diff = reference_lc.astype(float) - stacked_lc.astype(float)
         m = diff > 1e-10
         n_bad_epochs = (m.any(axis=1) | m.isna().any(axis=1)).sum()
