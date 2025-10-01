@@ -7,7 +7,7 @@ from tests.dummy_tap import get_table_from_query_and_chunk
 from timewise.io import DownloadConfig
 from timewise.config import TimewiseConfig
 from timewise.process import AmpelInterface
-from tests.constants import DATA_DIR, INPUT_CSV_PATH
+from tests.constants import DATA_DIR, INPUT_CSV_PATH, V0_KEYMAP
 
 
 @pytest.fixture
@@ -84,6 +84,9 @@ def ampel_interface(timewise_config_path) -> AmpelInterface:
     dl = cfg.download.build_downloader()
     for q, c in product(dl.queries, dl.chunker):
         data = get_table_from_query_and_chunk(q.adql, c.chunk_id)
+        for ol, nl in V0_KEYMAP:
+            if ol in data.columns:
+                data.rename_column(ol, nl)
         task = dl.get_task_id(c, q)
         dl.backend.save_data(task, data)
 

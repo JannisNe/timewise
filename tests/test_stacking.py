@@ -9,7 +9,7 @@ from numpy import typing as npt
 
 from timewise.config import TimewiseConfig
 
-from tests.constants import AMPEL_CONFIG_PATH, DATA_DIR
+from tests.constants import AMPEL_CONFIG_PATH, DATA_DIR, V0_KEYMAP
 
 
 logger = logging.getLogger(__name__)
@@ -103,6 +103,11 @@ def test_stacking(ampel_interface, timewise_config_path, mode):
                 reference_mask
             ].reset_index()
 
+            # rename columns to v1
+            for ol, nl in V0_KEYMAP:
+                if ol in reference_photometry.columns:
+                    reference_photometry.rename(columns={ol: nl}, inplace=True)
+
             # load result
             t1_result = t1.find_one({"stock": i})
 
@@ -151,6 +156,11 @@ def test_stacking(ampel_interface, timewise_config_path, mode):
         reference_lc = pd.DataFrame(reference_data[str(i)]["timewise_lightcurve"])
         reference_lc.set_index(reference_lc.index.astype(int), inplace=True)
 
+        # rename columns to v1
+        for ol, nl in V0_KEYMAP:
+            if ol in reference_lc.columns:
+                reference_lc.rename(columns={ol: nl}, inplace=True)
+
         n_epochs_diff = len(reference_lc) - len(stacked_lc)
 
         diff = reference_lc.astype(float) - stacked_lc.astype(float)
@@ -161,8 +171,8 @@ def test_stacking(ampel_interface, timewise_config_path, mode):
             datapoints_diff = min(
                 [
                     (
-                        stacked_lc[f"{b}_flux_density_Npoints"]
-                        - reference_lc[f"{b}_flux_density_Npoints"]
+                        stacked_lc[f"{b}fluxdensitynpoints"]
+                        - reference_lc[f"{b}fluxdensitynpoints"]
                     ).sum()
                     for b in ["W1", "W2"]
                 ]
