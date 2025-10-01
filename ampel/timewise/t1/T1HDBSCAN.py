@@ -207,6 +207,7 @@ class T1HDBSCAN(AbsT1CombineUnit):
             all_labels[data_mask] = labels
             svg_rec = self._plotter.make_plot(
                 lightcurve,
+                None,
                 all_labels,
                 source_ra,
                 source_dec,

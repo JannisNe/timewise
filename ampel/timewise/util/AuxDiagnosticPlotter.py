@@ -27,7 +27,8 @@ class AuxDiagnosticPlotter(AmpelBaseModel):
 
     def make_plot(
         self,
-        lightcurve: pd.DataFrame,
+        raw_lightcurve: pd.DataFrame,
+        stacked_lightcurve: pd.DataFrame | None,
         labels: npt.ArrayLike,
         source_ra: float,
         source_dec: float,
@@ -35,7 +36,8 @@ class AuxDiagnosticPlotter(AmpelBaseModel):
         highlight_radius: float | None = None,
     ) -> NewSVGRecord:
         fig, axs = self._plotter.make_plot(
-            raw_lightcurve=lightcurve,
+            raw_lightcurve=raw_lightcurve,
+            stacked_lightcurve=stacked_lightcurve,
             labels=labels,
             source_ra=source_ra,
             source_dec=source_dec,
