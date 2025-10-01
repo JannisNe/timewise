@@ -4,7 +4,7 @@
 [![DOI](https://zenodo.org/badge/449677569.svg)](https://zenodo.org/badge/latestdoi/449677569)
 
 
-![](docs/source/timewise.png)
+![](timewise.png)
 # `timewise`: Build IR Lightcurve from WISE data
 
 This package downloads WISE data for positions on the sky and stacks single-exposure photometry per visit
@@ -21,7 +21,7 @@ pip install timewise
 
 To tell AMPEL which modules, aka units, to use, build the corresponding configuration file:
 ```bash
-ampel config build -distributions ampel timewise -stop-on-errors 0 -out ampel_config.yml
+ampel config build -distributions ampel timewise -stop-on-errors 0 -out <path-to-ampel-config-file>
 ```
 
 ## Usage
