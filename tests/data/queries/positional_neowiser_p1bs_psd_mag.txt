@@ -1,0 +1,15 @@
+SELECT
+	neowiser_p1bs_psd.ra, neowiser_p1bs_psd.dec, neowiser_p1bs_psd.mjd, neowiser_p1bs_psd.allwise_cntr, neowiser_p1bs_psd.w1mpro, neowiser_p1bs_psd.w1sigmpro, neowiser_p1bs_psd.w2mpro, neowiser_p1bs_psd.w2sigmpro,
+	mine.orig_id
+FROM
+	TAP_UPLOAD.mine AS mine
+RIGHT JOIN
+	neowiser_p1bs_psd
+WHERE
+	CONTAINS(POINT('J2000',neowiser_p1bs_psd.ra,neowiser_p1bs_psd.dec),CIRCLE('J2000',mine.ra,mine.dec,0.001666666666666667))=1  AND (
+	neowiser_p1bs_psd.nb < 2 AND
+	neowiser_p1bs_psd.na < 1 AND
+	neowiser_p1bs_psd.cc_flags like '00%' AND
+	neowiser_p1bs_psd.qi_fact >= 1 AND
+	neowiser_p1bs_psd.saa_sep >= 5 AND
+	neowiser_p1bs_psd.moon_masked like '00%'	)
