@@ -71,3 +71,14 @@ ampel-core = {develop = true}
 [tool.pytest]
 testpaths = "tests"
 pythonpath = "."
+
+# Per-module ignores
+[tool.mypy]
+python_version = "3.10"
+[[tool.mypy.overrides]]
+module = [
+    "astropy.*",
+    "pyvo",
+    "SciServer"
+]
+ignore_missing_imports = true
