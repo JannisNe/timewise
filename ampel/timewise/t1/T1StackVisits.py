@@ -6,7 +6,7 @@
 # Date:                24.09.2025
 # Last Modified Date:  24.09.2025
 # Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
-from typing import Dict
+from typing import Dict, cast, Any
 
 import numpy as np
 import pandas as pd
@@ -43,17 +43,17 @@ class T1StackVisits(AbsT1ComputeUnit):
     def calculate_epochs(
         f: pd.Series,
         e: pd.Series,
-        visit_mask: npt.ArrayLike,
-        counts: npt.ArrayLike,
+        visit_mask: npt.NDArray[np.int64],
+        counts: npt.NDArray[np.int64],
         remove_outliers: bool,
-        outlier_mask: npt.ArrayLike | None = None,
+        outlier_mask: npt.NDArray[np.bool_] | None = None,
     ) -> tuple[
-        npt.ArrayLike,
-        npt.ArrayLike,
-        npt.ArrayLike,
-        npt.ArrayLike,
-        npt.ArrayLike,
-        npt.ArrayLike,
+        npt.NDArray[np.float64],
+        npt.NDArray[np.float64],
+        npt.NDArray[np.bool_],
+        npt.NDArray[np.bool_],
+        npt.NDArray[np.bool_],
+        npt.NDArray[np.int64],
     ]:
         """
         Calculates the visits within a raw lightcurve.
@@ -75,7 +75,14 @@ class T1StackVisits(AbsT1ComputeUnit):
         """
 
         if len(f) == 0:
-            return [], [], [], [], [], []
+            return (
+                np.array([]),
+                np.array([]),
+                np.array([]),
+                np.array([]),
+                np.array([]),
+                np.array([]),
+            )
 
         u_lims = pd.isna(e)
         nan_mask = pd.isna(f)
@@ -86,20 +93,23 @@ class T1StackVisits(AbsT1ComputeUnit):
         outlier_thresh = np.inf if not remove_outliers else 20
 
         # set up empty masks
-        outlier_mask = (
-            np.array([False] * len(f)) if outlier_mask is None else outlier_mask
+        outlier_mask = cast(
+            npt.NDArray[np.bool_],
+            (np.array([False] * len(f)) if outlier_mask is None else outlier_mask),
         )
-        median = np.nan
-        u = np.nan
-        use_mask = None
+        median = np.full_like(counts, np.nan, dtype=float)
+        u = np.full_like(counts, np.nan, dtype=float)
+        use_mask = np.full_like(counts, False, dtype=bool)
         n_points = counts
 
         # set up dummy values for number of remaining outliers
         n_remaining_outlier = np.inf
 
         # ---------------------   flag upper limits   ---------------------- #
-        bin_n_ulims = np.bincount(visit_mask, weights=u_lims, minlength=len(counts))
-        bin_ulim_bool = (counts - bin_n_ulims) == 0  # type: npt.ArrayLike
+        bin_n_ulims: npt.NDArray[np.int64] = np.bincount(
+            visit_mask, weights=u_lims, minlength=len(counts)
+        )
+        bin_ulim_bool = cast(npt.NDArray[np.bool_], (counts - bin_n_ulims) == 0)
         use_mask_ul = ~u_lims | (u_lims & bin_ulim_bool[visit_mask])
 
         n_loops = 0
@@ -107,9 +117,9 @@ class T1StackVisits(AbsT1ComputeUnit):
         # recalculate uncertainty and median as long as no outliers left
         while n_remaining_outlier > 0:
             # make a mask of values to use
-            use_mask = ~outlier_mask & use_mask_ul & ~nan_mask
+            use_mask = ~outlier_mask & use_mask_ul & ~nan_mask  # type: ignore[operator]
             n_points = np.bincount(visit_mask, weights=use_mask)
-            zero_points_mask = n_points == 0  # type: npt.ArrayLike
+            zero_points_mask = cast(npt.NDArray[np.bool_], n_points == 0)
 
             # -------------------------   calculate median   ------------------------- #
             median = np.zeros_like(counts, dtype=float)
@@ -220,7 +230,7 @@ class T1StackVisits(AbsT1ComputeUnit):
         visit_map = get_visit_map(lightcurve)
         counts = np.bincount(visit_map)
 
-        stacked_data = dict()
+        stacked_data: Dict[str, Any] = dict()
 
         # -------------------------   calculate mean mjd   -------------------------- #
         stacked_data["mean_mjd"] = (
@@ -231,7 +241,7 @@ class T1StackVisits(AbsT1ComputeUnit):
         for b in ["w1", "w2"]:
             # loop through magnitude and flux and save the respective datapoints
 
-            outlier_masks = dict()
+            outlier_masks: Dict[str, Any] = dict()
             use_masks = dict()
             bin_ulim_bools = dict()
 
@@ -346,4 +356,15 @@ class T1StackVisits(AbsT1ComputeUnit):
                 columns.extend([f"w{i}{l}", f"w{i}{keys.ERROR_EXT}{l}"])
         raw_lightcurve, stock_ids = datapoints_to_dataframe(datapoints, columns)
         stacked_lightcurve = self.stack_visits(raw_lightcurve)
-        return stacked_lightcurve.to_dict(orient="records"), datapoints[0]["stock"]
+
+        # make sure that the is one stock id that fits all dps
+        # this is a redundant check, the muxer should take care of it
+        unique_stocks = np.unique(np.array(stock_ids).flatten())
+        stock_in_all_dps = [
+            all([s in sids for sids in stock_ids]) for s in unique_stocks
+        ]
+        # make sure only one stock is in all datapoints
+        assert sum(stock_in_all_dps) == 1
+        stock_id = unique_stocks[stock_in_all_dps][0].item()
+
+        return stacked_lightcurve.to_dict(orient="records"), stock_id

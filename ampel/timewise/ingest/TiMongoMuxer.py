@@ -130,7 +130,10 @@ class TiMongoMuxer(AbsT0Muxer):
         for key, simultaneous_dps in unique_dps_ids.items():
             dps_db_wrong = [dp for dp in dps_db if dp["id"] in simultaneous_dps]
             dps_wrong = [dp for dp in dps if dp["id"] in simultaneous_dps]
-            msg = f"stockID {stock_id}: Duplicate photopoints at {key}!\nDPS from DB:\n{dps_db_wrong}\nNew DPS:\n{dps_wrong}"
+            msg = (
+                f"stockID {str(stock_id)}: Duplicate photopoints at {key}!\nDPS from DB:"
+                f"\n{dps_db_wrong}\nNew DPS:\n{dps_wrong}"
+            )
             assert len(simultaneous_dps) == 1, msg
 
         # Part 2: Update new data points that are already superseded

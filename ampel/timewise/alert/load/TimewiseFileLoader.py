@@ -40,7 +40,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         if self.logger:
             self.logger.info(f"Registering {len(self._tasks)} task(s) to load")
 
-        self._table_types = get_args(TableType.__origin__)
+        self._table_types = get_args(TableType.__origin__)  # type: ignore
 
         self._gen = self.iter_stocks()
 

@@ -3,7 +3,7 @@ import pandas as pd
 import numpy.typing as npt
 
 
-def get_visit_map(lightcurve: pd.DataFrame) -> npt.ArrayLike:
+def get_visit_map(lightcurve: pd.DataFrame) -> npt.NDArray[np.int64]:
     """
     Create a map datapoint to visit
 

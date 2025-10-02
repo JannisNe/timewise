@@ -85,6 +85,7 @@ packages = ["timewise", "ampel"]
 module = [
     "astropy.*",
     "pyvo.*",
-    "SciServer.*"
+    "SciServer.*",
+    "sklearn.*"
 ]
 ignore_missing_imports = true

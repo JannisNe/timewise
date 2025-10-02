@@ -33,17 +33,19 @@ class T1HDBSCAN(AbsT1CombineUnit):
     cluster_distance_arcsec: float = 0.5
 
     plot: bool = False
-    plotter: UnitModel = {
-        "unit": "AuxDiagnosticPlotter",
-        "config": {
-            "plot_properties": {
-                "file_name": {
-                    "format_str": "%s_hdbscan_selection.svg",
-                    "arg_keys": ["stock"],
+    plotter: UnitModel = UnitModel.model_validate(
+        {
+            "unit": "AuxDiagnosticPlotter",
+            "config": {
+                "plot_properties": {
+                    "file_name": {
+                        "format_str": "%s_hdbscan_selection.svg",
+                        "arg_keys": ["stock"],
+                    }
                 }
-            }
-        },
-    }
+            },
+        }
+    )
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -124,7 +126,6 @@ class T1HDBSCAN(AbsT1CombineUnit):
 
         # if there are more than one datapoints, we use a clustering algorithm to potentially find a cluster with
         # its center within 1 arcsec
-        labels = []
         if data_mask.sum() > 1:
             # instead of the polar coordinates separation and position angle we use cartesian coordinates because the
             # clustering algorithm works better with them
@@ -145,8 +146,10 @@ class T1HDBSCAN(AbsT1CombineUnit):
                     self.cluster_distance_arcsec / 3600
                 ),
             ).fit(cartesian)
-            centroids: npt.ArrayLike = cluster_res.__getattribute__("centroids_")
-            labels: npt.ArrayLike = cluster_res.__getattribute__("labels_")
+            centroids: npt.NDArray[np.float64] = cluster_res.__getattribute__(
+                "centroids_"
+            )
+            labels: npt.NDArray[np.int64] = cluster_res.__getattribute__("labels_")
 
             # we select the closest cluster within 1 arcsec
             cluster_separations = np.sqrt(np.sum(centroids**2, axis=1))
@@ -179,7 +182,7 @@ class T1HDBSCAN(AbsT1CombineUnit):
 
         else:
             # if there is only one datapoint we give him a label manually
-            labels = [-1]
+            labels = np.array([-1])
 
         # if the closest allwise source is selected, we also select all other detections belonging to that
         # source in the allwise period
@@ -199,8 +202,8 @@ class T1HDBSCAN(AbsT1CombineUnit):
             )
             selected_indices |= set(closest_allwise_indices_not_first)
 
-        selected_indices = list(selected_indices)
-        res = T1CombineResult(dps=selected_indices)
+        selected_indices_list = list(selected_indices)
+        res = T1CombineResult(dps=selected_indices_list)
 
         if self.plot:
             all_labels = np.array([-1] * len(lightcurve))
@@ -211,7 +214,7 @@ class T1HDBSCAN(AbsT1CombineUnit):
                 all_labels,
                 source_ra,
                 source_dec,
-                selected_indices,
+                selected_indices_list,
                 highlight_radius=self.whitelist_region_arcsec,
             )
             res.add_meta("plot", svg_rec)
