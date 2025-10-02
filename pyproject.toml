@@ -92,7 +92,7 @@ ignore_missing_imports = true
 
 [tool.ruff]
 src = ["timewise", "ampel"]
-exclude = ["tests", "SciServer"]
+exclude = ["tests", "SciScript-Python"]
 
 [tool.ruff.lint]
 ignore = ["F401"]
