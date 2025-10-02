@@ -1,8 +1,17 @@
 import json
+import logging
+from pathlib import Path
+import gzip
+from typing import BinaryIO, cast
 
 import pandas as pd
+from pymongo import MongoClient
+from bson import decode_file_iter
 
 from tests.constants import DATA_DIR, V0_KEYMAP
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_raw_reference_photometry(i) -> pd.DataFrame:
@@ -52,3 +61,28 @@ def get_stacked_reference_photometry(i, mode) -> None | pd.DataFrame:
             reference_lc.rename(columns={ol: nl}, inplace=True)
 
     return reference_lc
+
+
+def restore_from_bson_dir(
+    dump_dir: str, target_db_name: str, mongo_uri="mongodb://localhost:27017/"
+):
+    client = MongoClient(mongo_uri)
+    db = client[target_db_name]
+
+    dump_path = Path(dump_dir)
+
+    num = 0
+    for bson_file in dump_path.glob("*.bson.gz"):
+        coll_name = bson_file.stem.replace(".bson", "")
+        coll = db[coll_name]
+
+        with gzip.open(bson_file, "rb") as f:
+            f = cast(BinaryIO, f)
+            docs = list(decode_file_iter(f))
+            if docs:
+                coll.insert_many(docs)
+
+        logger.debug(f"Restored {coll_name} to {target_db_name}")
+        num += 1
+
+    logger.info(f"Restored {num} collections to {target_db_name}")
