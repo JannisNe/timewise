@@ -56,7 +56,6 @@ def plot_sdss_cutout(
     height=2.5,
 ):
     ang_px = int(arcsec / arcsec_per_px)
-    ang_deg = arcsec / 3600
 
     if not ax:
         fig, ax = plt.subplots(figsize=(height, height))

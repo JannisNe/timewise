@@ -352,8 +352,8 @@ class T1StackVisits(AbsT1ComputeUnit):
             "mjd",
         ]
         for i in range(1, 3):
-            for l in [keys.MAG_EXT, keys.FLUX_EXT]:
-                columns.extend([f"w{i}{l}", f"w{i}{keys.ERROR_EXT}{l}"])
+            for key in [keys.MAG_EXT, keys.FLUX_EXT]:
+                columns.extend([f"w{i}{key}", f"w{i}{keys.ERROR_EXT}{key}"])
         raw_lightcurve, stock_ids = datapoints_to_dataframe(datapoints, columns)
         stacked_lightcurve = self.stack_visits(raw_lightcurve)
 

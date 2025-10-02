@@ -89,3 +89,10 @@ module = [
     "sklearn.*"
 ]
 ignore_missing_imports = true
+
+[tool.ruff]
+src = ["timewise", "ampel"]
+exclude = ["tests", "SciServer"]
+
+[tool.ruff.lint]
+ignore = ["F401"]
