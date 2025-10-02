@@ -1,4 +1,5 @@
 from typing import Dict
+import warnings
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -98,6 +99,12 @@ def plot_lightcurve(
 
     ax.set_xlabel("MJD")
     ax.set_ylabel(lum_key)
-    ax.legend()
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="No artists with labels found to put in legend",
+            category=UserWarning,
+        )
+        ax.legend()
 
     return fig, ax
