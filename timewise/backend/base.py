@@ -1,13 +1,13 @@
 import abc
-from typing import Any, ClassVar
+from typing import Any
 from pydantic import BaseModel
 from astropy.table import Table
 from ..types import TaskID
 
 
 class Backend(abc.ABC, BaseModel):
-    type: ClassVar[str]
-    base_path: str | list[str]
+    type: str
+    base_path: Any
     """
     Abstract persistence backend for jobs, results, and markers.
     Works with generic TaskIDs so it can be reused across Downloader/Processor.

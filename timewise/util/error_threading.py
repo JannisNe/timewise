@@ -9,7 +9,7 @@ class ErrorQueue(Queue):
 
     def __init__(self, stop_event: Event, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.error_queue = Queue()
+        self.error_queue: Queue = Queue()
         self.stop_event = stop_event
 
     def report_error(self, exc_info):

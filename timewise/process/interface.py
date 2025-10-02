@@ -1,8 +1,9 @@
 from pathlib import Path
 import logging
-from typing import Iterable, List
+from typing import Iterable, List, cast
 
 import numpy as np
+from numpy import typing as npt
 import pandas as pd
 from pymongo import MongoClient, ASCENDING
 from pymongo.collection import Collection
@@ -102,9 +103,10 @@ class AmpelInterface:
         for i, ic in enumerate(
             self.t1.find({"stock": stock_id, "unit": "T1StackVisits"})
         ):
-            assert i == 0, f"More than one stacked lightcurve found for {stock_id}!"
+            stock_id_str = str(stock_id)
+            assert i == 0, f"More than one stacked lightcurve found for {stock_id_str}!"
             assert len(ic["body"]) == 1, (
-                f"None or more than one stacking result found for {stock_id}!"
+                f"None or more than one stacking result found for {stock_id_str}!"
             )
             records = ic["body"][0]
         return pd.DataFrame(records)
@@ -118,10 +120,13 @@ class AmpelInterface:
         return pd.DataFrame(records, index=index)
 
     def extract_selected_datapoint_ids(self, stock_id: StockId) -> List[DataPointId]:
-        return self.t1.find_one({"stock": stock_id})["dps"]
+        d = self.t1.find_one({"stock": stock_id})
+        if d is None:
+            return []
+        return d["dps"]
 
     def export_stacked_lightcurve(self, stock_id: StockId, filename: Path):
-        logger.debug(f"Exporting stacked lightcurve for {stock_id} to {filename}")
+        logger.debug(f"Exporting stacked lightcurve for {str(stock_id)} to {filename}")
         self.extract_stacked_lightcurve(stock_id).to_csv(filename)
 
     def export_many(
@@ -130,5 +135,5 @@ class AmpelInterface:
         if stock_ids is None:
             stock_ids = pd.read_csv(self.input_csv)[self.orig_id_key]
         directory.mkdir(exist_ok=True, parents=True)
-        for s in np.atleast_1d(stock_ids):
+        for s in np.atleast_1d(cast(npt.ArrayLike, stock_ids)):
             self.export_stacked_lightcurve(s.item(), directory / f"{s}.csv")

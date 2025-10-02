@@ -78,7 +78,7 @@ python_version = "3.10"
 [[tool.mypy.overrides]]
 module = [
     "astropy.*",
-    "pyvo",
-    "SciServer"
+    "pyvo.*",
+    "SciServer.*"
 ]
 ignore_missing_imports = true

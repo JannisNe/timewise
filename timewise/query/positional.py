@@ -1,6 +1,5 @@
 import logging
 from typing import Literal, Dict
-from pydantic import computed_field
 
 from .base import Query
 
@@ -11,7 +10,7 @@ class PositionalQuery(Query):
     type: Literal["positional"] = "positional"
     radius_arcsec: float
 
-    @computed_field
+    @property
     def input_columns(self) -> Dict[str, str]:
         return {"ra": "float", "dec": "float", self.original_id_key: "int"}
 

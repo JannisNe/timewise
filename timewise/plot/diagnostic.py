@@ -1,4 +1,4 @@
-from typing import Literal, Dict, Any, Sequence, List
+from typing import Literal, Dict, Any, Sequence, List, cast
 from functools import partial
 from pathlib import Path
 import logging
@@ -55,7 +55,7 @@ class DiagnosticPlotter(BaseModel):
     def make_plot(
         self,
         stacked_lightcurve: pd.DataFrame | None,
-        raw_lightcurve: pd.DataFrame | None,
+        raw_lightcurve: pd.DataFrame,
         labels: npt.ArrayLike,
         source_ra: float,
         source_dec: float,
@@ -225,13 +225,15 @@ def make_plot(
         selected_dp_ids = ampel_interface.extract_selected_datapoint_ids(stock_id=index)
         labels = [0] * len(raw_lightcurve)
         source = input_data.loc[index]
+        ra: float = cast(float, source.ra)
+        dec: float = cast(float, source.dec)
 
         fig, axs = plotter.make_plot(
             stacked_lightcurve=stacked_lightcurve,
             raw_lightcurve=raw_lightcurve,
             labels=labels,
-            source_ra=source.ra,
-            source_dec=source.dec,
+            source_ra=ra,
+            source_dec=dec,
             selected_indices=selected_dp_ids,
         )
         fn = output_directory / f"{index}.pdf"

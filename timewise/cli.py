@@ -78,7 +78,7 @@ def export(
     config_path: config_path_type,
     output_directory: Annotated[Path, typer.Argument(help="output directory")],
     indices: Annotated[
-        list[int],
+        list[int] | None,
         typer.Option(
             "-i", "--indices", help="Indices to export, defaults to all indices"
         ),
@@ -95,7 +95,7 @@ def run_chain(
     ampel_config_path: ampel_config_path_type,
     output_directory: Annotated[Path, typer.Argument(help="output directory")],
     indices: Annotated[
-        list[int],
+        list[int] | None,
         typer.Option(
             "-i", "--indices", help="Indices to export, defaults to all indices"
         ),

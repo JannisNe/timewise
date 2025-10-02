@@ -2,7 +2,7 @@ import time
 import threading
 import logging
 from queue import Empty
-from typing import Dict, Iterator
+from typing import Dict, Iterator, cast, Sequence
 from itertools import product
 from pathlib import Path
 
@@ -106,11 +106,20 @@ class Downloader:
     # TAP submission and download
     # ----------------------------
     def get_chunk_data(self, chunk: Chunk) -> pd.DataFrame:
-        start = min(chunk.row_numbers) + 1  # plus one to always skip header line
-        nrows = max(chunk.row_numbers) - start + 2  # plus one: skip header, plus one:
+        start = (
+            min(cast(Sequence[int], chunk.row_numbers)) + 1
+        )  # plus one to always skip header line
+        nrows = (
+            max(cast(Sequence[int], chunk.row_numbers)) - start + 2
+        )  # plus one: skip header, plus one:
 
-        columns = pd.read_csv(self.input_csv, nrows=0).columns
-        return pd.read_csv(self.input_csv, skiprows=start, nrows=nrows, names=columns)
+        columns = list(pd.read_csv(self.input_csv, nrows=0).columns)
+        return pd.read_csv(
+            filepath_or_buffer=self.input_csv,
+            skiprows=start,
+            nrows=nrows,
+            names=columns,
+        )
 
     def submit_tap_job(self, query: Query, chunk: Chunk) -> TAPJobMeta:
         adql = query.adql

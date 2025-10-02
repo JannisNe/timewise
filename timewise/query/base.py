@@ -1,15 +1,14 @@
 import abc
 from typing import ClassVar, List
-from pydantic import BaseModel, computed_field
+from pydantic import BaseModel
 from hashlib import sha256
 
 from ..tables import TableType
 
 
 class Query(abc.ABC, BaseModel):
-    type: ClassVar[str]
+    type: str
     upload_name: ClassVar[str] = "mine"
-    input_columns: ClassVar[dict[str, str]]
 
     original_id_key: str = "orig_id"
     constraints: List[str] = [
@@ -23,16 +22,18 @@ class Query(abc.ABC, BaseModel):
     columns: List[str]
     table: TableType
 
+    @property
+    @abc.abstractmethod
+    def input_columns(self) -> dict[str, str]: ...
+
     @abc.abstractmethod
     def build(self) -> str: ...
 
-    @computed_field
     @property
     def adql(self) -> str:
         """ADQL string computed once per instance."""
         return self.build()
 
-    @computed_field
     @property
     def hash(self) -> str:
         return (

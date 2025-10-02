@@ -1,6 +1,7 @@
 from typing import Iterator
 from pathlib import Path
 import numpy as np
+from numpy import typing as npt
 import pandas as pd
 import logging
 
@@ -8,7 +9,9 @@ logger = logging.getLogger(__name__)
 
 
 class Chunk:
-    def __init__(self, chunk_id: int, indices: np.ndarray, row_indices: np.ndarray):
+    def __init__(
+        self, chunk_id: int, indices: npt.ArrayLike, row_indices: npt.ArrayLike
+    ):
         self.chunk_id = chunk_id
         self.indices = indices
         self.row_numbers = row_indices
