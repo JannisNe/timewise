@@ -59,7 +59,7 @@ jobs:
           cd ..
 
       - name: Run mypy
-        run: poetry run mypy . --install-types --non-interactive
+        run: poetry run mypy
 
       - name: Run Ruff
         uses: astral-sh/ruff-action@v3
