@@ -14,6 +14,7 @@ class AmpelConfig(BaseModel):
     mongo_db_name: str
     template_path: Path = DEFAULT_TEMPLATE_PATH
     uri: str = "localhost:27017"
+    ncpu: int = 1
 
     @property
     def input_mongo_db_name(self) -> str:
@@ -27,4 +28,5 @@ class AmpelConfig(BaseModel):
             input_mongo_db_name=self.input_mongo_db_name,
             template_path=self.template_path,
             uri=self.uri,
+            ncpu=self.ncpu,
         )

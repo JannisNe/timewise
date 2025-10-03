@@ -24,6 +24,7 @@ class AmpelInterface:
         input_mongo_db_name: str,
         template_path: str | Path,
         uri: str,
+        ncpu: int,
     ):
         self.mongo_db_name = mongo_db_name
         self.orig_id_key = orig_id_key
@@ -31,6 +32,7 @@ class AmpelInterface:
         self.input_mongo_db_name = input_mongo_db_name
         self.template_path = Path(template_path)
         self.uri = uri
+        self.ncpu = ncpu
 
     def import_input(self):
         # if collection already exists, assume import was already done
@@ -57,6 +59,7 @@ class AmpelInterface:
             .replace("ORIGINAL_ID_KEY", self.orig_id_key)
             .replace("INPUT_MONGODB_NAME", self.input_mongo_db_name)
             .replace("MONGODB_NAME", self.mongo_db_name)
+            .replace("NCPU", str(self.ncpu))
         )
 
         ampel_job_path = cfg_path.parent / f"{cfg_path.stem}_ampel_job.yml"

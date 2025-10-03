@@ -34,9 +34,10 @@ task:
           config:
             timewise_config_file: TIMEWISE_CONFIG_PATH
             stock_id_column_name: ORIGINAL_ID_KEY
+            multiplier: NCPU
           unit: TimewiseFileLoader
       unit: TimewiseAlertSupplier
-  multiplier: 1
+  multiplier: NCPU
   title: t0
   template:
     live:
