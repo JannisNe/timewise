@@ -170,7 +170,6 @@ class Downloader:
         logger.info(f"downloading {job_meta['url']}")
         job = self.service.get_job_from_url(url=job_meta["url"])
         job.wait()
-        logger.info(f"{job_meta['url']}: Done!")
         return job.fetch_result().to_table()
 
     # ----------------------------
