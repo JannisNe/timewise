@@ -1,6 +1,5 @@
 from pathlib import Path
 from typing import List
-
 import pandas as pd
 from pydantic import BaseModel, Field, model_validator
 
@@ -36,17 +35,19 @@ class DownloadConfig(BaseModel):
             for col, dtype in qc.input_columns.items():
                 if col not in input_table.columns:
                     missing_columns.add(col)
-                try:
-                    input_table[col].astype(TYPE_MAP[dtype])
-                except Exception:
-                    wrong_dtype.add(col)
+                else:
+                    try:
+                        input_table[col].astype(TYPE_MAP[dtype])
+                    except Exception:
+                        wrong_dtype.add(col)
 
         msg = f"CSV file {self.input_csv}: "
         if missing_columns:
-            msg += f"\n\tmissing required columns: {sorted(missing_columns)}"
+            raise KeyError(msg + f"Missing required columns: {sorted(missing_columns)}")
         if wrong_dtype:
-            msg += (
-                f"\n\tcolumns not convertable to right data type: {sorted(wrong_dtype)}"
+            raise TypeError(
+                msg
+                + f"Columns not convertable to right data type: {sorted(wrong_dtype)}"
             )
 
         return self
