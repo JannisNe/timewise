@@ -6,12 +6,12 @@ from timewise.query import QueryType
 class TAPJobMeta(TypedDict):
     url: str
     status: str
-    submitted: float
-    last_checked: float
+    submitted: str
+    last_checked: str
     input_length: int
     query: str
     query_config: QueryType | dict
-    completed_at: float
+    completed_at: str
 
 
 class TaskID(NamedTuple):

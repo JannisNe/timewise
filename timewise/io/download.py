@@ -5,6 +5,7 @@ from queue import Empty
 from typing import Dict, Iterator, cast, Sequence
 from itertools import product
 from pathlib import Path
+from datetime import datetime
 
 import pandas as pd
 import numpy as np
@@ -154,14 +155,16 @@ class Downloader:
             query=adql,
             query_config=query.model_dump(),
             input_length=len(chunk_df),
-            submitted=time.time(),
-            last_checked=time.time(),
+            submitted=str(datetime.now()),
+            last_checked=str(datetime.now()),
             status=job.phase,
             completed_at=0,
         )
 
     def check_job_status(self, job_meta: TAPJobMeta) -> str:
-        return self.service.get_job_from_url(url=job_meta["url"]).phase
+        status = self.service.get_job_from_url(url=job_meta["url"]).phase
+        job_meta["last_checked"] = str(datetime.now())
+        return status
 
     def download_job_result(self, job_meta: TAPJobMeta) -> Table:
         logger.info(f"downloading {job_meta['url']}")
@@ -229,7 +232,7 @@ class Downloader:
                     logger.debug(payload_table.columns)
                     backend.save_data(task, payload_table)
                     meta["status"] = "COMPLETED"
-                    meta["completed_at"] = time.time()
+                    meta["completed_at"] = str(datetime.now())
                     backend.save_meta(task, meta)
                     backend.mark_done(task)
                     with self.job_lock:
