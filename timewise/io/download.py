@@ -158,7 +158,7 @@ class Downloader:
             submitted=str(datetime.now()),
             last_checked=str(datetime.now()),
             status=job.phase,
-            completed_at=0,
+            completed_at="",
         )
 
     def check_job_status(self, job_meta: TAPJobMeta) -> str:
@@ -263,6 +263,7 @@ class Downloader:
                     logger.info("All tasks done! Exiting polling thread")
                     break
 
+            logger.info(f"Next poll in {self.poll_interval}s")
             time.sleep(self.poll_interval)
 
     # ----------------------------
