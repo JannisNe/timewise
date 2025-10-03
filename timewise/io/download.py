@@ -5,7 +5,7 @@ from queue import Empty
 from typing import Dict, Iterator, cast, Sequence
 from itertools import product
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 import numpy as np
@@ -263,7 +263,9 @@ class Downloader:
                     logger.info("All tasks done! Exiting polling thread")
                     break
 
-            logger.info(f"Next poll in {self.poll_interval}s")
+            logger.info(
+                f"Next poll at {datetime.now() + timedelta(seconds=self.poll_interval)}s"
+            )
             time.sleep(self.poll_interval)
 
     # ----------------------------
