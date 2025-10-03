@@ -6,6 +6,7 @@ import os
 import tempfile
 
 import pytest
+from pymongo import MongoClient
 
 from tests.dummy_tap import get_table_from_query_and_chunk
 from timewise.io import DownloadConfig
@@ -89,13 +90,13 @@ def tmp_db_name(
     # Yield to test
     yield db_name
 
-    # try:
-    #     client = MongoClient()
-    #     for d in client.list_database_names():
-    #         if d.startswith(db_name):
-    #             client.drop_database(d)
-    # except Exception:
-    #     pass
+    try:
+        client = MongoClient()
+        for d in client.list_database_names():
+            if d.startswith(db_name):
+                client.drop_database(d)
+    except Exception:
+        pass
 
 
 @pytest.fixture
