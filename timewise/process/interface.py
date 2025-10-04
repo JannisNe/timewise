@@ -24,7 +24,6 @@ class AmpelInterface:
         input_mongo_db_name: str,
         template_path: str | Path,
         uri: str,
-        ncpu: int,
     ):
         self.mongo_db_name = mongo_db_name
         self.orig_id_key = orig_id_key
@@ -32,7 +31,6 @@ class AmpelInterface:
         self.input_mongo_db_name = input_mongo_db_name
         self.template_path = Path(template_path)
         self.uri = uri
-        self.ncpu = ncpu
 
     def import_input(self):
         # if collection already exists, assume import was already done
@@ -59,7 +57,6 @@ class AmpelInterface:
             .replace("ORIGINAL_ID_KEY", self.orig_id_key)
             .replace("INPUT_MONGODB_NAME", self.input_mongo_db_name)
             .replace("MONGODB_NAME", self.mongo_db_name)
-            .replace("NCPU", str(self.ncpu))
         )
 
         ampel_job_path = cfg_path.parent / f"{cfg_path.stem}_ampel_job.yml"
@@ -101,10 +98,14 @@ class AmpelInterface:
     def t1(self) -> Collection:
         return self.db["t1"]
 
+    @property
+    def t2(self) -> Collection:
+        return self.db["t2"]
+
     def extract_stacked_lightcurve(self, stock_id: StockId) -> pd.DataFrame:
         records = []
         for i, ic in enumerate(
-            self.t1.find({"stock": stock_id, "unit": "T1StackVisits"})
+            self.t2.find({"stock": stock_id, "unit": "T2StackVisits"})
         ):
             stock_id_str = str(stock_id)
             assert i == 0, f"More than one stacked lightcurve found for {stock_id_str}!"

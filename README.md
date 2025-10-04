@@ -29,23 +29,26 @@ ampel config build -distributions ampel timewise -stop-on-errors 0 -out <path-to
 ### Command line interface
 
 ```
- Usage: timewise [OPTIONS] COMMAND [ARGS]...                                    
-                                                                                
- Timewsie CLI                                                                   
-                                                                                
-╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --log-level           -l      TEXT  Logging level (DEBUG, INFO, WARNING,     │
-│                                     ERROR, CRITICAL)                         │
-│                                     [default: INFO]                          │
-│ --help                              Show this message and exit.              │
-╰──────────────────────────────────────────────────────────────────────────────╯
-╭─ Commands ───────────────────────────────────────────────────────────────────╮
-│ download        Download WISE photometry from IRSA                           │
-│ prepare-ampel   Prepares the AMPEL job file so AMPEL can be run manually     │
-│ process         Processes the lightcurves using AMPEL                        │
-│ export          Write stacked lightcurves to disk                            │
-│ run-chain       Run download, process and export                             │
-╰──────────────────────────────────────────────────────────────────────────────╯
+ Usage: timewise [OPTIONS] COMMAND [ARGS]...                                                                
+                                                                                                            
+ Timewsie CLI                                                                                               
+                                                                                                            
+╭─ Options ────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ --log-level           -l      TEXT  Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)                │
+│                                     [default: INFO]                                                      │
+│ --install-completion                Install completion for the current shell.                            │
+│ --show-completion                   Show completion for the current shell, to copy it or customize the   │
+│                                     installation.                                                        │
+│ --help                              Show this message and exit.                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ───────────────────────────────────────────────────────────────────────────────────────────────╮
+│ download        Download WISE photometry from IRSA                                                       │
+│ prepare-ampel   Prepares the AMPEL job file so AMPEL can be run manually                                 │
+│ process         Processes the lightcurves using AMPEL                                                    │
+│ export          Write stacked lightcurves to disk                                                        │
+│ run-chain       Run download, process and export                                                         │
+│ plot            Make diagnostic plots                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 ```
 
@@ -133,6 +136,12 @@ timewise prepare-ampel <path-to-config-file>
 The result will contain the path to the prepared AMPEL job file that can be run with
 ```bash
 ampel job -config <path-to-ampel-config-file> -schema <path-to-ampel-job-file>
+```
+
+#### Make some diagnostic plots
+To check the datapoint selection and binning, take a quick look at the data:
+```bash
+timewise plot <path-to-config-file> <indices-to-plot> <output-directory>
 ```
 
 

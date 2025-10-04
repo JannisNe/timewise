@@ -16,9 +16,8 @@ task:
       ingest:
         mux:
           combine:
-          - state_t2: []
-            compute:
-              unit: T1StackVisits
+          - state_t2:
+            - unit: T2StackVisits
             unit: T1SimpleCombiner
           unit: TiMongoMuxer
     iter_max: 1000000
@@ -40,3 +39,8 @@ task:
       - resolve_run_time_aliases
       - hash_t2_config
   unit: AlertConsumer
+- config:
+    log_profile: default
+  multiplier: 1
+  title: t2
+  unit: T2Worker

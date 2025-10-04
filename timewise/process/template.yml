@@ -16,9 +16,8 @@ task:
       ingest:
         mux:
           combine:
-          - state_t2: []
-            compute:
-              unit: T1StackVisits
+          - state_t2:
+            - unit: T2StackVisits
             unit: T1HDBSCAN
             config:
               original_id_key: ORIGINAL_ID_KEY
@@ -34,13 +33,17 @@ task:
           config:
             timewise_config_file: TIMEWISE_CONFIG_PATH
             stock_id_column_name: ORIGINAL_ID_KEY
-            multiplier: NCPU
           unit: TimewiseFileLoader
       unit: TimewiseAlertSupplier
-  multiplier: NCPU
+  multiplier: 1
   title: t0
   template:
     live:
       - resolve_run_time_aliases
       - hash_t2_config
   unit: AlertConsumer
+- config:
+    log_profile: default
+  multiplier: 1
+  title: t2
+  unit: T2Worker
