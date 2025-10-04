@@ -105,7 +105,7 @@ class TiMongoMuxer(AbsT0Muxer):
         ids_dps_alert = {el["id"] for el in new_dps}
 
         if len(ids_dps_alert) == 0:
-            self.logger.debug(f"{stock_id}: no new data points")
+            self.logger.debug(f"{str(stock_id)}: no new data points")
             return None, None
 
         # uniquify photopoints by mjd, ra, and dec.
