@@ -31,9 +31,10 @@ class T2StackVisits(AbsLightCurveT2Unit):
             for key in [keys.MAG_EXT, keys.FLUX_EXT]:
                 columns.extend([f"w{i}{key}", f"w{i}{keys.ERROR_EXT}{key}"])
 
-        data, _ = datapoints_to_dataframe(
-            light_curve.get_photopoints(), columns=columns
-        )
+        photopoints = light_curve.get_photopoints()
+        if photopoints is None:
+            return {}
+        data, _ = datapoints_to_dataframe(photopoints, columns=columns)
         if len(data) == 0:
             return {}
         return stack_visits(data, self.clean_outliers).to_dict(orient="records")
