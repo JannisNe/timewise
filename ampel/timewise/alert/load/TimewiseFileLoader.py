@@ -28,8 +28,6 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
     # column name of id
     stock_id_column_name: str
 
-    multiplier: int = 1
-
     chunks: list[int] | None = None
 
     def __init__(self, **kwargs) -> None:
@@ -41,7 +39,11 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         self._timewise_backend = dl.backend
 
         # selecting tasks to run
-        self._tasks = self.select_tasks([tasks for tasks in dl.iter_tasks_per_chunk()])
+        _tasks = [tasks for tasks in dl.iter_tasks_per_chunk()]
+        if self.chunks is not None:
+            self._tasks = [_tasks[i] for i in self.chunks]
+        else:
+            self._tasks = _tasks
         if self.logger:
             self.logger.info(
                 f"Registering {len(self._tasks)} chunk(s) to load: {self._tasks}"
@@ -49,27 +51,6 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
 
         self._table_types = get_args(TableType.__origin__)  # type: ignore
         self._gen = self.iter_stocks()
-
-    def select_tasks(self, _tasks: list[list[TaskID]]):
-        if self.chunks is not None:
-            if self.multiplier > 1:
-                self.logger.warn("Ignoring multiplier because chunks were specified!")
-            return [_tasks[i] for i in self.chunks]
-
-        if self.multiplier == 1:
-            return _tasks
-
-        # find out which process is being run
-        current_process_id = (
-            int(multiprocessing.current_process().name.split("-")[-1]) - 1
-        )
-        self.logger.info(f"Process: {current_process_id}")
-        batch_size = (len(_tasks) + self.multiplier - 1) // self.multiplier
-        self.logger.info(f"batch size is {batch_size}")
-        start = current_process_id * batch_size
-        end = (current_process_id + 1) * batch_size
-        self.logger.info(f"running batch {current_process_id}: {start} to {end}")
-        return _tasks[start:end]
 
     @staticmethod
     def encode_result(res: Table) -> Table:
