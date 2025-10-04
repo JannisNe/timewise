@@ -47,4 +47,4 @@ download:
 
 ampel:
   mongo_db_name: MONGODB_NAME
-  ncpu: 2
+  ncpu: 1
