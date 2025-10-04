@@ -7,18 +7,15 @@
 # Last Modified Date:  24.09.2025
 # Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
 
-import pandas as pd
-
 from ampel.abstract.AbsLightCurveT2Unit import AbsLightCurveT2Unit
 from ampel.struct.UnitResult import UnitResult
 from ampel.types import UBson
 from ampel.view.LightCurve import LightCurve
 
+from ampel.timewise.util.pdutil import datapoints_to_dataframe
+
 from timewise.process import keys
 from timewise.process.stacking import stack_visits
-
-
-# ruff: noqa: E712
 
 
 class T2StackVisits(AbsLightCurveT2Unit):
@@ -34,7 +31,9 @@ class T2StackVisits(AbsLightCurveT2Unit):
             for key in [keys.MAG_EXT, keys.FLUX_EXT]:
                 columns.extend([f"w{i}{key}", f"w{i}{keys.ERROR_EXT}{key}"])
 
-        data = pd.DataFrame(light_curve.get_ntuples(columns), columns=columns)
+        data, _ = datapoints_to_dataframe(
+            light_curve.get_photopoints(), columns=columns
+        )
         if len(data) == 0:
             return {}
         return stack_visits(data, self.clean_outliers).to_dict(orient="records")
