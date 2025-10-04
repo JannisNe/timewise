@@ -53,7 +53,7 @@ jobs:
      # Setting up dependencies
       - name: Install dependencies
         run: |
-          poetry run pip install setuptoolsl
+          poetry run pip install setuptools
           cd SciScript-Python
           poetry run python Install.py sciserver-v2.1.0
           cd ..
