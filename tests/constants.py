@@ -37,13 +37,13 @@ for i in range(1, 3):
     ):
         V0_KEYMAP.extend(
             [
-                (f"W{i}{V0_KEYS['mean_key']}{ol}", f"w{i}{nl}"),
-                (f"W{i}{ol}{V0_KEYS['rms_key']}", f"w{i}{keys.RMS}{nl}"),
+                (f"W{i}{V0_KEYS['mean_key']}{ol}", f"w{i}{keys.MEAN}{nl}"),
+                (f"W{i}{ol}{V0_KEYS['rms_key']}", f"w{i}{nl}{keys.RMS}"),
                 (
                     f"W{i}{ol}{V0_KEYS['upper_limit_key']}",
-                    f"w{i}{keys.UPPER_LIMIT}{nl}",
+                    f"w{i}{nl}{keys.UPPER_LIMIT}",
                 ),
-                (f"W{i}{ol}{V0_KEYS['Npoints_key']}", f"w{i}{keys.NPOINTS}{nl}"),
+                (f"W{i}{ol}{V0_KEYS['Npoints_key']}", f"w{i}{nl}{keys.NPOINTS}"),
             ]
         )
 V0_KEYMAP = np.array(V0_KEYMAP)
