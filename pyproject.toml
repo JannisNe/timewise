@@ -41,7 +41,6 @@ timewise = "timewise.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/JannisNe/timewise"
-Documentation = "https://timewise.readthedocs.io/en/latest"
 "Bug Tracker" = "https://github.com/JannisNe/timewise/issues"
 
 [project.optional-dependencies]
