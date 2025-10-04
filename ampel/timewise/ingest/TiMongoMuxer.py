@@ -97,18 +97,22 @@ class TiMongoMuxer(AbsT0Muxer):
         # New pps/uls lists for db loaded datapoints
         dps_db = self._get_dps(stock_id)
 
-        # Create set with datapoint ids from alert
-        ids_dps_alert = {el["id"] for el in dps}
-
         # python set of ids of datapoints from DB
         ids_dps_db = {el["id"] for el in dps_db}
 
-        # uniquify photopoints by jd, fid. For duplicate points,
-        # choose the one with the larger id
-        # (jd, fid) -> ids
+        # Create set with new datapoint ids from alert
+        new_dps = [dp for dp in dps if dp["id"] not in ids_dps_db]
+        ids_dps_alert = {el["id"] for el in new_dps}
+
+        if len(ids_dps_alert) == 0:
+            self.logger.debug(f"{str(stock_id)}: no new data points")
+            return None, None
+
+        # uniquify photopoints by mjd, ra, and dec.
+        # make sure there are no duplicates
         unique_dps_ids: dict[tuple[float, float, float], list[DataPointId]] = {}
 
-        for dp in dps_db + dps:
+        for dp in dps_db + new_dps:
             # jd alone is not enough for matching pps because each time is associated with
             # two filters! Also, if there can be multiple sources within the same frame which
             # leads to duplicate MJD and FID. Check position in addition.
