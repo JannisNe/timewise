@@ -69,7 +69,7 @@ pythonpath = "."
 
 # Per-module ignores
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 explicit_package_bases = true
 install_types = true
 non_interactive = true
