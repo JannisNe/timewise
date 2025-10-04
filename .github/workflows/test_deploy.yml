@@ -43,4 +43,4 @@ jobs:
           python -m pip install poetry
           python -m pip install --no-deps --pre --index-url https://test.pypi.org/simple/ timewise
           poetry install --no-root
-          poetry run python -c 'from timewise import WiseDataByVisit, ParentSampleBase'
+          poetry run python -c 'from timewise.config import TimewiseConfig'
