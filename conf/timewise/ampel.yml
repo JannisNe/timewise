@@ -7,3 +7,4 @@ unit:
 - ampel.timewise.t2.T2StackVisits
 - ampel.timewise.t1.T1HDBSCAN
 - ampel.timewise.util.AuxDiagnosticPlotter
+- ampel.timewise.t1.TimewiseFilter
