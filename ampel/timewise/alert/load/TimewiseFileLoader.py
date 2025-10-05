@@ -6,10 +6,10 @@
 # Date:                16.09.2025
 # Last Modified Date:  16.09.2025
 # Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
-from typing import Dict, get_args, Iterator
-import multiprocessing
+from typing import Dict, get_args
 
 import numpy as np
+import pandas as pd
 from astropy.table import Table, vstack
 from ampel.abstract.AbsAlertLoader import AbsAlertLoader
 from timewise.tables import TableType
@@ -53,7 +53,9 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
         self._gen = self.iter_stocks()
 
     @staticmethod
-    def encode_result(res: Table) -> Table:
+    def encode_result(res: pd.DataFrame) -> pd.DataFrame:
+        if isinstance(res, pd.Series):
+            return pd.DataFrame([res])
         return res
 
     def find_table_from_task(self, task: TaskID) -> TableType:
@@ -84,18 +86,33 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
 
                 data.append(idata)
 
-            data = vstack(data)
+            data = vstack(data).to_pandas()
 
             # rename stock id column
-            data.rename_column(self.stock_id_column_name, "stock_id")
+            data.rename(columns={self.stock_id_column_name: "stock_id"}, inplace=True)
+
+            # Find the indices for each stock id. This is much faster than making a mask
+            # each loop and accessing the table then. Shown below is a comparison.
+            # The top example is the access provided by pandas which would be
+            # again a factor 3 faster.
+            #
+            # In [45]: %timeit test_df()
+            # 5.62 μs ± 47.2 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
+            #
+            # In [46]: %timeit test_index()
+            # 14.6 μs ± 45 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
+            #
+            # In [47]: %timeit test_mask()
+            # 2.61 ms ± 18 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+            data.set_index(data.stock_id, inplace=True)
 
             # iterate over all stock ids
             for stock_id in np.unique(data["stock_id"]):
-                selection = data[data["stock_id"] == stock_id]
+                selection = data.loc[stock_id]
                 yield self.encode_result(selection)
 
     def __iter__(self):
         return self
 
-    def __next__(self) -> Table:
+    def __next__(self) -> pd.DataFrame:
         return next(self._gen)
