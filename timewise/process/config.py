@@ -1,8 +1,7 @@
 from pathlib import Path
 import logging
-from typing import Dict, Any
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, model_validator
 
 from .interface import AmpelInterface
 
@@ -15,16 +14,14 @@ class AmpelConfig(BaseModel):
     mongo_db_name: str
     template_path: Path = DEFAULT_TEMPLATE_PATH
     uri: str = "localhost:27017"
+    # will default to <mongo_db_name>_input
     input_mongo_db_name: str = ""
 
-    @field_validator("input_mongo_db_name", mode="after")  # type: ignore
-    @classmethod
-    def default_input_db_name(
-        cls, input_mongo_db_name: str, values: Dict[str, Any]
-    ) -> str:
-        if not input_mongo_db_name:
-            return values["mongo_db_name"] + "_input"
-        return input_mongo_db_name
+    @model_validator(mode="after")  # type: ignore
+    def default_input_db_name(self) -> "AmpelConfig":
+        if not self.input_mongo_db_name:
+            self.input_mongo_db_name = self.mongo_db_name + "_input"
+        return self
 
     def build_interface(self, original_id_key: str, input_csv: Path) -> AmpelInterface:
         return AmpelInterface(
