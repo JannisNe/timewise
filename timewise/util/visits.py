@@ -3,7 +3,9 @@ import pandas as pd
 import numpy.typing as npt
 
 
-def get_visit_map(mjd: npt.NDArray[float]) -> npt.NDArray[np.int64]:
+def get_visit_map(
+    mjd: npt.NDArray[np.float64] | pd.Series[float],
+) -> npt.NDArray[np.int64]:
     """
     Create a map datapoint to visit
 

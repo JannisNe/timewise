@@ -114,5 +114,5 @@ class TimewiseFileLoader(AbsAlertLoader[Dict]):
     def __iter__(self):
         return self
 
-    def __next__(self) -> pd.DataFrame:
+    def __next__(self) -> pd.DataFrame:  # type: ignore
         return next(self._gen)

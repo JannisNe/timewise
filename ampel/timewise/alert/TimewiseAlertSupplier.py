@@ -9,13 +9,11 @@
 
 import sys
 from hashlib import blake2b
-from typing import Literal, List, TYPE_CHECKING
+from typing import Literal, List
 
 import pandas as pd
 
 from bson import encode
-import numpy as np
-from numpy.ma.core import MaskedConstant
 
 from ampel.alert.AmpelAlert import AmpelAlert
 from ampel.alert.BaseAlertSupplier import BaseAlertSupplier
@@ -47,7 +45,7 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
         :raises StopIteration: when alert_loader dries out.
         :raises AttributeError: if alert_loader was not set properly before this method is called
         """
-        table: pd.DataFrame = self._deserialize(next(self.alert_loader))
+        table: pd.DataFrame = self._deserialize(next(self.alert_loader))  # type: ignore
 
         stock_ids = table["stock_id"].unique()
         assert len(stock_ids) == 1
@@ -61,9 +59,9 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
         columns_to_rename = [c for c in table.columns if c.endswith("_ep")]
         if len(columns_to_rename):
             rename = {
-                c: (cnew := c.replace("_ep", ""))
+                c: c.replace("_ep", "")
                 for c in columns_to_rename
-                if cnew not in table.columns
+                if c.replace("_ep", "") not in table.columns
             }
             if rename:
                 # in this case only the allwise column eith the _ep extension exists
@@ -71,9 +69,9 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
                 table.rename(columns=rename, inplace=True)
 
             move = {
-                c: (cnew := c.replace("_ep", ""))
+                c: c.replace("_ep", "")
                 for c in columns_to_rename
-                if cnew in table.columns
+                if c.replace("_ep", "") in table.columns
             }
             if move:
                 # In this case, the columns already exists because the neowise data is present
@@ -81,8 +79,10 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
                 # respective neowise columns
                 for c, nc in move.items():
                     na_mask = table[nc].isna()
-                    table[nc][na_mask] = table[c][na_mask]
+                    table.loc[na_mask, nc] = table[c][na_mask]
+                pd.options.mode.chained_assignment = None
                 table.drop(columns=[c for c in move], inplace=True)
+                pd.options.mode.chained_assignment = "warn"
 
         for i, row in table.iterrows():
             # convert table row to dict, convert data types from numpy to native python
