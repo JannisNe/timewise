@@ -9,14 +9,11 @@
 
 import sys
 from hashlib import blake2b
-from typing import Literal, List, TYPE_CHECKING
+from typing import Literal, List
 
-if TYPE_CHECKING:
-    from astropy.table import Table
+import pandas as pd
 
 from bson import encode
-import numpy as np
-from numpy.ma.core import MaskedConstant
 
 from ampel.alert.AmpelAlert import AmpelAlert
 from ampel.alert.BaseAlertSupplier import BaseAlertSupplier
@@ -48,9 +45,9 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
         :raises StopIteration: when alert_loader dries out.
         :raises AttributeError: if alert_loader was not set properly before this method is called
         """
-        table: Table = self._deserialize(next(self.alert_loader))
+        table: pd.DataFrame = self._deserialize(next(self.alert_loader))  # type: ignore
 
-        stock_ids = np.unique(table["stock_id"])
+        stock_ids = table["stock_id"].unique()
         assert len(stock_ids) == 1
         stock_id = stock_ids[0]
 
@@ -61,27 +58,36 @@ class TimewiseAlertSupplier(BaseAlertSupplier):
         # remove the _ep at the end of AllWISE MEP data
         columns_to_rename = [c for c in table.columns if c.endswith("_ep")]
         if len(columns_to_rename):
-            new_columns_names = [c.replace("_ep", "") for c in columns_to_rename]
-
-            try:
+            rename = {
+                c: c.replace("_ep", "")
+                for c in columns_to_rename
+                if c.replace("_ep", "") not in table.columns
+            }
+            if rename:
                 # in this case only the allwise column eith the _ep extension exists
                 # and we can simply rename the columns
-                table.rename_columns(columns_to_rename, new_columns_names)
-            except KeyError:
+                table.rename(columns=rename, inplace=True)
+
+            move = {
+                c: c.replace("_ep", "")
+                for c in columns_to_rename
+                if c.replace("_ep", "") in table.columns
+            }
+            if move:
                 # In this case, the columns already exists because the neowise data is present
                 # we have to insert the values form the columns with the _ep extension into the
                 # respective neowise columns
-                for c, nc in zip(columns_to_rename, new_columns_names):
-                    table[nc][table[nc].mask] = table[c][table[nc].mask]
-                    table.remove_column(c)
+                for c, nc in move.items():
+                    na_mask = table[nc].isna()
+                    table.loc[na_mask, nc] = table[c][na_mask]
+                pd.options.mode.chained_assignment = None
+                table.drop(columns=[c for c in move], inplace=True)
+                pd.options.mode.chained_assignment = "warn"
 
-        for row in table:
+        for i, row in table.iterrows():
             # convert table row to dict, convert data types from numpy to native python
             # Respect masked fields and convert to None
-            pp = {
-                k: None if isinstance(v, MaskedConstant) else v.item()
-                for k, v in dict(row).items()
-            }
+            pp = {k: None if pd.isna(v) else v for k, v in row.to_dict().items()}
             pp_hash = blake2b(encode(pp), digest_size=7).digest()
             if self.counter:
                 pp["candid"] = self.counter

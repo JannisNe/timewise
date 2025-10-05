@@ -106,7 +106,7 @@ class DiagnosticPlotter(BaseModel):
         dec = (raw_lightcurve.dec - source_dec) * 3600
 
         # get visit map
-        visit_map = get_visit_map(raw_lightcurve)
+        visit_map = get_visit_map(raw_lightcurve.mjd)
 
         # for each visit plot the datapoints on the cutout
         # for each visit plot the datapoints on the cutout

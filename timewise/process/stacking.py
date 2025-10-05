@@ -204,7 +204,7 @@ def stack_visits(lightcurve: pd.DataFrame, clean_outliers: bool = True):
     """
 
     # -------------------------   create visit mask   -------------------------- #
-    visit_map = get_visit_map(lightcurve)
+    visit_map = get_visit_map(lightcurve.mjd)
     counts = np.bincount(visit_map)
 
     stacked_data: Dict[str, Any] = dict()
