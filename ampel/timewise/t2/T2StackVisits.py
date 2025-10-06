@@ -24,8 +24,13 @@ SIGMA = stats.chi2.cdf(1, 1)
 
 class T2StackVisits(AbsLightCurveT2Unit):
     clean_outliers: bool = True
-    outlier_threshold: float = 5
+
+    # spread quantile of each visit to estimate, defaults to
+    # ~68% which is the equivalent of 1 sigma for a normal distribution
     outlier_quantile: float = SIGMA
+
+    # threshold above which to exclude outliers
+    outlier_threshold: float = 5
 
     def process(self, light_curve: LightCurve) -> UBson | UnitResult:
         columns = [
