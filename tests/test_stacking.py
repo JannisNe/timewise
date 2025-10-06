@@ -59,6 +59,8 @@ def test_stacking(
 ):
     if mode == "unmasked":
         ampel_interface.template_path = DATA_DIR / "template_stack_all.yml"
+    if mode == "masked":
+        ampel_interface.template_path = DATA_DIR / "template_stack.yml"
 
     mongo_db_name = ampel_interface.mongo_db_name + "_" + mode
     ampel_interface.mongo_db_name = mongo_db_name
