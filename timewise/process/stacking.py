@@ -158,7 +158,8 @@ def calculate_epochs(
         # take the maximum value of the measured single exposure errors and the standard deviation
         u = np.maximum(std, e_meas)
 
-        # calculate 90% confidence interval
+        # Estimate the spread of the flux.
+        # To be robust against outliers, do that with quantiles instead of std
         qs = np.zeros_like(counts, dtype=float)
         qs[one_points_mask] = 1e-10
         visits_at_least_two_point = np.unique(visit_mask[~one_points_mask[visit_mask]])
