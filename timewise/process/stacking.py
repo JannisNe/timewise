@@ -26,6 +26,8 @@ def calculate_epochs(
     visit_mask: npt.NDArray[np.int64],
     counts: npt.NDArray[np.int64],
     remove_outliers: bool,
+    outlier_threshold: float,
+    outlier_quantile: float,
     outlier_mask: npt.NDArray[np.bool_] | None = None,
 ) -> tuple[
     npt.NDArray[np.float64],
@@ -70,7 +72,7 @@ def calculate_epochs(
     # ---------------------   remove outliers in the bins   ---------------------- #
 
     # if we do not want to clean outliers just set the threshold to infinity
-    outlier_thresh = np.inf if not remove_outliers else 20
+    _outlier_threshold = np.inf if not remove_outliers else outlier_threshold
 
     # set up empty masks
     outlier_mask = cast(
@@ -156,15 +158,16 @@ def calculate_epochs(
         # take the maximum value of the measured single exposure errors and the standard deviation
         u = np.maximum(std, e_meas)
 
-        # calculate 90% confidence interval
-        u70 = np.zeros_like(counts, dtype=float)
-        u70[one_points_mask] = 1e-10
+        # Estimate the spread of the flux.
+        # To be robust against outliers, do that with quantiles instead of std
+        qs = np.zeros_like(counts, dtype=float)
+        qs[one_points_mask] = 1e-10
         visits_at_least_two_point = np.unique(visit_mask[~one_points_mask[visit_mask]])
-        u70[visits_at_least_two_point] = np.array(
+        qs[visits_at_least_two_point] = np.array(
             [
                 np.quantile(
                     abs(f[(visit_mask == i) & use_mask] - median[i]),
-                    0.7,
+                    outlier_quantile,
                     method="interpolated_inverted_cdf",
                 )
                 for i in visits_at_least_two_point
@@ -173,7 +176,7 @@ def calculate_epochs(
 
         # ---------------------   remove outliers in the bins   ---------------------- #
         remaining_outliers = (
-            abs(median[visit_mask] - f) > outlier_thresh * u70[visit_mask]
+            abs(median[visit_mask] - f) > _outlier_threshold * qs[visit_mask]
         ) & ~outlier_mask
         outlier_mask |= remaining_outliers
         n_remaining_outlier = sum(remaining_outliers) if remove_outliers else 0
@@ -187,7 +190,12 @@ def calculate_epochs(
     return median, u, bin_ulim_bool, outlier_mask, use_mask, n_points
 
 
-def stack_visits(lightcurve: pd.DataFrame, clean_outliers: bool = True):
+def stack_visits(
+    lightcurve: pd.DataFrame,
+    outlier_threshold: float,
+    outlier_quantile: float,
+    clean_outliers: bool = True,
+):
     """
     Combine the data by visits of the satellite of one region in the sky.
     The visits typically consist of some tens of observations. The individual visits are separated by about
@@ -235,6 +243,8 @@ def stack_visits(lightcurve: pd.DataFrame, clean_outliers: bool = True):
                 counts,
                 remove_outliers=remove_outliers,
                 outlier_mask=outlier_mask,
+                outlier_quantile=outlier_quantile,
+                outlier_threshold=outlier_threshold,
             )
             n_outliers = np.sum(outlier_mask)
 
@@ -300,6 +310,8 @@ def stack_visits(lightcurve: pd.DataFrame, clean_outliers: bool = True):
                 counts,
                 remove_outliers=False,
                 outlier_mask=outlier_masks[keys.FLUX_EXT],
+                outlier_threshold=outlier_threshold,
+                outlier_quantile=outlier_quantile,
             )
         )
         stacked_data[f"{b}{keys.MEAN}{keys.FLUX_DENSITY_EXT}"] = mean_fd
