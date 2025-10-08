@@ -19,7 +19,7 @@ from timewise.process import keys
 from timewise.process.stacking import stack_visits
 
 
-SIGMA = stats.chi2.cdf(1, 1)
+SIGMA = float(stats.chi2.cdf(1, 1))
 
 
 class T2StackVisits(AbsLightCurveT2Unit):
