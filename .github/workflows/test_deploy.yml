@@ -40,6 +40,7 @@ jobs:
 
       - name: Test install from TestPyPi
         run: |
+          python -c "import time; time.sleep(20)"
           python -m pip install poetry
           python -m pip install --pre --index-url https://test.pypi.org/simple/ 'timewise[ampel]==1.0.0a4'
           poetry install --no-root -E ampel
