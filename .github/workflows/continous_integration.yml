@@ -57,7 +57,7 @@ jobs:
           cd SciScript-Python
           poetry run python Install.py sciserver-v2.1.0
           cd ..
-          poetry install -E dev
+          poetry install -E dev -E ampel
 
       - name: Run mypy
         run: poetry run mypy

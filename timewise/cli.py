@@ -6,11 +6,15 @@ import typer
 
 from .config import TimewiseConfig
 from .plot.diagnostic import make_plot
+from .process.interface import AMPEL_EXISTS
 
 from rich.logging import RichHandler
 
 
-app = typer.Typer(help="Timewsie CLI")
+ampel_missing_msg = (
+    " (download only because AMPEL is not installed)" if not AMPEL_EXISTS else ""
+)
+app = typer.Typer(help="Timewsie CLI" + ampel_missing_msg)
 
 config_path_type = Annotated[
     Path, typer.Argument(help="Pipeline config file (YAML/JSON)")
@@ -53,72 +57,74 @@ def download(
     TimewiseConfig.from_yaml(config_path).download.build_downloader().run()
 
 
-@app.command(help="Prepares the AMPEL job file so AMPEL can be run manually")
-def prepare_ampel(
-    config_path: config_path_type,
-):
-    cfg = TimewiseConfig.from_yaml(config_path)
-    ampel_interface = cfg.build_ampel_interface()
-    p = ampel_interface.prepare(config_path)
-    typer.echo(f"AMPEL job file: {p}")
+# the following commands will only be added if ampel is installed
+if AMPEL_EXISTS:
 
+    @app.command(help="Prepares the AMPEL job file so AMPEL can be run manually")
+    def prepare_ampel(
+        config_path: config_path_type,
+    ):
+        cfg = TimewiseConfig.from_yaml(config_path)
+        ampel_interface = cfg.build_ampel_interface()
+        p = ampel_interface.prepare(config_path)
+        typer.echo(f"AMPEL job file: {p}")
 
-@app.command(help="Processes the lightcurves using AMPEL")
-def process(
-    config_path: config_path_type,
-    ampel_config_path: ampel_config_path_type,
-):
-    cfg = TimewiseConfig.from_yaml(config_path)
-    ampel_interface = cfg.build_ampel_interface()
-    ampel_interface.run(config_path, ampel_config_path)
+    @app.command(help="Processes the lightcurves using AMPEL")
+    def process(
+        config_path: config_path_type,
+        ampel_config_path: ampel_config_path_type,
+    ):
+        cfg = TimewiseConfig.from_yaml(config_path)
+        ampel_interface = cfg.build_ampel_interface()
+        ampel_interface.run(config_path, ampel_config_path)
 
+    @app.command(help="Write stacked lightcurves to disk")
+    def export(
+        config_path: config_path_type,
+        output_directory: Annotated[Path, typer.Argument(help="output directory")],
+        indices: Annotated[
+            list[int] | None,
+            typer.Option(
+                "-i", "--indices", help="Indices to export, defaults to all indices"
+            ),
+        ] = None,
+    ):
+        TimewiseConfig.from_yaml(config_path).build_ampel_interface().export_many(
+            output_directory, indices
+        )
 
-@app.command(help="Write stacked lightcurves to disk")
-def export(
-    config_path: config_path_type,
-    output_directory: Annotated[Path, typer.Argument(help="output directory")],
-    indices: Annotated[
-        list[int] | None,
-        typer.Option(
-            "-i", "--indices", help="Indices to export, defaults to all indices"
-        ),
-    ] = None,
-):
-    TimewiseConfig.from_yaml(config_path).build_ampel_interface().export_many(
-        output_directory, indices
-    )
+    @app.command(help="Run download, process and export")
+    def run_chain(
+        config_path: config_path_type,
+        ampel_config_path: ampel_config_path_type,
+        output_directory: Annotated[Path, typer.Argument(help="output directory")],
+        indices: Annotated[
+            list[int] | None,
+            typer.Option(
+                "-i", "--indices", help="Indices to export, defaults to all indices"
+            ),
+        ] = None,
+    ):
+        download(config_path)
+        process(config_path, ampel_config_path)
+        export(config_path, output_directory, indices)
 
-
-@app.command(help="Run download, process and export")
-def run_chain(
-    config_path: config_path_type,
-    ampel_config_path: ampel_config_path_type,
-    output_directory: Annotated[Path, typer.Argument(help="output directory")],
-    indices: Annotated[
-        list[int] | None,
-        typer.Option(
-            "-i", "--indices", help="Indices to export, defaults to all indices"
-        ),
-    ] = None,
-):
-    download(config_path)
-    process(config_path, ampel_config_path)
-    export(config_path, output_directory, indices)
-
-
-@app.command(help="Make diagnostic plots")
-def plot(
-    config_path: config_path_type,
-    indices: Annotated[
-        List[int],
-        typer.Argument(help="Identifiers of the objects for which to create plots"),
-    ],
-    output_directory: Annotated[Path, typer.Argument(help="Output directory")],
-    cutout: Annotated[
-        Literal["sdss", "panstarrs"],
-        typer.Option("-c", "--cutout", help="Which survey to use for cutouts"),
-    ] = "panstarrs",
-):
-    make_plot(
-        config_path, indices=indices, cutout=cutout, output_directory=output_directory
-    )
+    @app.command(help="Make diagnostic plots")
+    def plot(
+        config_path: config_path_type,
+        indices: Annotated[
+            List[int],
+            typer.Argument(help="Identifiers of the objects for which to create plots"),
+        ],
+        output_directory: Annotated[Path, typer.Argument(help="Output directory")],
+        cutout: Annotated[
+            Literal["sdss", "panstarrs"],
+            typer.Option("-c", "--cutout", help="Which survey to use for cutouts"),
+        ] = "panstarrs",
+    ):
+        make_plot(
+            config_path,
+            indices=indices,
+            cutout=cutout,
+            output_directory=output_directory,
+        )
