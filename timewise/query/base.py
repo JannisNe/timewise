@@ -1,6 +1,6 @@
 import abc
-from typing import ClassVar, List
-from pydantic import BaseModel
+from typing import ClassVar, List, Self
+from pydantic import BaseModel, model_validator
 from hashlib import sha256
 
 from ..tables import TableType
@@ -21,6 +21,13 @@ class Query(abc.ABC, BaseModel):
     ]
     columns: List[str]
     table: TableType
+
+    @model_validator(mode="after")
+    def check_columns(self) -> Self:
+        for column in self.columns:
+            if column not in self.table.columns_dtypes:
+                raise KeyError(f"{column} not found in table {self.table.name}")
+        return self
 
     @property
     @abc.abstractmethod
