@@ -1,6 +1,7 @@
 from pathlib import Path
 import logging
 from typing import Iterable, List, cast
+from importlib.util import find_spec
 
 import numpy as np
 from numpy import typing as npt
@@ -8,11 +9,18 @@ import pandas as pd
 from pymongo import MongoClient, ASCENDING
 from pymongo.collection import Collection
 from pymongo.database import Database
-from ampel.cli.JobCommand import JobCommand
-from ampel.types import DataPointId, StockId
+
+if find_spec("ampel.core"):
+    AMPEL_EXISTS = True
+    from ampel.cli.JobCommand import JobCommand
+else:
+    AMPEL_EXISTS = False
 
 
 logger = logging.getLogger(__name__)
+
+# copy from ampel.types
+StockId = int | bytes | str
 
 
 class AmpelInterface:
@@ -71,6 +79,10 @@ class AmpelInterface:
         return self.make_ampel_job_file(cfg_path)
 
     def run(self, timewise_cfg_path: Path, ampel_config_path: Path):
+        if not AMPEL_EXISTS:
+            raise ModuleNotFoundError(
+                "You are trying to run ampel but it is not installed!"
+            )
         ampel_job_path = self.prepare(timewise_cfg_path)
         cmd = JobCommand()
         parser = cmd.get_parser()
@@ -123,7 +135,7 @@ class AmpelInterface:
             index.append(ic["id"])
         return pd.DataFrame(records, index=index)
 
-    def extract_selected_datapoint_ids(self, stock_id: StockId) -> List[DataPointId]:
+    def extract_selected_datapoint_ids(self, stock_id: StockId) -> List[int]:
         d = self.t1.find_one({"stock": stock_id})
         if d is None:
             return []
