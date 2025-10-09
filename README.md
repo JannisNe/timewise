@@ -10,23 +10,33 @@
 This package downloads WISE data for positions on the sky and stacks single-exposure photometry per visit
 
 ## Prerequisites
+Python version 3.11.
 
-`timewise` makes use of [AMPEL](https://ampelproject.github.io/ampelastro/) and needs a running [MongoDB](https://www.mongodb.com/).
+If you want to not only download individual exposure photometry but also stack detections per visit (see below),
+you must have access to a running [MongoDB](https://www.mongodb.com/)*. 
+
+<sub>* On MacOS have alook at the custom `brew` tap 
+[here](https://stackoverflow.com/questions/57856809/installing-mongodb-with-homebrew)
+to get the MongoDB community edition. </sub>
 
 ## Installation
-The package can be installed via `pip`:
-```bash
-pip install timewise
-```
 
+### If you use timewise only for downloading
+The package can be installed via `pip` (but make sure to install the v1 pre-release):
+```bash
+pip install --pre timewise==1.0.0a2
+```
+### If you use timewise also for stacking individual exposures
+You must install with the `ampel` extra:
+```bash
+pip install --pre timewise[ampel]==1.0.0a2
+```
 To tell AMPEL which modules, aka units, to use, build the corresponding configuration file:
 ```bash
 ampel config build -distributions ampel timewise -stop-on-errors 0 -out <path-to-ampel-config-file>
 ```
 
-## Usage
-
-### Command line interface
+## Command line interface
 
 ```
  Usage: timewise [OPTIONS] COMMAND [ARGS]...                                                                
@@ -111,38 +121,48 @@ ampel:
 This configuration file will be the input to all subcommands. Downloading and stacking can be run together or separate.
 
 
-#### All-in-one:
-Run download, stacking, and export:
-```bash
-timewise run-chain <path-to-config-file> <path-to-ampel-config-file> <output-directory>
-```
-
-#### Separate download and processing:
-To only download the data:
+### To only download the data:
 ```bash
 timewise download <path-to-config-file>
 ```
+The photometry can be found in FITS files in the working directory specified in the configuration file\
+along with metadata JSON files. These tell `timewise` which quries have already completed (per chunk) so the
+download process can be interrupted and re-started at a later time.
 
-To execute the stacking:
+### Stack individual exposure by visits
+As mentioned above, this needs installation with the ampel extra.
+
+
+To **execute the stacking** after the download:
 ```bash
 timewise process <path-to-config-file> <path-to-ampel-config-file>
 ```
 
-#### Run AMPEL manually
-Prepare an AMPEL job file for stacking the single-exposure data:
+Make some **diagnostic plots** to check the datapoint selection and binning:
+```bash
+timewise plot <path-to-config-file> <indices-to-plot> <output-directory>
+```
+
+As a shortcut, you can also run **download, stacking, and export in one command**:
+```bash
+timewise run-chain <path-to-config-file> <path-to-ampel-config-file> <output-directory>
+```
+
+For more configuration options of the stacking, you can **run AMPEL manually**.
+
+1. Prepare an AMPEL job file for stacking the single-exposure data:
 ```bash
 timewise prepare-ampel <path-to-config-file>
 ```
-The result will contain the path to the prepared AMPEL job file that can be run with
+The result will contain the path to the prepared AMPEL job file.
+
+2. Run the AMPEL job
 ```bash
 ampel job -config <path-to-ampel-config-file> -schema <path-to-ampel-job-file>
 ```
 
-#### Make some diagnostic plots
-To check the datapoint selection and binning, take a quick look at the data:
-```bash
-timewise plot <path-to-config-file> <indices-to-plot> <output-directory>
-```
+
+
 
 
 ## Citation
