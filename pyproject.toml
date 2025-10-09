@@ -31,6 +31,15 @@ dependencies = [
     "urllib3 (>=2.5.0,<3.0.0)",
 ]
 
+[tool.poetry]
+packages = [
+    {include = "ampel"},
+    {include = "timewise"}
+]
+include = [
+    'conf/timewise/ampel.yml',
+]
+
 [project.scripts]
 timewise = "timewise.cli:app"
 
