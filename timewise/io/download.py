@@ -232,27 +232,25 @@ class Downloader:
                     backend.save_data(task, payload_table)
                     meta["status"] = "COMPLETED"
                     meta["completed_at"] = str(datetime.now())
-                    backend.save_meta(task, meta)
                     backend.mark_done(task)
-                    with self.job_lock:
-                        self.jobs[task] = meta
                 elif status in ("ERROR", "ABORTED"):
                     logger.warning(f"failed {task}: {status}")
-                    meta["status"] = status
-                    with self.job_lock:
-                        self.jobs[task] = meta
-                    backend.save_meta(task, meta)
-                else:
-                    with self.job_lock:
-                        self.jobs[task]["status"] = status
-                        snapshot = self.jobs[task]
-                    backend.save_meta(task, snapshot)
+                elif not status:
+                    logger.warning(
+                        f"No job found under {meta['url']} for {task}! "
+                        f"Probably took too long before downloading results."
+                    )
+
+                meta["status"] = status
+                with self.job_lock:
+                    self.jobs[task] = meta
+                backend.save_meta(task, meta)
 
             if self.all_chunks_submitted:
                 with self.job_lock:
                     all_done = (
                         all(
-                            j.get("status") in ("COMPLETED", "ERROR", "ABORTED")
+                            j.get("status") in ("COMPLETED", "ERROR", "ABORTED", None)
                             for j in self.jobs.values()
                         )
                         if len(self.jobs) > 0
