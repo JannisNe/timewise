@@ -16,7 +16,7 @@ If you want to not only download individual exposure photometry but also stack d
 you must have access to a running [MongoDB](https://www.mongodb.com/)*. 
 
 <sub>* On MacOS have alook at the custom `brew` tap 
-[here](https://stackoverflow.com/questions/57856809/installing-mongodb-with-homebrew)
+[here](https://github.com/mongodb/homebrew-brew)
 to get the MongoDB community edition. </sub>
 
 ## Installation
