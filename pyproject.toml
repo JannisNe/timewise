@@ -37,7 +37,7 @@ packages = [
     {include = "timewise"}
 ]
 include = [
-    'conf/timewise/ampel.yml',
+    { path = "conf/**/*.yml", format = ["sdist", "wheel"] }
 ]
 
 [project.scripts]
