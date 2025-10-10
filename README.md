@@ -29,7 +29,7 @@ pip install --pre timewise==1.0.0a5
 ### If you use timewise also for stacking individual exposures
 You must install with the `ampel` extra:
 ```bash
-pip install --pre timewise[ampel]==1.0.0a5
+pip install --pre 'timewise[ampel]==1.0.0a5'
 ```
 To tell AMPEL which modules, aka units, to use, build the corresponding configuration file:
 ```bash
