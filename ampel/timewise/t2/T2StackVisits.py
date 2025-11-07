@@ -6,6 +6,7 @@
 # Date:                24.09.2025
 # Last Modified Date:  24.09.2025
 # Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
+from typing import Literal
 from scipy import stats
 
 from ampel.abstract.AbsLightCurveT2Unit import AbsLightCurveT2Unit
@@ -32,6 +33,10 @@ class T2StackVisits(AbsLightCurveT2Unit):
     # threshold above which to exclude outliers
     outlier_threshold: float = 5
 
+    # methods to calculate mean and std
+    mean_name: Literal["mean", "median"] = "median"
+    std_name: Literal["std", "sdom"] = "sdom"
+
     def process(self, light_curve: LightCurve) -> UBson | UnitResult:
         columns = [
             "ra",
@@ -53,4 +58,6 @@ class T2StackVisits(AbsLightCurveT2Unit):
             outlier_threshold=self.outlier_threshold,
             outlier_quantile=self.outlier_quantile,
             clean_outliers=self.clean_outliers,
+            mean_name=self.mean_name,
+            std_name=self.std_name
         ).to_dict(orient="records")
