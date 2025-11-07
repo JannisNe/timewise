@@ -203,6 +203,8 @@ def stack_visits(
     outlier_threshold: float,
     outlier_quantile: float,
     clean_outliers: bool = True,
+    mean_name: Literal["mean", "median"] = "mean",
+    std_name: Literal["std", "sdom"] = "sdom",
 ):
     """
     Combine the data by visits of the satellite of one region in the sky.
@@ -253,6 +255,8 @@ def stack_visits(
                 outlier_mask=outlier_mask,
                 outlier_quantile=outlier_quantile,
                 outlier_threshold=outlier_threshold,
+                mean_name=mean_name,
+                std_name=std_name
             )
             n_outliers = np.sum(outlier_mask)
 
@@ -320,6 +324,8 @@ def stack_visits(
                 outlier_mask=outlier_masks[keys.FLUX_EXT],
                 outlier_threshold=outlier_threshold,
                 outlier_quantile=outlier_quantile,
+                mean_name=mean_name,
+                std_name=std_name
             )
         )
         stacked_data[f"{b}{keys.MEAN}{keys.FLUX_DENSITY_EXT}"] = mean_fd
