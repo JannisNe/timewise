@@ -49,6 +49,9 @@ def plot_lightcurve(
                     markeredgecolor="k",
                     ecolor="k",
                     capsize=2,
+                    zorder=3,
+                    barsabove=True,
+                    elinewidth=.5
                 )
                 ax.scatter(
                     stacked_lightcurve[keys.MEAN + "_mjd"][ul_mask_stacked],
@@ -75,6 +78,7 @@ def plot_lightcurve(
                         c=colors[b],
                         markersize=4,
                         alpha=0.3,
+                        zorder=2
                     )
 
                 single_ul_m = m & ul_mask_raw
@@ -90,6 +94,7 @@ def plot_lightcurve(
                         alpha=0.3,
                         s=1,
                         label=label,
+                        zorder=1,
                     )
 
         except KeyError as e:
