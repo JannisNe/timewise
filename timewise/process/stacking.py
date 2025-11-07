@@ -1,7 +1,8 @@
 import logging
-from typing import cast, Dict, Any
+from typing import cast, Dict, Any, Literal
 
 from scipy import stats
+from scipy.special import gamma
 import numpy as np
 from numpy import typing as npt
 import pandas as pd
@@ -20,6 +21,26 @@ MAGNITUDE_ZEROPOINTS: Dict[str, float] = {"w1": 20.752, "w2": 19.596}
 FLUX_ZEROPOINTS = {"w1": 309.54, "w2": 171.787}
 
 
+def std_debias_factor(n: npt.NDArray[np.int64]) -> npt.NDArray[np.float64]:
+    # Cureton The American Statistician 22, 22–22 (1968). https://www.jstor.org/stable/2681876
+    return gamma((n - 1) / 2) / np.sqrt(2 / (n - 1)) / gamma(n / 2)
+
+
+def t_distribution_correction(n: npt.NDArray[np.int64]) -> npt.NDArray[np.float64]:
+    return stats.t.interval(0.68, df=n - 1)[1]
+
+
+def no_correction(n: npt.NDArray[np.int64]) -> npt.NDArray[np.float64]:
+    return np.ones_like(n, dtype=float)
+
+
+CORRECTION_FUNCTIONS = {
+    "debias": std_debias_factor,
+    "tdist": t_distribution_correction,
+    "none": no_correction
+}
+
+
 def calculate_epochs(
     f: pd.Series,
     e: pd.Series,
@@ -31,6 +52,7 @@ def calculate_epochs(
     outlier_mask: npt.NDArray[np.bool_] | None = None,
     mean_name: Literal["mean", "median"] = "mean",
     std_name: Literal["std", "sdom"] = "sdom",
+    correction_name: Literal["tdist", "debias", "none"] = "debias"
 ) -> tuple[
     npt.NDArray[np.float64],
     npt.NDArray[np.float64],
@@ -52,12 +74,18 @@ def calculate_epochs(
     :type counts: np.array
     :param remove_outliers: whether to remove outliers
     :type remove_outliers: bool
+    :param outlier_threshold: threshold to identify outliers
+    :type outlier_threshold: float
+    :param outlier_quantile: quantile that the outlier_threshold is multiplied with
+    :type outlier_quantile: float
     :param outlier_mask: the outlier mask
     :type outlier_mask: np.array, optional
     :param mean_name: name of the numpy function to calculate the mean, defaults to "mean"
     :type mean_name: str, optional
     :param std_name: name of the function to calculate the stacked error, defaults to "std"
     :type std_name: str, optional
+    :param correction_name: name of the correction function to apply to the standard deviation, defaults to "debias"
+    :type correction_name: str, optional
     :return: the epoch
     :rtype: float
     """
@@ -104,6 +132,10 @@ def calculate_epochs(
 
     # recalculate uncertainty and median as long as no outliers left
     mean_function = np.mean if mean_name == "mean" else np.median
+
+    # select function to use to correct standard deviation with
+    bias_correction_function = CORRECTION_FUNCTIONS[correction_name]
+
     while n_remaining_outlier > 0:
         # make a mask of values to use
         use_mask = ~outlier_mask & use_mask_ul & ~nan_mask  # type: ignore[operator]
@@ -143,9 +175,8 @@ def calculate_epochs(
         std = np.zeros_like(counts, dtype=float)
         extra_factor = 1 if std_name == "std" else 1 / n_points[~one_points_mask]
         std[~one_points_mask] = (
-            np.sqrt(mean_deviation[~one_points_mask])
-            / (n_points[~one_points_mask] - 1)
-            * stats.t.interval(0.68, df=n_points[~one_points_mask] - 1)[1]
+            np.sqrt(mean_deviation[~one_points_mask] / (n_points[~one_points_mask] - 1) * extra_factor)
+            * bias_correction_function(n_points[~one_points_mask])
             # for visits with small number of detections we have to correct according to the t distribution
         )
         std[one_points_mask] = -np.inf
@@ -205,6 +236,7 @@ def stack_visits(
     clean_outliers: bool = True,
     mean_name: Literal["mean", "median"] = "mean",
     std_name: Literal["std", "sdom"] = "sdom",
+    correction_name: Literal["tdist", "debias", "none"] = "debias"
 ):
     """
     Combine the data by visits of the satellite of one region in the sky.
@@ -217,6 +249,20 @@ def stack_visits(
 
     :param lightcurve: the raw lightcurve
     :type lightcurve: pandas.DataFrame
+    :param outlier_threshold: threshold to identify outliers
+    :type outlier_threshold: float
+    :param outlier_quantile: quantile that the outlier_threshold is multiplied with
+    :type outlier_quantile: float
+    :param clean_outliers:
+        if True, remove outliers that are outlier_threshold x outlier_quantile far away from the mean per visit,
+        default is True
+    :type clean_outliers: bool
+    :param mean_name: name of the numpy function to calculate the mean, defaults to "mean"
+    :type mean_name: str, optional
+    :param std_name: name of the function to calculate the stacked error, defaults to "std"
+    :type std_name: str, optional
+    :param correction_name: name of the correction function to apply to the standard deviation, defaults to "debias"
+    :type correction_name: str, optional
     :return: the stacked lightcurve
     :rtype: pandas.DataFrame
     """
@@ -256,7 +302,8 @@ def stack_visits(
                 outlier_quantile=outlier_quantile,
                 outlier_threshold=outlier_threshold,
                 mean_name=mean_name,
-                std_name=std_name
+                std_name=std_name,
+                correction_name=correction_name
             )
             n_outliers = np.sum(outlier_mask)
 
@@ -325,7 +372,8 @@ def stack_visits(
                 outlier_threshold=outlier_threshold,
                 outlier_quantile=outlier_quantile,
                 mean_name=mean_name,
-                std_name=std_name
+                std_name=std_name,
+                correction_name=correction_name
             )
         )
         stacked_data[f"{b}{keys.MEAN}{keys.FLUX_DENSITY_EXT}"] = mean_fd
