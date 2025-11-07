@@ -36,12 +36,12 @@ class TimewiseFilter(AbsAlertFilter):
         visits, counts = np.unique(visit_map, return_counts=True)
         visit_passed = counts >= self.det_per_visit
         if not all(visit_passed):
-            self.logger.info(None, extra={"min_det_per_visit": min(counts).item()})
+            self.logger.debug(None, extra={"min_det_per_visit": min(counts).item()})
             return None
 
         # enough visits
         if not len(visits) >= self.n_visits:
-            self.logger.info(None, extra={"n_visits": len(visits)})
+            self.logger.debug(None, extra={"n_visits": len(visits)})
             return None
 
         return True
