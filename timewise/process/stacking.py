@@ -29,6 +29,8 @@ def calculate_epochs(
     outlier_threshold: float,
     outlier_quantile: float,
     outlier_mask: npt.NDArray[np.bool_] | None = None,
+    mean_name: Literal["mean", "median"] = "mean",
+    std_name: Literal["std", "sdom"] = "sdom",
 ) -> tuple[
     npt.NDArray[np.float64],
     npt.NDArray[np.float64],
@@ -51,7 +53,11 @@ def calculate_epochs(
     :param remove_outliers: whether to remove outliers
     :type remove_outliers: bool
     :param outlier_mask: the outlier mask
-    :type outlier_mask: np.array
+    :type outlier_mask: np.array, optional
+    :param mean_name: name of the numpy function to calculate the mean, defaults to "mean"
+    :type mean_name: str, optional
+    :param std_name: name of the function to calculate the stacked error, defaults to "std"
+    :type std_name: str, optional
     :return: the epoch
     :rtype: float
     """
@@ -97,6 +103,7 @@ def calculate_epochs(
     n_loops = 0
 
     # recalculate uncertainty and median as long as no outliers left
+    mean_function = np.mean if mean_name == "mean" else np.median
     while n_remaining_outlier > 0:
         # make a mask of values to use
         use_mask = ~outlier_mask & use_mask_ul & ~nan_mask  # type: ignore[operator]
@@ -109,7 +116,7 @@ def calculate_epochs(
         visits_zero_points = np.unique(visit_mask[zero_points_mask[visit_mask]])
         median[visits_at_least_one_point] = np.array(
             [
-                np.median(f[(visit_mask == i) & use_mask])
+                mean_function(f[(visit_mask == i) & use_mask])
                 for i in visits_at_least_one_point
             ]
         )
@@ -134,6 +141,7 @@ def calculate_epochs(
         one_points_mask = n_points <= 1
         # calculate standard deviation
         std = np.zeros_like(counts, dtype=float)
+        extra_factor = 1 if std_name == "std" else 1 / n_points[~one_points_mask]
         std[~one_points_mask] = (
             np.sqrt(mean_deviation[~one_points_mask])
             / (n_points[~one_points_mask] - 1)
