@@ -245,7 +245,7 @@ def stack_visits(
     outlier_quantile: float,
     clean_outliers: bool = True,
     mean_name: Literal["mean", "median"] = "median",
-    std_name: Literal["std", "sdom"] = "sdom-1",
+    std_name: Literal["std", "sdom", "sdom-1"] = "sdom-1",
     correction_name: Literal["tdist", "debias", "none"] = "tdist",
 ):
     """
