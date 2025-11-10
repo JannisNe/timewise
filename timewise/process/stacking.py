@@ -37,7 +37,7 @@ def no_correction(n: npt.NDArray[np.int64]) -> npt.NDArray[np.float64]:
 CORRECTION_FUNCTIONS = {
     "debias": std_debias_factor,
     "tdist": t_distribution_correction,
-    "none": no_correction
+    "none": no_correction,
 }
 
 
@@ -50,9 +50,9 @@ def calculate_epochs(
     outlier_threshold: float,
     outlier_quantile: float,
     outlier_mask: npt.NDArray[np.bool_] | None = None,
-    mean_name: Literal["mean", "median"] = "mean",
-    std_name: Literal["std", "sdom"] = "sdom",
-    correction_name: Literal["tdist", "debias", "none"] = "debias"
+    mean_name: Literal["mean", "median"] = "median",
+    std_name: Literal["std", "sdom", "sdmo-1"] = "sdom-1",
+    correction_name: Literal["tdist", "debias", "none"] = "tdist",
 ) -> tuple[
     npt.NDArray[np.float64],
     npt.NDArray[np.float64],
@@ -173,9 +173,19 @@ def calculate_epochs(
         one_points_mask = n_points <= 1
         # calculate standard deviation
         std = np.zeros_like(counts, dtype=float)
-        extra_factor = 1 if std_name == "std" else 1 / n_points[~one_points_mask]
+        extra_factor = (
+            1
+            if std_name == "std"
+            else 1 / n_points[~one_points_mask]
+            if std_name == "sdom"
+            else 1 / (n_points[~one_points_mask] - 1)
+        )
         std[~one_points_mask] = (
-            np.sqrt(mean_deviation[~one_points_mask] / (n_points[~one_points_mask] - 1) * extra_factor)
+            np.sqrt(
+                mean_deviation[~one_points_mask]
+                / (n_points[~one_points_mask] - 1)
+                * extra_factor
+            )
             * bias_correction_function(n_points[~one_points_mask])
             # for visits with small number of detections we have to correct according to the t distribution
         )
@@ -234,9 +244,9 @@ def stack_visits(
     outlier_threshold: float,
     outlier_quantile: float,
     clean_outliers: bool = True,
-    mean_name: Literal["mean", "median"] = "mean",
-    std_name: Literal["std", "sdom"] = "sdom",
-    correction_name: Literal["tdist", "debias", "none"] = "debias"
+    mean_name: Literal["mean", "median"] = "median",
+    std_name: Literal["std", "sdom"] = "sdom-1",
+    correction_name: Literal["tdist", "debias", "none"] = "tdist",
 ):
     """
     Combine the data by visits of the satellite of one region in the sky.
@@ -303,7 +313,7 @@ def stack_visits(
                 outlier_threshold=outlier_threshold,
                 mean_name=mean_name,
                 std_name=std_name,
-                correction_name=correction_name
+                correction_name=correction_name,
             )
             n_outliers = np.sum(outlier_mask)
 
@@ -373,7 +383,7 @@ def stack_visits(
                 outlier_quantile=outlier_quantile,
                 mean_name=mean_name,
                 std_name=std_name,
-                correction_name=correction_name
+                correction_name=correction_name,
             )
         )
         stacked_data[f"{b}{keys.MEAN}{keys.FLUX_DENSITY_EXT}"] = mean_fd

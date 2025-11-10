@@ -35,7 +35,7 @@ class T2StackVisits(AbsLightCurveT2Unit):
 
     # methods to calculate mean and std
     mean_name: Literal["mean", "median"] = "median"
-    std_name: Literal["std", "sdom"] = "sdom"
+    std_name: Literal["std", "sdom", "sdom-1"] = "sdom-1"
     correction_name: Literal["debias", "tdist", "none"] = "tdist"
 
     def process(self, light_curve: LightCurve) -> UBson | UnitResult:
