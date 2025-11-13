@@ -27,7 +27,7 @@ def std_debias_factor(n: npt.NDArray[np.int64]) -> npt.NDArray[np.float64]:
 
 
 def t_distribution_correction(n: npt.NDArray[np.int64]) -> npt.NDArray[np.float64]:
-    return stats.t.interval(0.68, df=n - 1)[1]
+    return stats.t.interval(0.68, df=n - 1)[1]  # type: ignore
 
 
 def no_correction(n: npt.NDArray[np.int64]) -> npt.NDArray[np.float64]:
@@ -146,7 +146,7 @@ def calculate_epochs(
     bias_correction_function = CORRECTION_FUNCTIONS[correction_name]
 
     one_points_mask = None
-    visits_at_least_two_point = None
+    visits_at_least_two_point = []
 
     while n_remaining_outlier > 0:
         # make a mask of values to use
@@ -257,17 +257,18 @@ def calculate_epochs(
     # --------------------   calculate std for crosscheck   -------------------- #
     if calculate_pvalues:
         npstd = np.zeros_like(counts, dtype=float)
-        npstd[~one_points_mask] = np.array(
+        npstd[~one_points_mask] = np.array(  # type: ignore[operator]
             [np.std(f[(visit_mask == i) & use_mask]) for i in visits_at_least_two_point]
         )
         npstd[one_points_mask] = np.nan
 
         # ----------------   calculate compatibility with gaussian   ---------------- #
         pvalues = np.ones_like(counts, dtype=float)
-        pvalues[~one_points_mask] = np.array(
+        pvalues[~one_points_mask] = np.array(  # type: ignore[operator]
             [
                 stats.kstest(
-                    f[(visit_mask == i) & use_mask], stats.norm(median[i], npstd[i]).cdf
+                    f[(visit_mask == i) & use_mask],
+                    stats.norm(median[i], npstd[i]).cdf,  # type: ignore
                 ).pvalue
                 for i in visits_at_least_two_point
             ]
