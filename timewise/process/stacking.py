@@ -51,8 +51,9 @@ def calculate_epochs(
     outlier_quantile: float,
     outlier_mask: npt.NDArray[np.bool_] | None = None,
     mean_name: Literal["mean", "median"] = "median",
-    std_name: Literal["std", "sdom", "sdmo-1"] = "sdom-1",
+    std_name: Literal["std", "sdom", "sdom-1"] = "sdom-1",
     correction_name: Literal["tdist", "debias", "none"] = "tdist",
+    calculate_pvalues: bool = False,
 ) -> tuple[
     npt.NDArray[np.float64],
     npt.NDArray[np.float64],
@@ -60,6 +61,7 @@ def calculate_epochs(
     npt.NDArray[np.bool_],
     npt.NDArray[np.bool_],
     npt.NDArray[np.int64],
+    npt.NDArray[np.float64],
 ]:
     """
     Calculates the visits within a raw lightcurve.
@@ -86,12 +88,18 @@ def calculate_epochs(
     :type std_name: str, optional
     :param correction_name: name of the correction function to apply to the standard deviation, defaults to "debias"
     :type correction_name: str, optional
+    :param calculate_pvalues: if true, calculate ks-test p-values to check consistency with normal distribution per visit
+    :type calculate_pvalues: bool
+    :param use_single_exposure_errors:
+        if true, use the maximum of the RMS and the combined single exposure measurements as the final uncertainty
+    :type use_single_exposure_errors: bool
     :return: the epoch
     :rtype: float
     """
 
     if len(f) == 0:
         return (
+            np.array([]),
             np.array([]),
             np.array([]),
             np.array([]),
@@ -135,6 +143,9 @@ def calculate_epochs(
 
     # select function to use to correct standard deviation with
     bias_correction_function = CORRECTION_FUNCTIONS[correction_name]
+
+    one_points_mask = None
+    visits_at_least_two_point = None
 
     while n_remaining_outlier > 0:
         # make a mask of values to use
@@ -236,7 +247,28 @@ def calculate_epochs(
         if n_loops > 20:
             raise Exception(f"{n_loops}!")
 
-    return median, u, bin_ulim_bool, outlier_mask, use_mask, n_points
+    # --------------------   calculate std for crosscheck   -------------------- #
+    if calculate_pvalues:
+        npstd = np.zeros_like(counts, dtype=float)
+        npstd[~one_points_mask] = np.array(
+            [np.std(f[(visit_mask == i) & use_mask]) for i in visits_at_least_two_point]
+        )
+        npstd[one_points_mask] = np.nan
+
+    # ----------------   calculate compatibility with gaussian   ---------------- #
+        pvalues = np.ones_like(counts, dtype=float)
+        pvalues[~one_points_mask] = np.array(
+            [
+                stats.kstest(
+                    f[(visit_mask == i) & use_mask], stats.norm(median[i], npstd[i]).cdf
+                ).pvalue
+                for i in visits_at_least_two_point
+            ]
+        )
+    else:
+        pvalues = np.full_like(counts, -999)
+
+    return median, u, bin_ulim_bool, outlier_mask, use_mask, n_points, pvalues
 
 
 def stack_visits(
@@ -247,6 +279,7 @@ def stack_visits(
     mean_name: Literal["mean", "median"] = "median",
     std_name: Literal["std", "sdom", "sdom-1"] = "sdom-1",
     correction_name: Literal["tdist", "debias", "none"] = "tdist",
+    calculate_pvalues: bool = False
 ):
     """
     Combine the data by visits of the satellite of one region in the sky.
@@ -273,6 +306,8 @@ def stack_visits(
     :type std_name: str, optional
     :param correction_name: name of the correction function to apply to the standard deviation, defaults to "debias"
     :type correction_name: str, optional
+    :param calculate_pvalues: if true, calculate ks-test p-values to check consistency with normal distribution per visit
+    :type calculate_pvalues: bool
     :return: the stacked lightcurve
     :rtype: pandas.DataFrame
     """
@@ -302,7 +337,7 @@ def stack_visits(
             remove_outliers = lum_ext == keys.FLUX_EXT and clean_outliers
             outlier_mask = outlier_masks.get(keys.FLUX_EXT, None)
 
-            mean, u, bin_ulim_bool, outlier_mask, use_mask, n_points = calculate_epochs(
+            mean, u, bin_ulim_bool, outlier_mask, use_mask, n_points, p_values = calculate_epochs(
                 f,
                 e,
                 visit_map,
@@ -314,6 +349,7 @@ def stack_visits(
                 mean_name=mean_name,
                 std_name=std_name,
                 correction_name=correction_name,
+                calculate_pvalues=calculate_pvalues
             )
             n_outliers = np.sum(outlier_mask)
 
@@ -326,6 +362,7 @@ def stack_visits(
             stacked_data[f"{b}{lum_ext}{keys.RMS}"] = u
             stacked_data[f"{b}{lum_ext}{keys.UPPER_LIMIT}"] = bin_ulim_bool
             stacked_data[f"{b}{lum_ext}{keys.NPOINTS}"] = n_points
+            stacked_data[f"{b}{lum_ext}{keys.KSTEST_NORM_EXT}"] = p_values
 
             outlier_masks[lum_ext] = outlier_mask
             use_masks[lum_ext] = use_mask
@@ -371,7 +408,7 @@ def stack_visits(
         flux_densities_e = inst_fluxes_e * flux_dens_const[visit_map]
 
         # bin flux densities
-        mean_fd, u_fd, ul_fd, outlier_mask_fd, use_mask_fd, n_points_fd = (
+        mean_fd, u_fd, ul_fd, outlier_mask_fd, use_mask_fd, n_points_fd, p_values_fd = (
             calculate_epochs(
                 flux_densities,
                 flux_densities_e,
@@ -384,11 +421,13 @@ def stack_visits(
                 mean_name=mean_name,
                 std_name=std_name,
                 correction_name=correction_name,
+                calculate_pvalues=calculate_pvalues
             )
         )
         stacked_data[f"{b}{keys.MEAN}{keys.FLUX_DENSITY_EXT}"] = mean_fd
         stacked_data[f"{b}{keys.FLUX_DENSITY_EXT}{keys.RMS}"] = u_fd
         stacked_data[f"{b}{keys.FLUX_DENSITY_EXT}{keys.UPPER_LIMIT}"] = ul_fd
         stacked_data[f"{b}{keys.FLUX_DENSITY_EXT}{keys.NPOINTS}"] = n_points_fd
+        stacked_data[f"{b}{keys.FLUX_DENSITY_EXT}{keys.KSTEST_NORM_EXT}"] = p_values_fd
 
     return pd.DataFrame(stacked_data)
