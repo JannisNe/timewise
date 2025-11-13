@@ -54,6 +54,7 @@ def calculate_epochs(
     std_name: Literal["std", "sdom", "sdom-1"] = "sdom-1",
     correction_name: Literal["tdist", "debias", "none"] = "tdist",
     calculate_pvalues: bool = False,
+    use_single_exposure_errors: bool = False
 ) -> tuple[
     npt.NDArray[np.float64],
     npt.NDArray[np.float64],
@@ -215,8 +216,14 @@ def calculate_epochs(
             single_exp_measurement_errors[n_points > 0] / n_points[n_points > 0]
         )
         e_meas[zero_points_mask] = np.nan
-        # take the maximum value of the measured single exposure errors and the standard deviation
-        u = np.maximum(std, e_meas)
+
+        if use_single_exposure_errors:
+            # take the maximum value of the measured single exposure errors and the standard deviation
+            u = np.maximum(std, e_meas)
+        else:
+            # take the rms as the measurement uncertainty except if there is only one single exposure
+            u = std
+            u[one_points_mask] = e_meas[one_points_mask]
 
         # Estimate the spread of the flux.
         # To be robust against outliers, do that with quantiles instead of std
@@ -279,7 +286,8 @@ def stack_visits(
     mean_name: Literal["mean", "median"] = "median",
     std_name: Literal["std", "sdom", "sdom-1"] = "sdom-1",
     correction_name: Literal["tdist", "debias", "none"] = "tdist",
-    calculate_pvalues: bool = False
+    calculate_pvalues: bool = False,
+    use_single_exposure_errors: bool = False
 ):
     """
     Combine the data by visits of the satellite of one region in the sky.
@@ -308,6 +316,9 @@ def stack_visits(
     :type correction_name: str, optional
     :param calculate_pvalues: if true, calculate ks-test p-values to check consistency with normal distribution per visit
     :type calculate_pvalues: bool
+    :param use_single_exposure_errors:
+        if true, use the maximum of the RMS and the combined single exposure measurements as the final uncertainty
+    :type use_single_exposure_errors: bool
     :return: the stacked lightcurve
     :rtype: pandas.DataFrame
     """
@@ -349,7 +360,8 @@ def stack_visits(
                 mean_name=mean_name,
                 std_name=std_name,
                 correction_name=correction_name,
-                calculate_pvalues=calculate_pvalues
+                calculate_pvalues=calculate_pvalues,
+                use_single_exposure_errors=use_single_exposure_errors
             )
             n_outliers = np.sum(outlier_mask)
 
@@ -421,7 +433,8 @@ def stack_visits(
                 mean_name=mean_name,
                 std_name=std_name,
                 correction_name=correction_name,
-                calculate_pvalues=calculate_pvalues
+                calculate_pvalues=calculate_pvalues,
+                use_single_exposure_errors=use_single_exposure_errors
             )
         )
         stacked_data[f"{b}{keys.MEAN}{keys.FLUX_DENSITY_EXT}"] = mean_fd
