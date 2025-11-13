@@ -54,7 +54,7 @@ def calculate_epochs(
     std_name: Literal["std", "sdom", "sdom-1"] = "sdom-1",
     correction_name: Literal["tdist", "debias", "none"] = "tdist",
     calculate_pvalues: bool = False,
-    use_single_exposure_errors: bool = False
+    use_single_exposure_errors: bool = True,
 ) -> tuple[
     npt.NDArray[np.float64],
     npt.NDArray[np.float64],
@@ -262,7 +262,7 @@ def calculate_epochs(
         )
         npstd[one_points_mask] = np.nan
 
-    # ----------------   calculate compatibility with gaussian   ---------------- #
+        # ----------------   calculate compatibility with gaussian   ---------------- #
         pvalues = np.ones_like(counts, dtype=float)
         pvalues[~one_points_mask] = np.array(
             [
@@ -287,8 +287,8 @@ def stack_visits(
     std_name: Literal["std", "sdom", "sdom-1"] = "sdom-1",
     correction_name: Literal["tdist", "debias", "none"] = "tdist",
     calculate_pvalues: bool = False,
-    use_single_exposure_errors: bool = False,
-    median_zeropoint_per_visit: bool = True
+    use_single_exposure_errors: bool = True,
+    median_zeropoint_per_visit: bool = True,
 ):
     """
     Combine the data by visits of the satellite of one region in the sky.
@@ -351,20 +351,22 @@ def stack_visits(
             remove_outliers = lum_ext == keys.FLUX_EXT and clean_outliers
             outlier_mask = outlier_masks.get(keys.FLUX_EXT, None)
 
-            mean, u, bin_ulim_bool, outlier_mask, use_mask, n_points, p_values = calculate_epochs(
-                f,
-                e,
-                visit_map,
-                counts,
-                remove_outliers=remove_outliers,
-                outlier_mask=outlier_mask,
-                outlier_quantile=outlier_quantile,
-                outlier_threshold=outlier_threshold,
-                mean_name=mean_name,
-                std_name=std_name,
-                correction_name=correction_name,
-                calculate_pvalues=calculate_pvalues,
-                use_single_exposure_errors=use_single_exposure_errors
+            mean, u, bin_ulim_bool, outlier_mask, use_mask, n_points, p_values = (
+                calculate_epochs(
+                    f,
+                    e,
+                    visit_map,
+                    counts,
+                    remove_outliers=remove_outliers,
+                    outlier_mask=outlier_mask,
+                    outlier_quantile=outlier_quantile,
+                    outlier_threshold=outlier_threshold,
+                    mean_name=mean_name,
+                    std_name=std_name,
+                    correction_name=correction_name,
+                    calculate_pvalues=calculate_pvalues,
+                    use_single_exposure_errors=use_single_exposure_errors,
+                )
             )
             n_outliers = np.sum(outlier_mask)
 
@@ -444,7 +446,7 @@ def stack_visits(
                 std_name=std_name,
                 correction_name=correction_name,
                 calculate_pvalues=calculate_pvalues,
-                use_single_exposure_errors=use_single_exposure_errors
+                use_single_exposure_errors=use_single_exposure_errors,
             )
         )
         stacked_data[f"{b}{keys.MEAN}{keys.FLUX_DENSITY_EXT}"] = mean_fd
