@@ -64,10 +64,10 @@ docs = [
     "autodoc_pydantic[erdantic]>=2.2.0,<3.0.0"
 ]
 ampel= [
-    "ampel-photometry (>=0.10.1,<0.11.0)",
+    "ampel-photometry (>=0.10.2a0,<0.11.0)",
     "ampel-plot (>=0.9.1,<0.10.0)",
     "ampel-core (>=0.10.6a12,<0.11.0)",
-    "ampel-alerts (==0.10.3a5)",
+    "ampel-alerts (==0.10.3a6)",
 ]
 
 [tool.coverage.run]
