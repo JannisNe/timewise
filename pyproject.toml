@@ -66,7 +66,7 @@ docs = [
 ampel= [
     "ampel-photometry (>=0.10.1,<0.11.0)",
     "ampel-plot (>=0.9.1,<0.10.0)",
-    "ampel-core (>=0.10.4.post0,<0.11.0)",
+    "ampel-core (>=0.10.6a12,<0.11.0)",
     "ampel-alerts (==0.10.3a5)",
 ]
 
