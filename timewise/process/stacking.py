@@ -287,7 +287,8 @@ def stack_visits(
     std_name: Literal["std", "sdom", "sdom-1"] = "sdom-1",
     correction_name: Literal["tdist", "debias", "none"] = "tdist",
     calculate_pvalues: bool = False,
-    use_single_exposure_errors: bool = False
+    use_single_exposure_errors: bool = False,
+    median_zeropoint_per_visit: bool = True
 ):
     """
     Combine the data by visits of the satellite of one region in the sky.
@@ -319,6 +320,8 @@ def stack_visits(
     :param use_single_exposure_errors:
         if true, use the maximum of the RMS and the combined single exposure measurements as the final uncertainty
     :type use_single_exposure_errors: bool
+    :param median_zeropoint_per_visit: if true, use the median zeropoint per visit instead of the individual exposure ones
+    :type median_zeropoint_per_visit: bool
     :return: the stacked lightcurve
     :rtype: pandas.DataFrame
     """
@@ -407,17 +410,24 @@ def stack_visits(
         # if the visit only has upper limits then use the fall-back zeropoint
         zps_median[bin_ulim_bools[keys.FLUX_EXT]] = MAGNITUDE_ZEROPOINTS[b]
 
+        if median_zeropoint_per_visit:
+            use_zp = zps_median[visit_map]
+        else:
+            zp_nan_mask = np.isnan(zps)
+            zps[zp_nan_mask] = zps_median[visit_map[zp_nan_mask]]
+            use_zp = zps
+
         # ---------------   calculate flux density from instrument flux   ---------------- #
         # get the instrument flux [digital numbers], i.e. source count
         inst_fluxes_e = lightcurve[f"{b}{keys.ERROR_EXT}{keys.FLUX_EXT}"]
 
         # calculate the proportionality constant between flux density and source count
         mag_zp = FLUX_ZEROPOINTS[b] * 1e3  # in mJy
-        flux_dens_const = mag_zp * 10 ** (-zps_median / 2.5)
+        flux_dens_const = mag_zp * 10 ** (-use_zp / 2.5)
 
         # calculate flux densities from instrument counts
-        flux_densities = inst_fluxes * flux_dens_const[visit_map]
-        flux_densities_e = inst_fluxes_e * flux_dens_const[visit_map]
+        flux_densities = inst_fluxes * flux_dens_const
+        flux_densities_e = inst_fluxes_e * flux_dens_const
 
         # bin flux densities
         mean_fd, u_fd, ul_fd, outlier_mask_fd, use_mask_fd, n_points_fd, p_values_fd = (
