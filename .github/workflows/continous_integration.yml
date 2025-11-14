@@ -68,6 +68,7 @@ jobs:
       - name: build ampel config
         run: |
           poetry run ampel config build -out ampel_config.yml -distributions ampel timewise -stop-on-errors 0
+          cat ampel_config.yml
 
       - name: Start MongoDB
         uses: supercharge/mongodb-github-action@1.12.0
