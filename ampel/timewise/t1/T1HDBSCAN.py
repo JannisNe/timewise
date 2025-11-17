@@ -10,8 +10,6 @@ from typing import Iterable, Sequence
 
 import numpy as np
 from numpy import typing as npt
-from ampel.base.AuxUnitRegister import AuxUnitRegister
-from astropy.coordinates.angle_utilities import angular_separation, position_angle
 from sklearn.cluster import HDBSCAN
 from pymongo import MongoClient
 
@@ -20,10 +18,20 @@ from ampel.struct.T1CombineResult import T1CombineResult
 from ampel.types import DataPointId
 from ampel.abstract.AbsT1CombineUnit import AbsT1CombineUnit
 from ampel.model.UnitModel import UnitModel
+from ampel.base.AuxUnitRegister import AuxUnitRegister
 
 from ampel.timewise.util.pdutil import datapoints_to_dataframe
 from ampel.timewise.util.AuxDiagnosticPlotter import AuxDiagnosticPlotter
 from timewise.process import keys
+
+from importlib.util import find_spec
+
+if find_spec("astropy.coordinates.angle_utilities"):
+    # astropy < v6.0.0
+    from astropy.coordinates.angle_utilities import angular_separation, position_angle
+else:
+    # astropy >= v6.0.0
+    from astropy.coordinates.angles import angular_separation, position_angle
 
 
 class T1HDBSCAN(AbsT1CombineUnit):
