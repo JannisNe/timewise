@@ -38,6 +38,11 @@ class T2StackVisits(AbsLightCurveT2Unit):
     std_name: Literal["std", "sdom", "sdom-1"] = "sdom-1"
     correction_name: Literal["debias", "tdist", "none"] = "tdist"
 
+    # see timewise.process.stacking
+    calculate_pvalues: bool = False
+    use_single_exposure_errors: bool = True
+    median_zeropoint_per_visit: bool = True
+
     def process(self, light_curve: LightCurve) -> UBson | UnitResult:
         columns = [
             "ra",
@@ -62,4 +67,7 @@ class T2StackVisits(AbsLightCurveT2Unit):
             mean_name=self.mean_name,
             std_name=self.std_name,
             correction_name=self.correction_name,
+            calculate_pvalues=self.calculate_pvalues,
+            use_single_exposure_errors=self.use_single_exposure_errors,
+            median_zeropoint_per_visit=self.median_zeropoint_per_visit,
         ).to_dict(orient="records")
