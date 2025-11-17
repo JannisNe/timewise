@@ -26,7 +26,7 @@ jobs:
     # Specify the python versions to test
     strategy:
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.11", "3.13"]
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -65,12 +65,13 @@ jobs:
       - name: Run Ruff
         run: poetry run ruff check
 
-      - name: build ampel config
-        run: |
-          poetry run ampel config build -out ampel_config.yml -distributions ampel timewise -stop-on-errors 0
-
       - name: Start MongoDB
         uses: supercharge/mongodb-github-action@1.12.0
+
+      - name: build ampel config
+        run: |
+          poetry run ampel config build -out ampel_config.yml -distributions ampel timewise -stop-on-errors 0 -verbose
+          cat ampel_config.yml
 
       # Runs a set of commands using the runners shell
       - name: Test the code

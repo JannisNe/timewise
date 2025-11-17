@@ -14,6 +14,14 @@ from timewise.config import TimewiseConfig
 from timewise.process import AmpelInterface
 from tests.constants import DATA_DIR, INPUT_CSV_PATH, V0_KEYMAP
 
+from ampel.log.AmpelLogger import AmpelLogger
+
+
+# reset AmpelLoggers to make sure it is not trying to write to closed sys.stdout/sys.stderr
+@pytest.fixture(autouse=True)
+def reset_ampel_logger():
+    AmpelLogger.loggers.clear()  # if available
+
 
 @pytest.fixture
 def download_cfg(tmp_path) -> DownloadConfig:
