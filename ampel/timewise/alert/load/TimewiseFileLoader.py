@@ -10,7 +10,7 @@ from typing import Dict, get_args
 
 import numpy as np
 import pandas as pd
-from astropy.table import Table, vstack
+from astropy.table import vstack
 from ampel.abstract.AbsAlertLoader import AbsAlertLoader
 from timewise.tables import TableType
 from timewise.config import TimewiseConfig

@@ -16,11 +16,12 @@ import pandas as pd
 from bson import encode
 
 from ampel.alert.AmpelAlert import AmpelAlert
+from ampel.base.AmpelABC import AmpelABC
 from ampel.alert.BaseAlertSupplier import BaseAlertSupplier
 from ampel.view.ReadOnlyDict import ReadOnlyDict
 
 
-class TimewiseAlertSupplier(BaseAlertSupplier):
+class TimewiseAlertSupplier(BaseAlertSupplier, AmpelABC):
     """
     Iterable class that, for each transient name provided by the underlying alert_loader
     returns a PhotoAlert instance.

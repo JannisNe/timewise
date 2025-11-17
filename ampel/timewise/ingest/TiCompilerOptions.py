@@ -9,9 +9,10 @@
 from typing import Any
 
 from ampel.model.ingest.CompilerOptions import CompilerOptions
+from ampel.base.AmpelABC import AmpelABC
 
 
-class TiCompilerOptions(CompilerOptions):
+class TiCompilerOptions(CompilerOptions, AmpelABC):
     stock: dict[str, Any] = {"tag": "TIMEWISE"}
     t0: dict[str, Any] = {"tag": "TIMEWISE"}
     t1: dict[str, Any] = {"tag": "TIMEWISE"}
