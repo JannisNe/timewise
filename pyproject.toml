@@ -36,9 +36,6 @@ packages = [
     {include = "ampel"},
     {include = "timewise"}
 ]
-include = [
-    { path = "conf/**/*.yml", format = ["sdist", "wheel"] }
-]
 
 [project.scripts]
 timewise = "timewise.cli:app"
