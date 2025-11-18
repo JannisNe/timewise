@@ -5,13 +5,14 @@ from numpy import typing as npt
 
 from ampel.plot.create import create_plot_record
 from ampel.base.AmpelBaseModel import AmpelBaseModel
+from ampel.base.AmpelABC import AmpelABC
 from ampel.model.PlotProperties import PlotProperties
 from ampel.content.NewSVGRecord import NewSVGRecord
 
 from timewise.plot.diagnostic import DiagnosticPlotter
 
 
-class AuxDiagnosticPlotter(AmpelBaseModel):
+class AuxDiagnosticPlotter(AmpelBaseModel, AmpelABC):
     plot_properties: PlotProperties
     cutout: Literal["sdss", "panstarrs"] = DiagnosticPlotter.model_fields[
         "cutout"

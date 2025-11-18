@@ -10,14 +10,15 @@ from typing import Dict, get_args
 
 import numpy as np
 import pandas as pd
-from astropy.table import Table, vstack
+from astropy.table import vstack
 from ampel.abstract.AbsAlertLoader import AbsAlertLoader
+from ampel.base.AmpelABC import AmpelABC
 from timewise.tables import TableType
 from timewise.config import TimewiseConfig
 from timewise.types import TaskID
 
 
-class TimewiseFileLoader(AbsAlertLoader[Dict]):
+class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
     """
     Load alerts from one of more files.
     """
