@@ -7,6 +7,7 @@ from .download import Downloader
 from ..query import QueryType
 from ..backend import BackendType
 from ..types import TYPE_MAP
+from ..util.path import expand
 
 
 class DownloadConfig(BaseModel):
@@ -19,15 +20,19 @@ class DownloadConfig(BaseModel):
 
     service_url: str = "https://irsa.ipac.caltech.edu/TAP"
 
+    @property
+    def expanded_input_csv(self) -> Path:
+        return expand(self.input_csv)
+
     @model_validator(mode="after")
     def validate_input_csv_columns(self) -> "DownloadConfig":
         """Ensure that the input CSV contains all columns required by queries."""
         # only validate if the CSV actually exists
-        if not self.input_csv.exists():
-            raise ValueError(f"CSV file does not exist: {self.input_csv}")
+        if not self.expanded_input_csv.exists():
+            raise ValueError(f"CSV file does not exist: {self.expanded_input_csv}")
 
         # read just the header and first 10 lines
-        input_table = pd.read_csv(self.input_csv, nrows=10)
+        input_table = pd.read_csv(self.expanded_input_csv, nrows=10)
 
         missing_columns = set()
         wrong_dtype = set()
@@ -41,7 +46,7 @@ class DownloadConfig(BaseModel):
                     except Exception:
                         wrong_dtype.add(col)
 
-        msg = f"CSV file {self.input_csv}: "
+        msg = f"CSV file {self.expanded_input_csv}: "
         if missing_columns:
             raise KeyError(msg + f"Missing required columns: {sorted(missing_columns)}")
         if wrong_dtype:
@@ -55,7 +60,7 @@ class DownloadConfig(BaseModel):
     def build_downloader(self) -> Downloader:
         return Downloader(
             service_url=self.service_url,
-            input_csv=self.input_csv,
+            input_csv=self.expanded_input_csv,
             chunk_size=self.chunk_size,
             backend=self.backend,
             queries=self.queries,
