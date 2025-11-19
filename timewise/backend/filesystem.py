@@ -6,6 +6,7 @@ from astropy.table import Table
 
 from .base import Backend
 from ..types import TaskID
+from ..util.path import expand
 
 
 logger = logging.getLogger(__name__)
@@ -15,17 +16,21 @@ class FileSystemBackend(Backend):
     type: Literal["filesystem"] = "filesystem"
     base_path: Path
 
+    @property
+    def expanded_path(self) -> Path:
+        return expand(self.base_path)
+
     # ----------------------------
     # Helpers for paths
     # ----------------------------
     def _meta_path(self, task: TaskID) -> Path:
-        return self.base_path / f"{task}.meta.json"
+        return self.expanded_path / f"{task}.meta.json"
 
     def _marker_path(self, task: TaskID) -> Path:
-        return self.base_path / f"{task}.ok"
+        return self.expanded_path / f"{task}.ok"
 
     def _data_path(self, task: TaskID) -> Path:
-        return self.base_path / f"{task}.fits"
+        return self.expanded_path / f"{task}.fits"
 
     # ----------------------------
     # Metadata

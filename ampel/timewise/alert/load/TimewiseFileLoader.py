@@ -16,6 +16,7 @@ from ampel.base.AmpelABC import AmpelABC
 from timewise.tables import TableType
 from timewise.config import TimewiseConfig
 from timewise.types import TaskID
+from timewise.util.path import expand
 
 
 class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
@@ -34,8 +35,10 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
-        self.logger.info(f"loading timewise config file {self.timewise_config_file}")
-        timewise_config = TimewiseConfig.from_yaml(self.timewise_config_file)
+        expanded_config_file = expand(self.timewise_config_file)
+
+        self.logger.info(f"loading timewise config file {expanded_config_file}")
+        timewise_config = TimewiseConfig.from_yaml(expanded_config_file)
         dl = timewise_config.download.build_downloader()
         self._timewise_backend = dl.backend
 
