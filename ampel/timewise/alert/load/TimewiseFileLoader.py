@@ -141,7 +141,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
             for stock_id in np.unique(data["stock_id"]):
                 selection = data.loc[stock_id]
                 if isinstance(selection, pd.Series):
-                    return pd.DataFrame([selection])
+                    selection = pd.DataFrame([selection])
                 yield self.merge_allwise_and_neowise_data(selection)
 
     def __iter__(self):
