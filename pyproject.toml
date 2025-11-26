@@ -63,7 +63,7 @@ docs = [
 ampel= [
     "ampel-photometry (==0.10.2a1)",
     "ampel-plot (>=0.9.1,<0.10.0)",
-    "ampel-core @ git+https://github.com/JannisNe/Ampel-core.git#sort-dependent-distributions",
+    "ampel-core (==0.10.6a17)",
     "ampel-alerts (==0.10.3a6)",
     "ampel-interface (==0.10.5a8)"
 ]
