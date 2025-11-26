@@ -56,12 +56,6 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
         self._table_types = get_args(TableType.__origin__)  # type: ignore
         self._gen = self.iter_stocks()
 
-    @staticmethod
-    def encode_result(res: pd.DataFrame) -> pd.DataFrame:
-        if isinstance(res, pd.Series):
-            return pd.DataFrame([res])
-        return res
-
     def find_table_from_task(self, task: TaskID) -> TableType:
         tables = [
             t for t in self._table_types if t.model_fields["name"].default in str(task)
@@ -72,6 +66,39 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
             f"{task} is from table {tables[0].model_fields['name'].default}"
         )
         return tables[0]
+
+    @staticmethod
+    def merge_allwise_and_neowise_data(table: pd.DataFrame) -> pd.DataFrame:
+        # remove the _ep at the end of AllWISE MEP data
+        columns_to_rename = [c for c in table.columns if c.endswith("_ep")]
+        if len(columns_to_rename):
+            rename = {
+                c: c.replace("_ep", "")
+                for c in columns_to_rename
+                if c.replace("_ep", "") not in table.columns
+            }
+            if rename:
+                # in this case only the allwise column eith the _ep extension exists
+                # and we can simply rename the columns
+                table.rename(columns=rename, inplace=True)
+
+            move = {
+                c: c.replace("_ep", "")
+                for c in columns_to_rename
+                if c.replace("_ep", "") in table.columns
+            }
+            if move:
+                # In this case, the columns already exists because the neowise data is present
+                # we have to insert the values form the columns with the _ep extension into the
+                # respective neowise columns
+                for c, nc in move.items():
+                    na_mask = table[nc].isna()
+                    table.loc[na_mask, nc] = table[c][na_mask]
+                pd.options.mode.chained_assignment = None
+                table.drop(columns=[c for c in move], inplace=True)
+                pd.options.mode.chained_assignment = "warn"
+
+        return table
 
     def iter_stocks(self):
         # emit all datapoints per stock id
@@ -113,7 +140,9 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
             # iterate over all stock ids
             for stock_id in np.unique(data["stock_id"]):
                 selection = data.loc[stock_id]
-                yield self.encode_result(selection)
+                if isinstance(selection, pd.Series):
+                    return pd.DataFrame([selection])
+                yield self.merge_allwise_and_neowise_data(selection)
 
     def __iter__(self):
         return self

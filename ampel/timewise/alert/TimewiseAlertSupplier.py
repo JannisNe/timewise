@@ -56,35 +56,6 @@ class TimewiseAlertSupplier(BaseAlertSupplier, AmpelABC):
         all_ids = b""
         pps = []
 
-        # remove the _ep at the end of AllWISE MEP data
-        columns_to_rename = [c for c in table.columns if c.endswith("_ep")]
-        if len(columns_to_rename):
-            rename = {
-                c: c.replace("_ep", "")
-                for c in columns_to_rename
-                if c.replace("_ep", "") not in table.columns
-            }
-            if rename:
-                # in this case only the allwise column eith the _ep extension exists
-                # and we can simply rename the columns
-                table.rename(columns=rename, inplace=True)
-
-            move = {
-                c: c.replace("_ep", "")
-                for c in columns_to_rename
-                if c.replace("_ep", "") in table.columns
-            }
-            if move:
-                # In this case, the columns already exists because the neowise data is present
-                # we have to insert the values form the columns with the _ep extension into the
-                # respective neowise columns
-                for c, nc in move.items():
-                    na_mask = table[nc].isna()
-                    table.loc[na_mask, nc] = table[c][na_mask]
-                pd.options.mode.chained_assignment = None
-                table.drop(columns=[c for c in move], inplace=True)
-                pd.options.mode.chained_assignment = "warn"
-
         for i, row in table.iterrows():
             # convert table row to dict, convert data types from numpy to native python
             # Respect masked fields and convert to None
