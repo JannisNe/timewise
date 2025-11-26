@@ -3,6 +3,8 @@ import backoff
 import pyvo as vo
 from xml.etree import ElementTree
 
+import requests
+
 from timewise.util.backoff import backoff_hndlr
 
 
@@ -20,6 +22,12 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
         self.submit_response = None
 
     @classmethod
+    @backoff.on_exception(
+        backoff.expo,
+        requests.exceptions.HTTPError,
+        max_tries=5,
+        on_backoff=backoff_hndlr,
+    )
     def create(
         cls,
         baseurl,
