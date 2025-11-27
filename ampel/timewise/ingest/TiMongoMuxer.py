@@ -32,7 +32,7 @@ class TiMongoMuxer(AbsT0Muxer):
     """
 
     # Standard projection used when checking DB for existing PPS/ULS
-    projection = {
+    projection: dict[str, int] = {
         "_id": 0,
         "id": 1,
         "tag": 1,
@@ -50,6 +50,8 @@ class TiMongoMuxer(AbsT0Muxer):
         "body.ra": 1,
         "body.dec": 1,
     }
+
+    unique_key: list[str] = ["mjd", "ra", "dec"]
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -116,11 +118,7 @@ class TiMongoMuxer(AbsT0Muxer):
             # jd alone is not enough for matching pps because each time is associated with
             # two filters! Also, if there can be multiple sources within the same frame which
             # leads to duplicate MJD and FID. Check position in addition.
-            key = (
-                dp["body"]["mjd"],
-                dp["body"]["ra"],
-                dp["body"]["dec"],
-            )
+            key = tuple(dp["body"][k] for k in self.unique_key)
 
             if target := unique_dps_ids.get(key):
                 # insert id in order
