@@ -97,6 +97,16 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
     def phase(self):
         return super(StableAsyncTAPJob, self).phase
 
+    @property
+    @backoff.on_exception(
+        backoff.expo,
+        vo.dal.DALServiceError,
+        max_tries=50,
+        on_backoff=backoff_hndlr,
+    )
+    def _update(self, *args, **kwargs):
+        return super(StableAsyncTAPJob, self)._update(*args, **kwargs)
+
 
 class StableTAPService(vo.dal.TAPService):
     """
