@@ -97,7 +97,6 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
     def phase(self):
         return super(StableAsyncTAPJob, self).phase
 
-    @property
     @backoff.on_exception(
         backoff.expo,
         vo.dal.DALServiceError,
