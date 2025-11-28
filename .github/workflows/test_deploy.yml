@@ -42,5 +42,5 @@ jobs:
         run: |
           python -c "import time; time.sleep(60)"
           poetry install --no-root -E ampel
-          python -m pip install --no-deps --index-url https://test.pypi.org/simple/ 'timewise[ampel]==1.0.0a6'
+          poetry run pip install --no-deps --index-url https://test.pypi.org/simple/ 'timewise[ampel]==1.0.0a8'
           poetry run timewise process --help
