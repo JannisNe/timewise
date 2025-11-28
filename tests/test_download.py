@@ -11,14 +11,12 @@ from tests.dummy_tap import DummyTAPService, get_table_from_query_and_chunk
 
 
 def test_chunking(download_cfg):
-    dl = download_cfg.build_downloader()
     chunks = Chunker(
         input_csv=download_cfg.input_csv, chunk_size=download_cfg.chunk_size
     )
     for i, chunk in enumerate(chunks):
-        chunk_data = dl.get_chunk_data(chunk)
         assert (
-            len(pd.Index(chunk_data.orig_id).difference(range(i * 32, (i + 1) * 32)))
+            len(pd.Index(chunk.data.orig_id).difference(range(i * 32, (i + 1) * 32)))
             == 0
         )
 
