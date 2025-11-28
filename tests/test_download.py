@@ -11,7 +11,6 @@ from tests.dummy_tap import DummyTAPService, get_table_from_query_and_chunk
 
 
 def test_chunking(download_cfg):
-    dl = download_cfg.build_downloader()
     chunks = Chunker(
         input_csv=download_cfg.input_csv, chunk_size=download_cfg.chunk_size
     )
