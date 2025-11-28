@@ -1,7 +1,7 @@
 import logging
 from functools import cached_property
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Sequence, cast
 
 import numpy as np
 import pandas as pd
@@ -23,6 +23,23 @@ class Chunk:
         start = min(self.row_numbers)
         stop = max(self.row_numbers) + 1
         return pd.read_csv(self.input_csv, skiprows=start, nrows=stop - start).index
+
+    @property
+    def data(self) -> pd.DataFrame:
+        start = (
+            min(cast(Sequence[int], self.row_numbers)) + 1
+        )  # plus one to always skip header line
+        nrows = (
+            max(cast(Sequence[int], self.row_numbers)) - start + 2
+        )  # plus one: skip header, plus one:
+
+        columns = list(pd.read_csv(self.input_csv, nrows=0).columns)
+        return pd.read_csv(
+            filepath_or_buffer=self.input_csv,
+            skiprows=start,
+            nrows=nrows,
+            names=columns,
+        )
 
 
 class Chunker:
