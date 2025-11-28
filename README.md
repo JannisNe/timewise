@@ -10,7 +10,7 @@
 This package downloads WISE data for positions on the sky and stacks single-exposure photometry per visit
 
 ## Prerequisites
-Python version 3.11.
+Python version 3.11, 3.12 or 3.13.
 
 If you want to not only download individual exposure photometry but also stack detections per visit (see below),
 you must have access to a running [MongoDB](https://www.mongodb.com/)*. 
@@ -29,7 +29,7 @@ pip install --pre timewise==1.0.0a6
 ### If you use timewise also for stacking individual exposures
 You must install with the `ampel` extra:
 ```bash
-pip install --pre 'timewise[ampel]==1.0.0a6'
+pip install --pre 'timewise[ampel]==1.0.0a8'
 ```
 To tell AMPEL which modules, aka units, to use, build the corresponding configuration file:
 ```bash
