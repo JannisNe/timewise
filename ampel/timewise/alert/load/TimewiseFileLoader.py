@@ -32,6 +32,9 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
 
     chunks: list[int] | None = None
 
+    # optionally skip files that are missing
+    skip_missing_files: bool = False
+
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -83,9 +86,12 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
                 self.logger.debug(f"reading {task}")
                 try:
                     idata = backend.load_data(task)
-                except FileNotFoundError:
-                    self.logger.warn(f"file for task {task} not found, skipping...")
-                    continue
+                except FileNotFoundError as e:
+                    if self.skip_missing_files:
+                        self.logger.warn(f"file for task {task} not found, skipping...")
+                        continue
+                    else:
+                        raise e
 
                 # add table name
                 idata["table_name"] = (
