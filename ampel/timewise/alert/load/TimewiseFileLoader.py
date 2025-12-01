@@ -81,7 +81,11 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
             data = []
             for task in tasks:
                 self.logger.debug(f"reading {task}")
-                idata = backend.load_data(task)
+                try:
+                    idata = backend.load_data(task)
+                except FileNotFoundError:
+                    self.logger.warn(f"file for task {task} not found, skipping...")
+                    continue
 
                 # add table name
                 idata["table_name"] = (

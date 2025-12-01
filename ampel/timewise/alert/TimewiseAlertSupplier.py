@@ -71,8 +71,9 @@ class TimewiseAlertSupplier(BaseAlertSupplier, AmpelABC):
 
             move = {
                 c: c.replace("_ep", "")
-                for c in columns_to_rename
-                if c.replace("_ep", "") in table.columns
+                for c in table.columns
+                if (c.replace("_ep", "") in table.columns)
+                and (c.endswith("_ep"))
             }
             if move:
                 # In this case, the columns already exists because the neowise data is present
@@ -80,6 +81,7 @@ class TimewiseAlertSupplier(BaseAlertSupplier, AmpelABC):
                 # respective neowise columns
                 for c, nc in move.items():
                     na_mask = table[nc].isna()
+                    print(table.columns)
                     table.loc[na_mask, nc] = table[c][na_mask]
                 pd.options.mode.chained_assignment = None
                 table.drop(columns=[c for c in move], inplace=True)
