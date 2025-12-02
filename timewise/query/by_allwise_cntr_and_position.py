@@ -35,7 +35,7 @@ class AllWISECntrQuery(Query):
         )
 
         constraints = self.constraints + [
-            f"{self.table.name}.{self.table.allwise_cntr_column} = {self.upload_name}.allwise_cntr"
+            f"{self.table.allwise_cntr_column} = {self.upload_name}.allwise_cntr"
         ]
 
         if len(constraints) > 0:
