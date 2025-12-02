@@ -8,7 +8,7 @@
 
 from bisect import bisect_right
 from contextlib import suppress
-from typing import Any
+from typing import Any, Union
 
 
 from ampel.abstract.AbsT0Muxer import AbsT0Muxer
@@ -88,11 +88,13 @@ class TiMongoMuxer(AbsT0Muxer):
     def _get_dps(self, stock_id: None | StockId) -> list[DataPoint]:
         if self.channel is not None:
             if isinstance(self.channel, ChannelId):
-                channel_query = self.channel
+                channel_query: (
+                    ChannelId | dict[str, list[ChannelId | AllOf[ChannelId]]]
+                ) = self.channel
             elif isinstance(self.channel, AnyOf):
-                channel_query = {"$in": self.channel.value}
+                channel_query = {"$in": self.channel.any_of}
             elif isinstance(self.channel, AllOf):
-                channel_query = {"$all": self.channel.value}
+                channel_query = {"$all": self.channel.all_of}
             else:
                 # should not happen
                 raise TypeError()
