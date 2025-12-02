@@ -14,6 +14,7 @@ from ampel.log.AmpelLogger import DEBUG, AmpelLogger
 from ampel.dev.DevAmpelContext import DevAmpelContext
 from ampel.test.conftest import mock_context, _patch_mongo, testing_config
 
+from timewise.tables.allwise_p3as_mep import allwise_p3as_mep
 from tests.constants import DATA_DIR
 
 
@@ -81,3 +82,12 @@ def test_muxer_combines(mock_context):
     assert ids_to_insert is not None
     assert sorted(ids_alert) == sorted(ids_to_insert)
     assert sorted(all_ids) == sorted(ids_to_combine)
+
+
+def test_muxer_skips_redundant_allwise_mep_data(mock_context):
+    data = load_duplicate_data()
+    data["table_name"] = "allwise_p3as_mep"
+    alert_dps = dataframe_to_dps(data, "allwise_p3as_mep")
+    logger = AmpelLogger.get_logger(console=dict(level=DEBUG))
+    muxer = TestMuxer(logger=logger, context=mock_context)
+    dps_to_insert, dps_to_combine = muxer.process(alert_dps, stock_id=STOCK_ID)
