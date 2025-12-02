@@ -7,12 +7,17 @@ logger = logging.getLogger(__name__)
 
 
 class AllWISECntrQuery(Query):
-    type: Literal["by_allwise_cntr"] = "by_allwise_cntr"
+    type: Literal["by_allwise_cntr_and_position"] = "by_allwise_cntr_and_position"
     radius_arcsec: float
 
     @property
     def input_columns(self) -> Dict[str, str]:
-        return {"allwise_cntr": "int", self.original_id_key: "int"}
+        return {
+            "allwise_cntr": "int",
+            "ra": "float",
+            "dec": "float",
+            self.original_id_key: "int",
+        }
 
     def build(self) -> str:
         logger.debug(f"constructing query by AllWISE cntr for {self.table.name}")
