@@ -1,4 +1,5 @@
-from typing import Literal, ClassVar, Type, Dict
+from typing import ClassVar, Dict, Literal, Type
+
 from .base import TableConfig
 
 
@@ -20,3 +21,4 @@ class allwise_p3as_mep(TableConfig):
     }
     ra_column: ClassVar[str] = "ra"
     dec_column: ClassVar[str] = "dec"
+    allwise_column: ClassVar[str] = "cntr_mf"

@@ -1,4 +1,5 @@
-from typing import Literal, ClassVar, Dict, Type
+from typing import ClassVar, Dict, Literal, Type
+
 from .base import TableConfig
 
 
@@ -20,3 +21,4 @@ class neowiser_p1bs_psd(TableConfig):
     }
     ra_column: ClassVar[str] = "ra"
     dec_column: ClassVar[str] = "dec"
+    allwise_cntr_column: ClassVar[str] = "allwise_cntr"
