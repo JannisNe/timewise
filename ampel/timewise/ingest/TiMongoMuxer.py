@@ -8,7 +8,7 @@
 
 from bisect import bisect_right
 from contextlib import suppress
-from typing import Any, Sequence
+from typing import Any, Sequence, get_args
 
 from ampel.abstract.AbsT0Muxer import AbsT0Muxer
 from ampel.content.DataPoint import DataPoint
@@ -16,9 +16,13 @@ from ampel.model.operator.AllOf import AllOf
 from ampel.model.operator.AnyOf import AnyOf
 from ampel.types import ChannelId, DataPointId, StockId
 from ampel.util.mappings import unflatten_dict
+
+from astropy.table import Table
 from pydantic import TypeAdapter
 from timewise.io.stable_tap import StableTAPService
 from timewise.query import QueryType
+from timewise.types import TYPE_MAP
+from timewise.tables.allwise_p3as_mep import allwise_p3as_mep
 
 
 class ConcurrentUpdateError(Exception):
@@ -60,7 +64,7 @@ class TiMongoMuxer(AbsT0Muxer):
     unique_key: list[str] = ["mjd", "ra", "dec"]
 
     # URL of tap service for query of AllWISE Source Table
-    tap_service_url : str = "https://irsa.ipac.caltech.edu/TAP"
+    tap_service_url: str = "https://irsa.ipac.caltech.edu/TAP"
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -116,23 +120,31 @@ class TiMongoMuxer(AbsT0Muxer):
     def _check_mep_allwise_sources(self, dps: Sequence[DataPoint]) -> list[DataPointId]:
         # assemble query
         query_config = {
-            "type": "by_allwise_id",
-            "radius_arcsec": 1,
-            "columns": [
-                "ra",
-                "dec",
-                "mjd",
-                "cntr",
-            ],
+            "type": "by_allwise_cntr_and_position",
+            "radius_arcsec": 10,
+            "columns": ["cntr"],
+            "constraints": [],
             "table": {"name": "allwise_p3as_psd"},
         }
         query = TypeAdapter(QueryType).validate_python(query_config)
 
         # load datapoints into astropy table
         upload = Table([dp["body"] for dp in dps])
+        upload["allwise_cntr"] = upload[allwise_p3as_mep.allwise_cntr_column]
+        upload[query.original_id_key] = upload["stock"]
+        for key, dtype in query.input_columns.items():
+            upload[key] = upload[key].astype(TYPE_MAP[dtype])
+        for key in upload.colnames:
+            if key not in query.input_columns:
+                upload.remove_column(key)
 
         # run query
-        res = self._tap_service.run_sync(query.adql, uploads={query.upload_name: upload})
+        res = self._tap_service.run_sync(
+            query.adql, uploads={query.upload_name: upload}
+        )
+
+        # extract valid cntrs
+        res
 
     def _process(
         self, dps: list[DataPoint], stock_id: None | StockId = None
@@ -192,9 +204,12 @@ class TiMongoMuxer(AbsT0Muxer):
                 # if these datapoints come from the AllWISE MEP database, downloaded by timewise
                 # there can be duplicates. Only the AllWISE CNTR can tell us which datapoints
                 # should be used: the CNTR that appears in the AllWISE source catalog.
-                if all([("TIMEWISE" in dp["tag"]) and ("allwise_p3as_mep" in dp["tag"])]):
-                    invalid_dpids = self._check_mep_allwise_sources(dps_db_wrong + dps_wrong)
-
+                if all(
+                    [("TIMEWISE" in dp["tag"]) and ("allwise_p3as_mep" in dp["tag"])]
+                ):
+                    invalid_dpids = self._check_mep_allwise_sources(
+                        dps_db_wrong + dps_wrong
+                    )
 
                 else:
                     raise RuntimeError(msg)
