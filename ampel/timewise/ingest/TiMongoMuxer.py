@@ -89,7 +89,9 @@ class TiMongoMuxer(AbsT0Muxer):
         if self.channel is not None:
             if isinstance(self.channel, ChannelId):
                 channel_query: (
-                    ChannelId | dict[str, list[ChannelId | AllOf[ChannelId]]]
+                    ChannelId
+                    | dict[str, list[ChannelId | AllOf[ChannelId]]]
+                    | dict[str, list[ChannelId]]
                 ) = self.channel
             elif isinstance(self.channel, AnyOf):
                 channel_query = {"$in": self.channel.any_of}
