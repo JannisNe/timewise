@@ -87,6 +87,7 @@ def test_muxer_combines(mock_context):
 def test_muxer_skips_redundant_allwise_mep_data(mock_context):
     data = load_duplicate_data()
     data["table_name"] = "allwise_p3as_mep"
+    data["stock"] = STOCK_ID
     alert_dps = dataframe_to_dps(data, "allwise_p3as_mep")
     logger = AmpelLogger.get_logger(console=dict(level=DEBUG))
     muxer = TestMuxer(logger=logger, context=mock_context)
