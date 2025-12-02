@@ -21,4 +21,4 @@ class allwise_p3as_psd(TableConfig):
     }
     ra_column: ClassVar[str] = "ra"
     dec_column: ClassVar[str] = "dec"
-    allwise_column: ClassVar[str] = "cntr"
+    allwise_cntr_column: ClassVar[str] = "cntr"
