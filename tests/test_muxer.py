@@ -27,7 +27,7 @@ STOCK_ID = 666
 class TestMuxer(TiMongoMuxer):
     dps_in_db: list[DataPoint] = []
 
-    def _get_db(self, stock_id: None | StockId) -> list[DataPoint]:
+    def _get_dps(self, stock_id: None | StockId) -> list[DataPoint]:
         return self.dps_in_db
 
 
@@ -69,10 +69,11 @@ def test_muxer_fails_with_duplicates(mock_context):
 
 def test_muxer_combines(mock_context):
     data = load_duplicate_data()
-    unique_cntrs = data["cntr"].unique()
-    data = data[data.cntr == unique_cntrs[0]].reset_index(drop=True)
-    dps_in_db = dataframe_to_dps(data.iloc[: len(data) // 2], "neowiser_p1bs_psd")
-    alert_dps = dataframe_to_dps(data.iloc[len(data) // 2 :], "neowiser_p1bs_psd")
+    unique_cntrs = data["cntr_mf"].unique()
+    data = data[data.cntr_mf == unique_cntrs[0]].reset_index(drop=True)
+    i_dps = len(data) // 2
+    dps_in_db = dataframe_to_dps(data.iloc[:i_dps], "neowiser_p1bs_psd")
+    alert_dps = dataframe_to_dps(data.iloc[i_dps:], "neowiser_p1bs_psd")
     logger = AmpelLogger.get_logger(console=dict(level=DEBUG))
     muxer = TestMuxer(dps_in_db=dps_in_db, logger=logger, context=mock_context)
     dps_to_insert, dps_to_combine = muxer.process(alert_dps, stock_id=STOCK_ID)
