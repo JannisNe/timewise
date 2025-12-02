@@ -8,13 +8,16 @@
 
 from bisect import bisect_right
 from contextlib import suppress
-from typing import Any
+from typing import Any, Union, Sequence
 
 
 from ampel.abstract.AbsT0Muxer import AbsT0Muxer
 from ampel.content.DataPoint import DataPoint
 from ampel.types import DataPointId, StockId
 from ampel.util.mappings import unflatten_dict
+from ampel.model.operator.AnyOf import AnyOf
+from ampel.model.operator.AllOf import AllOf
+from ampel.types import ChannelId
 
 
 class ConcurrentUpdateError(Exception):
@@ -51,6 +54,8 @@ class TiMongoMuxer(AbsT0Muxer):
         "body.dec": 1,
     }
 
+    channel: None | ChannelId | AnyOf[ChannelId] | AllOf[ChannelId] = None
+
     unique_key: list[str] = ["mjd", "ra", "dec"]
 
     def __init__(self, **kwargs) -> None:
@@ -81,7 +86,23 @@ class TiMongoMuxer(AbsT0Muxer):
 
     # NB: this 1-liner is a separate method to provide a patch point for race condition testing
     def _get_dps(self, stock_id: None | StockId) -> list[DataPoint]:
-        return list(self._photo_col.find({"stock": stock_id}, self.projection))
+        if self.channel is not None:
+            if isinstance(self.channel, ChannelId):
+                channel_query: (
+                    ChannelId | dict[str, Sequence[ChannelId | AllOf[ChannelId]]]
+                ) = self.channel
+            elif isinstance(self.channel, AnyOf):
+                channel_query = {"$in": self.channel.any_of}
+            elif isinstance(self.channel, AllOf):
+                channel_query = {"$all": self.channel.all_of}
+            else:
+                # should not happen
+                raise TypeError()
+            _channel = {"channel": channel_query}
+        else:
+            _channel = {}
+        query = {"stock": stock_id, **_channel}
+        return list(self._photo_col.find(query, self.projection))
 
     def _process(
         self, dps: list[DataPoint], stock_id: None | StockId = None
