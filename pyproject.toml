@@ -54,6 +54,7 @@ dev = [
     "scipy-stubs (>=1.16.2.0,<2.0.0.0)",
     "types-pyyaml (>=6.0.12.20250915,<7.0.0.0)",
     "types-requests (>=2.32.4.20250913,<3.0.0.0)",
+    "mongomock (>=4.3.0,<5.0.0)",
 ]
 docs = [
     "myst-parser>=1,<3",
