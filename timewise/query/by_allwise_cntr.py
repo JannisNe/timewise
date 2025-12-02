@@ -12,7 +12,7 @@ class AllWISECntrQuery(Query):
 
     @property
     def input_columns(self) -> Dict[str, str]:
-        return {"allwise_cntr": "str", self.original_id_key: "int"}
+        return {"allwise_cntr": "int", self.original_id_key: "int"}
 
     def build(self) -> str:
         logger.debug(f"constructing query by AllWISE cntr for {self.table.name}")
