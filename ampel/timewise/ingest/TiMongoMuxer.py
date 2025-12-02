@@ -8,16 +8,17 @@
 
 from bisect import bisect_right
 from contextlib import suppress
-from typing import Any, Union, Sequence
-
+from typing import Any, Sequence
 
 from ampel.abstract.AbsT0Muxer import AbsT0Muxer
 from ampel.content.DataPoint import DataPoint
-from ampel.types import DataPointId, StockId
-from ampel.util.mappings import unflatten_dict
-from ampel.model.operator.AnyOf import AnyOf
 from ampel.model.operator.AllOf import AllOf
-from ampel.types import ChannelId
+from ampel.model.operator.AnyOf import AnyOf
+from ampel.types import ChannelId, DataPointId, StockId
+from ampel.util.mappings import unflatten_dict
+from pydantic import TypeAdapter
+from timewise.io.stable_tap import StableTAPService
+from timewise.query import QueryType
 
 
 class ConcurrentUpdateError(Exception):
@@ -58,12 +59,20 @@ class TiMongoMuxer(AbsT0Muxer):
 
     unique_key: list[str] = ["mjd", "ra", "dec"]
 
+    # URL of tap service for query of AllWISE Source Table
+    tap_service_url : str = "https://irsa.ipac.caltech.edu/TAP"
+
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
         # used to check potentially already inserted pps
         self._photo_col = self.context.db.get_collection("t0")
         self._projection_spec = unflatten_dict(self.projection)
+
+        self._tap_service = StableTAPService(self.tap_service_url)
+
+        self._allwise_source_cntr: list[str] = []
+        self._not_allwise_source_cntr: list[str] = []
 
     def process(
         self, dps: list[DataPoint], stock_id: None | StockId = None
@@ -103,6 +112,27 @@ class TiMongoMuxer(AbsT0Muxer):
             _channel = {}
         query = {"stock": stock_id, **_channel}
         return list(self._photo_col.find(query, self.projection))
+
+    def _check_mep_allwise_sources(self, dps: Sequence[DataPoint]) -> list[DataPointId]:
+        # assemble query
+        query_config = {
+            "type": "by_allwise_id",
+            "radius_arcsec": 1,
+            "columns": [
+                "ra",
+                "dec",
+                "mjd",
+                "cntr",
+            ],
+            "table": {"name": "allwise_p3as_psd"},
+        }
+        query = TypeAdapter(QueryType).validate_python(query_config)
+
+        # load datapoints into astropy table
+        upload = Table([dp["body"] for dp in dps])
+
+        # run query
+        res = self._tap_service.run_sync(query.adql, uploads={query.upload_name: upload})
 
     def _process(
         self, dps: list[DataPoint], stock_id: None | StockId = None
@@ -157,7 +187,17 @@ class TiMongoMuxer(AbsT0Muxer):
                 f"stockID {str(stock_id)}: Duplicate photopoints at {key}!\nDPS from DB:"
                 f"\n{dps_db_wrong}\nNew DPS:\n{dps_wrong}"
             )
-            assert len(simultaneous_dps) == 1, msg
+
+            if len(simultaneous_dps) > 1:
+                # if these datapoints come from the AllWISE MEP database, downloaded by timewise
+                # there can be duplicates. Only the AllWISE CNTR can tell us which datapoints
+                # should be used: the CNTR that appears in the AllWISE source catalog.
+                if all([("TIMEWISE" in dp["tag"]) and ("allwise_p3as_mep" in dp["tag"])]):
+                    invalid_dpids = self._check_mep_allwise_sources(dps_db_wrong + dps_wrong)
+
+
+                else:
+                    raise RuntimeError(msg)
 
         # Part 2: Update new data points that are already superseded
         ############################################################
