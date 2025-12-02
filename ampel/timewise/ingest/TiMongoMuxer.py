@@ -126,7 +126,7 @@ class TiMongoMuxer(AbsT0Muxer):
             "constraints": [],
             "table": {"name": "allwise_p3as_psd"},
         }
-        query = TypeAdapter(QueryType).validate_python(query_config)
+        query: QueryType = TypeAdapter(QueryType).validate_python(query_config)
 
         # load datapoints into astropy table
         upload = Table([dp["body"] for dp in dps])
