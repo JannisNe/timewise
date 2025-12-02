@@ -12,7 +12,7 @@ class AllWISECntrQuery(Query):
 
     @property
     def input_columns(self) -> Dict[str, str]:
-        return {"allwise_cntr": str, self.original_id_key: "int"}
+        return {"allwise_cntr": "str", self.original_id_key: "int"}
 
     def build(self) -> str:
         logger.debug(f"constructing query by AllWISE cntr for {self.table.name}")
@@ -29,7 +29,9 @@ class AllWISECntrQuery(Query):
             f"CIRCLE('J2000',mine.ra,mine.dec,{self.radius_arcsec / 3600:.18f}))=1 "
         )
 
-        constraints = self.constraints + [f"{self.table.name}.{self.table.allwise_cntr_column} = {self.upload_name}.allwise_cntr"]
+        constraints = self.constraints + [
+            f"{self.table.name}.{self.table.allwise_cntr_column} = {self.upload_name}.allwise_cntr"
+        ]
 
         if len(constraints) > 0:
             q += " AND (\n"
