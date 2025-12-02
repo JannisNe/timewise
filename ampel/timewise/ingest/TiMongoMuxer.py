@@ -8,7 +8,7 @@
 
 from bisect import bisect_right
 from contextlib import suppress
-from typing import Any, Union
+from typing import Any, Union, Sequence
 
 
 from ampel.abstract.AbsT0Muxer import AbsT0Muxer
@@ -89,9 +89,7 @@ class TiMongoMuxer(AbsT0Muxer):
         if self.channel is not None:
             if isinstance(self.channel, ChannelId):
                 channel_query: (
-                    ChannelId
-                    | dict[str, list[ChannelId | AllOf[ChannelId]]]
-                    | dict[str, list[ChannelId]]
+                    ChannelId | dict[str, Sequence[ChannelId | AllOf[ChannelId]]]
                 ) = self.channel
             elif isinstance(self.channel, AnyOf):
                 channel_query = {"$in": self.channel.any_of}
