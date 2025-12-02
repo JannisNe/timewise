@@ -117,7 +117,7 @@ class TiMongoMuxer(AbsT0Muxer):
         query = {"stock": stock_id, **_channel}
         return list(self._photo_col.find(query, self.projection))
 
-    def _check_mep_allwise_sources(self, dps: Sequence[DataPoint]) -> list[DataPointId]:
+    def _check_cntrs(self, dps: Sequence[DataPoint]) -> None:
         # assemble query
         query_config = {
             "type": "by_allwise_cntr_and_position",
@@ -139,12 +139,38 @@ class TiMongoMuxer(AbsT0Muxer):
                 upload.remove_column(key)
 
         # run query
+        self.logger.info("Querying AllWISE Source Table for MEP CNTRs ...")
         res = self._tap_service.run_sync(
             query.adql, uploads={query.upload_name: upload}
         )
 
-        # extract valid cntrs
-        res
+        # update internal state
+        self._allwise_source_cntr.extend(list(res.table["cntr"].astype(str)))
+        self._not_allwise_source_cntr.extend(
+            list(
+                set(upload["allwise_cntr"].astype(str))
+                - set(res.table["cntr"].astype(str))
+            )
+        )
+
+    def _check_mep_allwise_sources(self, dps: Sequence[DataPoint]) -> list[DataPointId]:
+        dps_with_unchecked_cntr = [
+            dp
+            for dp in dps
+            if str(dp["body"][allwise_p3as_mep.allwise_cntr_column])
+            not in self._allwise_source_cntr + self._not_allwise_source_cntr
+        ]
+        if len(dps_with_unchecked_cntr) > 0:
+            self._check_cntrs(dps_with_unchecked_cntr)
+
+        # compile list of invalid datapoint ids
+        invalid_dp_ids = []
+        for dp in dps:
+            cntr = str(dp["body"][allwise_p3as_mep.allwise_cntr_column])
+            if cntr in self._not_allwise_source_cntr:
+                invalid_dp_ids.append(dp["id"])
+
+        return invalid_dp_ids
 
     def _process(
         self, dps: list[DataPoint], stock_id: None | StockId = None
@@ -191,7 +217,10 @@ class TiMongoMuxer(AbsT0Muxer):
             else:
                 unique_dps_ids[key] = [dp["id"]]
 
-        # make sure no duplicate datapoints exist
+        # Part 2: Check that there are no duplicates and handle redundant AllWISE MEP data
+        ##################################################################################
+
+        invalid_dp_ids = []
         for key, simultaneous_dps in unique_dps_ids.items():
             dps_db_wrong = [dp for dp in dps_db if dp["id"] in simultaneous_dps]
             dps_wrong = [dp for dp in dps if dp["id"] in simultaneous_dps]
@@ -200,32 +229,44 @@ class TiMongoMuxer(AbsT0Muxer):
                 f"\n{dps_db_wrong}\nNew DPS:\n{dps_wrong}"
             )
 
+            all_wrong_dps = dps_db_wrong + dps_wrong
             if len(simultaneous_dps) > 1:
                 # if these datapoints come from the AllWISE MEP database, downloaded by timewise
                 # there can be duplicates. Only the AllWISE CNTR can tell us which datapoints
                 # should be used: the CNTR that appears in the AllWISE source catalog.
                 if all(
                     [("TIMEWISE" in dp["tag"]) and ("allwise_p3as_mep" in dp["tag"])]
+                    for dp in all_wrong_dps
                 ):
-                    invalid_dpids = self._check_mep_allwise_sources(
+                    self.logger.info(
+                        f"{len(all_wrong_dps)} duplicate MEP datapoints found. Checking ..."
+                    )
+                    i_invalid_dp_ids = self._check_mep_allwise_sources(
                         dps_db_wrong + dps_wrong
                     )
+                    self.logger.info(
+                        f"Found {len(i_invalid_dp_ids)} invalid MEP datapoints."
+                    )
+                    invalid_dp_ids.extend(i_invalid_dp_ids)
 
                 else:
                     raise RuntimeError(msg)
 
-        # Part 2: Update new data points that are already superseded
-        ############################################################
+        # Part 3: Compile final lists of datapoints to insert and combine
+        #################################################################
 
         # Difference between candids from the alert and candids present in DB
-        ids_dps_to_insert = ids_dps_alert - ids_dps_db
+        ids_dps_to_insert = ids_dps_alert - ids_dps_db - set(invalid_dp_ids)
         dps_to_insert = [dp for dp in dps if dp["id"] in ids_dps_to_insert]
         dps_to_combine = [
-            dp for dp in dps + dps_db if dp["id"] in ids_dps_alert | ids_dps_db
+            dp
+            for dp in dps + dps_db
+            if dp["id"] in ((ids_dps_alert | ids_dps_db) - set(invalid_dp_ids))
         ]
         self.logger.debug(
             f"Got {len(ids_dps_alert)} datapoints from alerts, "
             f"found {len(dps_db)} in DB, "
+            f"{len(invalid_dp_ids)} invalid datapoints, "
             f"inserting {len(dps_to_insert)} datapoints, "
             f"combining {len(dps_to_combine)} datapoints"
         )
