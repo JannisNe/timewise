@@ -145,12 +145,10 @@ class TiMongoMuxer(AbsT0Muxer):
         )
 
         # update internal state
-        self._allwise_source_cntr.extend(list(res.table["cntr"].astype(str)))
+        res_cntr = res.to_table()["cntr"].astype(str)
+        self._allwise_source_cntr.extend(list(res_cntr))
         self._not_allwise_source_cntr.extend(
-            list(
-                set(upload["allwise_cntr"].astype(str))
-                - set(res.table["cntr"].astype(str))
-            )
+            list(set(upload["allwise_cntr"].astype(str)) - set(res_cntr))
         )
 
     def _check_mep_allwise_sources(self, dps: Sequence[DataPoint]) -> list[DataPointId]:
