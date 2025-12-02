@@ -233,8 +233,10 @@ class TiMongoMuxer(AbsT0Muxer):
                 # there can be duplicates. Only the AllWISE CNTR can tell us which datapoints
                 # should be used: the CNTR that appears in the AllWISE source catalog.
                 if all(
-                    [("TIMEWISE" in dp["tag"]) and ("allwise_p3as_mep" in dp["tag"])]
-                    for dp in all_wrong_dps
+                    [
+                        ("TIMEWISE" in dp["tag"]) and ("allwise_p3as_mep" in dp["tag"])
+                        for dp in all_wrong_dps
+                    ]
                 ):
                     self.logger.info(
                         f"{len(all_wrong_dps)} duplicate MEP datapoints found. Checking ..."
