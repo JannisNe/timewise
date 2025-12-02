@@ -40,7 +40,7 @@ class AllWISECntrQuery(Query):
 
         if len(constraints) > 0:
             q += " AND (\n"
-            for c in self.constraints:
+            for c in constraints:
                 q += f"\t{self.table.name}.{c} AND \n"
             q = q.strip(" AND \n")
             q += "\t)"
