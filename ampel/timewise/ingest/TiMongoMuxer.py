@@ -8,16 +8,21 @@
 
 from bisect import bisect_right
 from contextlib import suppress
-from typing import Any, Union, Sequence
-
+from typing import Any, Sequence, get_args
 
 from ampel.abstract.AbsT0Muxer import AbsT0Muxer
 from ampel.content.DataPoint import DataPoint
-from ampel.types import DataPointId, StockId
-from ampel.util.mappings import unflatten_dict
-from ampel.model.operator.AnyOf import AnyOf
 from ampel.model.operator.AllOf import AllOf
-from ampel.types import ChannelId
+from ampel.model.operator.AnyOf import AnyOf
+from ampel.types import ChannelId, DataPointId, StockId
+from ampel.util.mappings import unflatten_dict
+
+from astropy.table import Table
+from pydantic import TypeAdapter
+from timewise.io.stable_tap import StableTAPService
+from timewise.query import QueryType
+from timewise.types import TYPE_MAP
+from timewise.tables.allwise_p3as_mep import allwise_p3as_mep
 
 
 class ConcurrentUpdateError(Exception):
@@ -58,12 +63,20 @@ class TiMongoMuxer(AbsT0Muxer):
 
     unique_key: list[str] = ["mjd", "ra", "dec"]
 
+    # URL of tap service for query of AllWISE Source Table
+    tap_service_url: str = "https://irsa.ipac.caltech.edu/TAP"
+
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
         # used to check potentially already inserted pps
         self._photo_col = self.context.db.get_collection("t0")
         self._projection_spec = unflatten_dict(self.projection)
+
+        self._tap_service = StableTAPService(self.tap_service_url)
+
+        self._allwise_source_cntr: list[str] = []
+        self._not_allwise_source_cntr: list[str] = []
 
     def process(
         self, dps: list[DataPoint], stock_id: None | StockId = None
@@ -103,6 +116,59 @@ class TiMongoMuxer(AbsT0Muxer):
             _channel = {}
         query = {"stock": stock_id, **_channel}
         return list(self._photo_col.find(query, self.projection))
+
+    def _check_cntrs(self, dps: Sequence[DataPoint]) -> None:
+        # assemble query
+        query_config = {
+            "type": "by_allwise_cntr_and_position",
+            "radius_arcsec": 10,
+            "columns": ["cntr"],
+            "constraints": [],
+            "table": {"name": "allwise_p3as_psd"},
+        }
+        query: QueryType = TypeAdapter(QueryType).validate_python(query_config)
+
+        # load datapoints into astropy table
+        upload = Table([dp["body"] for dp in dps])
+        upload["allwise_cntr"] = upload[allwise_p3as_mep.allwise_cntr_column]
+        upload[query.original_id_key] = upload["stock"]
+        for key, dtype in query.input_columns.items():
+            upload[key] = upload[key].astype(TYPE_MAP[dtype])
+        for key in upload.colnames:
+            if key not in query.input_columns:
+                upload.remove_column(key)
+
+        # run query
+        self.logger.info("Querying AllWISE Source Table for MEP CNTRs ...")
+        res = self._tap_service.run_sync(
+            query.adql, uploads={query.upload_name: upload}
+        )
+
+        # update internal state
+        res_cntr = res.to_table()["cntr"].astype(str)
+        self._allwise_source_cntr.extend(list(res_cntr))
+        self._not_allwise_source_cntr.extend(
+            list(set(upload["allwise_cntr"].astype(str)) - set(res_cntr))
+        )
+
+    def _check_mep_allwise_sources(self, dps: Sequence[DataPoint]) -> list[DataPointId]:
+        dps_with_unchecked_cntr = [
+            dp
+            for dp in dps
+            if str(dp["body"][allwise_p3as_mep.allwise_cntr_column])
+            not in self._allwise_source_cntr + self._not_allwise_source_cntr
+        ]
+        if len(dps_with_unchecked_cntr) > 0:
+            self._check_cntrs(dps_with_unchecked_cntr)
+
+        # compile list of invalid datapoint ids
+        invalid_dp_ids = []
+        for dp in dps:
+            cntr = str(dp["body"][allwise_p3as_mep.allwise_cntr_column])
+            if cntr in self._not_allwise_source_cntr:
+                invalid_dp_ids.append(dp["id"])
+
+        return invalid_dp_ids
 
     def _process(
         self, dps: list[DataPoint], stock_id: None | StockId = None
@@ -149,7 +215,10 @@ class TiMongoMuxer(AbsT0Muxer):
             else:
                 unique_dps_ids[key] = [dp["id"]]
 
-        # make sure no duplicate datapoints exist
+        # Part 2: Check that there are no duplicates and handle redundant AllWISE MEP data
+        ##################################################################################
+
+        invalid_dp_ids = []
         for key, simultaneous_dps in unique_dps_ids.items():
             dps_db_wrong = [dp for dp in dps_db if dp["id"] in simultaneous_dps]
             dps_wrong = [dp for dp in dps if dp["id"] in simultaneous_dps]
@@ -157,20 +226,47 @@ class TiMongoMuxer(AbsT0Muxer):
                 f"stockID {str(stock_id)}: Duplicate photopoints at {key}!\nDPS from DB:"
                 f"\n{dps_db_wrong}\nNew DPS:\n{dps_wrong}"
             )
-            assert len(simultaneous_dps) == 1, msg
 
-        # Part 2: Update new data points that are already superseded
-        ############################################################
+            all_wrong_dps = dps_db_wrong + dps_wrong
+            if len(simultaneous_dps) > 1:
+                # if these datapoints come from the AllWISE MEP database, downloaded by timewise
+                # there can be duplicates. Only the AllWISE CNTR can tell us which datapoints
+                # should be used: the CNTR that appears in the AllWISE source catalog.
+                if all(
+                    [
+                        ("TIMEWISE" in dp["tag"]) and ("allwise_p3as_mep" in dp["tag"])
+                        for dp in all_wrong_dps
+                    ]
+                ):
+                    self.logger.info(
+                        f"{len(all_wrong_dps)} duplicate MEP datapoints found. Checking ..."
+                    )
+                    i_invalid_dp_ids = self._check_mep_allwise_sources(
+                        dps_db_wrong + dps_wrong
+                    )
+                    self.logger.info(
+                        f"Found {len(i_invalid_dp_ids)} invalid MEP datapoints."
+                    )
+                    invalid_dp_ids.extend(i_invalid_dp_ids)
+
+                else:
+                    raise RuntimeError(msg)
+
+        # Part 3: Compile final lists of datapoints to insert and combine
+        #################################################################
 
         # Difference between candids from the alert and candids present in DB
-        ids_dps_to_insert = ids_dps_alert - ids_dps_db
+        ids_dps_to_insert = ids_dps_alert - ids_dps_db - set(invalid_dp_ids)
         dps_to_insert = [dp for dp in dps if dp["id"] in ids_dps_to_insert]
         dps_to_combine = [
-            dp for dp in dps + dps_db if dp["id"] in ids_dps_alert | ids_dps_db
+            dp
+            for dp in dps + dps_db
+            if dp["id"] in ((ids_dps_alert | ids_dps_db) - set(invalid_dp_ids))
         ]
         self.logger.debug(
             f"Got {len(ids_dps_alert)} datapoints from alerts, "
             f"found {len(dps_db)} in DB, "
+            f"{len(invalid_dp_ids)} invalid datapoints, "
             f"inserting {len(dps_to_insert)} datapoints, "
             f"combining {len(dps_to_combine)} datapoints"
         )

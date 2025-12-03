@@ -120,6 +120,7 @@ class DummyTAPService(vo.dal.TAPService):
         session=None,
         fail_submit=False,
         fail_fetch=False,
+        sync_res: Table | None = None,
     ):
         super(DummyTAPService, self).__init__(
             baseurl, capability_description=None, session=None
@@ -127,6 +128,7 @@ class DummyTAPService(vo.dal.TAPService):
         self.chunksize = chunksize
         self.fail_submit = fail_submit
         self.fail_fetch = fail_fetch
+        self.sync_res = sync_res
 
     def submit_job(
         self, query, *, language="ADQL", maxrec=None, uploads=None, **keywords
@@ -152,3 +154,12 @@ class DummyTAPService(vo.dal.TAPService):
         return DummyAsyncTAPJob(
             url=url, session=self._session, fail_fetch=self.fail_fetch
         )
+
+    def run_sync(
+        self, query, *, language="ADQL", maxrec=None, uploads=None, **keywords
+    ):
+        class DummyTAPResult:
+            def to_table(self_inner):
+                return self.sync_res
+
+        return DummyTAPResult()

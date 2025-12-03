@@ -130,9 +130,10 @@ def ampel_interface(timewise_config_path) -> AmpelInterface:
     dl = cfg.download.build_downloader()
     for q, c in product(dl.queries, dl.chunker):
         data = get_table_from_query_and_chunk(q.adql, c.chunk_id)
+        ext = "_eq" if "allwise_p3as_mep" in q else ""
         for ol, nl in V0_KEYMAP:
             if ol in data.columns:
-                data.rename_column(ol, nl)
+                data.rename_column(ol, nl + ext)
         task = dl.get_task_id(c, q)
         dl.backend.save_data(task, data)
 

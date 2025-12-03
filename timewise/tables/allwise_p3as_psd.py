@@ -3,13 +3,13 @@ from typing import ClassVar, Dict, Literal, Type
 from .base import TableConfig
 
 
-class neowiser_p1bs_psd(TableConfig):
-    name: Literal["neowiser_p1bs_psd"] = "neowiser_p1bs_psd"
+class allwise_p3as_psd(TableConfig):
+    name: Literal["allwise_p3as_psd"] = "allwise_p3as_psd"
     columns_dtypes: ClassVar[Dict[str, Type]] = {
         "ra": float,
         "dec": float,
         "mjd": float,
-        "allwise_cntr": str,
+        "cntr": str,
         "w1mpro": float,
         "w1sigmpro": float,
         "w2mpro": float,
@@ -21,4 +21,4 @@ class neowiser_p1bs_psd(TableConfig):
     }
     ra_column: ClassVar[str] = "ra"
     dec_column: ClassVar[str] = "dec"
-    allwise_cntr_column: ClassVar[str] = "allwise_cntr"
+    allwise_cntr_column: ClassVar[str] = "cntr"
