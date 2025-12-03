@@ -1,21 +1,18 @@
 import pytest
 import sys
 from hashlib import blake2b
-from typing import Literal, List
 
 import pandas as pd
 from bson import encode
 from astropy.table import Table
 
 from ampel.timewise.ingest.TiMongoMuxer import TiMongoMuxer
-from ampel.types import ChannelId, DataPointId, StockId
+from ampel.types import DataPointId, StockId
 from ampel.content.DataPoint import DataPoint
 from ampel.content.MetaRecord import MetaRecord
 from ampel.log.AmpelLogger import DEBUG, AmpelLogger
-from ampel.dev.DevAmpelContext import DevAmpelContext
 from ampel.test.conftest import mock_context, _patch_mongo, testing_config
 
-from timewise.tables.allwise_p3as_mep import allwise_p3as_mep
 from tests.constants import DATA_DIR
 from tests.dummy_tap import DummyTAPService
 
