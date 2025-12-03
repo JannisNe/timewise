@@ -8,7 +8,7 @@
 
 from bisect import bisect_right
 from contextlib import suppress
-from typing import Any, Sequence, get_args
+from typing import Any, Sequence
 
 from ampel.abstract.AbsT0Muxer import AbsT0Muxer
 from ampel.content.DataPoint import DataPoint
@@ -16,13 +16,12 @@ from ampel.model.operator.AllOf import AllOf
 from ampel.model.operator.AnyOf import AnyOf
 from ampel.types import ChannelId, DataPointId, StockId
 from ampel.util.mappings import unflatten_dict
-
 from astropy.table import Table
 from pydantic import TypeAdapter
 from timewise.io.stable_tap import StableTAPService
 from timewise.query import QueryType
-from timewise.types import TYPE_MAP
 from timewise.tables.allwise_p3as_mep import allwise_p3as_mep
+from timewise.types import TYPE_MAP
 
 
 class ConcurrentUpdateError(Exception):
@@ -131,7 +130,7 @@ class TiMongoMuxer(AbsT0Muxer):
         # load datapoints into astropy table
         upload = Table([dp["body"] for dp in dps])
         upload["allwise_cntr"] = upload[allwise_p3as_mep.allwise_cntr_column]
-        upload[query.original_id_key] = upload["stock"]
+        upload[query.original_id_key] = [dp["id"] for dp in dps]
         for key, dtype in query.input_columns.items():
             upload[key] = upload[key].astype(TYPE_MAP[dtype])
         for key in upload.colnames:
