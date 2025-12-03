@@ -59,7 +59,6 @@ def test_muxer_fails_with_duplicates(mock_context):
     data["table_name"] = "neowiser_p1bs_psd"
     logger = AmpelLogger.get_logger(console=dict(level=DEBUG))
     muxer = TestMuxer(
-        dps_in_db=dataframe_to_dps(data, "neowiser_p1bs_psd"),
         logger=logger,
         context=mock_context,
     )
