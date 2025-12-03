@@ -1,25 +1,23 @@
-import time
-import threading
 import logging
-from queue import Empty
-from typing import Dict, Iterator, cast, Sequence
+import threading
+import time
+from datetime import datetime, timedelta
 from itertools import product
 from pathlib import Path
-from datetime import datetime, timedelta
+from queue import Empty
+from typing import Dict, Iterator, Sequence, cast
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from astropy.table import Table
 from pyvo.utils.http import create_session
 
-from .stable_tap import StableTAPService
 from ..backend import BackendType
-from ..types import TAPJobMeta, TaskID, TYPE_MAP
+from ..chunking import Chunk, Chunker
 from ..query import QueryType
-from ..query.base import Query
+from ..types import TYPE_MAP, TAPJobMeta, TaskID
 from ..util.error_threading import ErrorQueue, ExceptionSafeThread
-from ..chunking import Chunker, Chunk
-
+from .stable_tap import StableTAPService
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +72,7 @@ class Downloader:
     # helpers
     # ----------------------------
     @staticmethod
-    def get_task_id(chunk: Chunk, query: Query) -> TaskID:
+    def get_task_id(chunk: Chunk, query: QueryType) -> TaskID:
         return TaskID(
             namespace="download", key=f"chunk{chunk.chunk_id:04d}_{query.hash}"
         )
@@ -107,7 +105,7 @@ class Downloader:
     # TAP submission and download
     # ----------------------------
 
-    def submit_tap_job(self, query: Query, chunk: Chunk) -> TAPJobMeta:
+    def submit_tap_job(self, query: QueryType, chunk: Chunk) -> TAPJobMeta:
         adql = query.adql
         chunk_df = chunk.data
 
@@ -163,7 +161,7 @@ class Downloader:
     def _submission_worker(self):
         while not self.stop_event.is_set():
             try:
-                chunk, query = self.submit_queue.get(timeout=1.0)  # type: Chunk, Query
+                chunk, query = self.submit_queue.get(timeout=1.0)  # type: Chunk, QueryType
             except Empty:
                 if self.all_chunks_queued:
                     self.all_chunks_submitted = True

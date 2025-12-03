@@ -1,21 +1,18 @@
 import pytest
 import sys
 from hashlib import blake2b
-from typing import Literal, List
 
 import pandas as pd
 from bson import encode
 from astropy.table import Table
 
 from ampel.timewise.ingest.TiMongoMuxer import TiMongoMuxer
-from ampel.types import ChannelId, DataPointId, StockId
+from ampel.types import DataPointId, StockId
 from ampel.content.DataPoint import DataPoint
 from ampel.content.MetaRecord import MetaRecord
 from ampel.log.AmpelLogger import DEBUG, AmpelLogger
-from ampel.dev.DevAmpelContext import DevAmpelContext
 from ampel.test.conftest import mock_context, _patch_mongo, testing_config
 
-from timewise.tables.allwise_p3as_mep import allwise_p3as_mep
 from tests.constants import DATA_DIR
 from tests.dummy_tap import DummyTAPService
 
@@ -89,12 +86,12 @@ def test_muxer_combines(mock_context):
 def test_muxer_skips_redundant_allwise_mep_data(mock_context):
     data = load_duplicate_data()
     data["table_name"] = "allwise_p3as_mep"
-    data["stock"] = STOCK_ID
     alert_dps = dataframe_to_dps(data, "allwise_p3as_mep")
     logger = AmpelLogger.get_logger(console=dict(level=DEBUG))
     muxer = TestMuxer(logger=logger, context=mock_context)
     valid_cntr = data["cntr_mf"].unique()[0]
-    sync_res = Table({"cntr": [valid_cntr], "orig_id": [STOCK_ID]})
+    corresponding_valid_dp_id = alert_dps[0]["id"]
+    sync_res = Table({"cntr": [valid_cntr], "orig_id": [corresponding_valid_dp_id]})
     muxer._tap_service = DummyTAPService(sync_res=sync_res, baseurl="", chunksize=1)
     dps_to_insert, dps_to_combine = muxer.process(alert_dps, stock_id=STOCK_ID)
 
