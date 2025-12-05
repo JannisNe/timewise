@@ -68,6 +68,7 @@ ampel= [
     "ampel-alerts (==0.10.3a6)",
     "ampel-interface (==0.10.5a8)"
 ]
+slack =["slack-sdk (>=3.39.0,<4.0.0)"]
 
 [tool.coverage.run]
 source = ["timewise", "ampel"]
