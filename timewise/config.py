@@ -1,16 +1,19 @@
+from typing import Self
 from pathlib import Path
 import yaml
 
 import numpy as np
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, model_validator, field_validator
 
 from .io import DownloadConfig
 from .process import AmpelConfig, AmpelInterface
+from .slackbot import SLACK_EXISTS, SlackbotConfig
 
 
 class TimewiseConfig(BaseModel):
     download: DownloadConfig
     ampel: AmpelConfig
+    slackbot: SlackbotConfig | None = None
 
     @classmethod
     def from_yaml(cls, path: str | Path):
@@ -21,7 +24,7 @@ class TimewiseConfig(BaseModel):
         return cls.model_validate(config_dict)
 
     @model_validator(mode="after")
-    def validate_query_original_id_key(self) -> "TimewiseConfig":
+    def validate_query_original_id_key(self) -> Self:
         unique_keys = np.unique([q.original_id_key for q in self.download.queries])
         assert len(unique_keys) == 1, (
             "Can not use different 'original_id_key' in queries!"
