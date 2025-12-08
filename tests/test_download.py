@@ -64,3 +64,23 @@ def test_downloader_creates_files(download_cfg):
             else:
                 m = [True] * len(reference)
             assert sum(np.array(reference[col] - produced[col])[m]) == 0
+
+
+@pytest.mark.parametrize("resubmit", [False, True])
+def test_resubmit(download_cfg, resubmit):
+    dl = download_cfg.build_downloader(resubmit_failed=resubmit)
+
+    # mimick behavior when job results disappear from server
+    dl.service = DummyTAPService(
+        baseurl="",
+        chunksize=download_cfg.chunk_size,
+        final_job_phase=[None, "COMPLETED"],
+    )
+
+    # make sure that downloader fails / succeeds as expected when not retrying
+    dl.run()
+    for t in dl.iter_tasks():
+        if resubmit:
+            assert dl.backend.is_done(t)
+        else:
+            assert not dl.backend.is_done(t)
