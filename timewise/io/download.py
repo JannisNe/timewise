@@ -245,6 +245,7 @@ class Downloader:
                     )
                     if self.resubmit_failed:
                         self.resubmit(task)
+                        continue
 
                 meta["status"] = status
                 with self.job_lock:
