@@ -17,6 +17,7 @@ class DownloadConfig(BaseModel):
     poll_interval: float = 10.0
     queries: List[QueryType] = Field(..., description="One or more queries per chunk")
     backend: BackendType = Field(..., discriminator="type")
+    resubmit_failed: bool = False
 
     service_url: str = "https://irsa.ipac.caltech.edu/TAP"
 
@@ -66,6 +67,7 @@ class DownloadConfig(BaseModel):
             queries=self.queries,
             max_concurrent_jobs=self.max_concurrent_jobs,
             poll_interval=self.poll_interval,
+            resubmit_failed=self.resubmit_failed,
         )
         default.update(overwrite)
         return Downloader(**default)
