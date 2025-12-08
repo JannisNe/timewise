@@ -30,7 +30,15 @@ class DummyAsyncTAPJob:
     Hacky drop-in replacement for AsyncTAPJob
     """
 
-    def __init__(self, url, *, session=None, delete=True, fail_fetch=False, final_phase="COMPLETED"):
+    def __init__(
+        self,
+        url,
+        *,
+        session=None,
+        delete=True,
+        fail_fetch=False,
+        final_phase="COMPLETED",
+    ):
         self.url = url
         self.fail_fetch = fail_fetch
         self.final_phase = final_phase
@@ -121,6 +129,7 @@ class DummyTAPService(vo.dal.TAPService):
         session=None,
         fail_submit=False,
         fail_fetch=False,
+        final_job_phase="COMPLETED",
         sync_res: Table | None = None,
     ):
         super(DummyTAPService, self).__init__(
@@ -130,6 +139,7 @@ class DummyTAPService(vo.dal.TAPService):
         self.fail_submit = fail_submit
         self.fail_fetch = fail_fetch
         self.sync_res = sync_res
+        self.final_job_phase = final_job_phase
 
     def submit_job(
         self, query, *, language="ADQL", maxrec=None, uploads=None, **keywords
@@ -145,6 +155,7 @@ class DummyTAPService(vo.dal.TAPService):
             uploads=uploads,
             session=self._session,
             chunksize=self.chunksize,
+            final_phase=self.final_job_phase,
             **keywords,
         )
         logger.debug(job.url)
@@ -153,7 +164,10 @@ class DummyTAPService(vo.dal.TAPService):
 
     def get_job_from_url(self, url):
         return DummyAsyncTAPJob(
-            url=url, session=self._session, fail_fetch=self.fail_fetch
+            url=url,
+            session=self._session,
+            fail_fetch=self.fail_fetch,
+            final_phase=self.final_job_phase,
         )
 
     def run_sync(
