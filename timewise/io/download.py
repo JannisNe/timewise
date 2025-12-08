@@ -32,6 +32,7 @@ class Downloader:
         queries: list[QueryType],
         max_concurrent_jobs: int,
         poll_interval: float,
+        resubmit_failed: bool,
     ):
         self.backend = backend
         self.queries = queries
@@ -65,6 +66,7 @@ class Downloader:
         self.service: StableTAPService = StableTAPService(
             service_url, session=self.session
         )
+        self.resubmit_failed = resubmit_failed
 
         self.chunker = Chunker(input_csv=input_csv, chunk_size=chunk_size)
 
@@ -192,6 +194,19 @@ class Downloader:
     # ----------------------------
     # Polling thread
     # ----------------------------
+
+    def resubmit(self, resubmit_task: TaskID):
+        logger.debug(f"resubmitting {resubmit_task}")
+        submit = None
+        for chunk, q in product(self.chunker, self.queries):
+            task = self.get_task_id(chunk, q)
+            if task == resubmit_task:
+                submit = chunk, q
+                break
+        if submit is None:
+            raise RuntimeError(f"resubmit task {resubmit_task} not found!")
+        self.submit_queue.put(submit)
+
     def _polling_worker(self):
         logger.debug("starting polling worker")
         backend = self.backend
@@ -223,6 +238,8 @@ class Downloader:
                         f"No job found under {meta['url']} for {task}! "
                         f"Probably took too long before downloading results."
                     )
+                    if self.resubmit_failed:
+                        self.resubmit(task)
 
                 meta["status"] = status
                 with self.job_lock:

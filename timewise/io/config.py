@@ -57,8 +57,8 @@ class DownloadConfig(BaseModel):
 
         return self
 
-    def build_downloader(self) -> Downloader:
-        return Downloader(
+    def build_downloader(self, **overwrite) -> Downloader:
+        default = dict(
             service_url=self.service_url,
             input_csv=self.expanded_input_csv,
             chunk_size=self.chunk_size,
@@ -67,3 +67,5 @@ class DownloadConfig(BaseModel):
             max_concurrent_jobs=self.max_concurrent_jobs,
             poll_interval=self.poll_interval,
         )
+        default.update(overwrite)
+        return Downloader(**default)
