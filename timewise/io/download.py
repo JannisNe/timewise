@@ -133,7 +133,6 @@ class Downloader:
         logger.debug(f"uploading {len(upload)} objects.")
         job = self.service.submit_job(adql, uploads={query.upload_name: upload})
         job.run()
-        logger.debug(job.url)
 
         return TAPJobMeta(
             url=job.url,
@@ -196,7 +195,7 @@ class Downloader:
     # ----------------------------
 
     def resubmit(self, resubmit_task: TaskID):
-        logger.debug(f"resubmitting {resubmit_task}")
+        logger.info(f"resubmitting {resubmit_task}")
         submit = None
         for chunk, q in product(self.chunker, self.queries):
             task = self.get_task_id(chunk, q)
