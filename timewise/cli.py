@@ -56,7 +56,6 @@ def download(
     resubmit_failed: Annotated[
         bool,
         typer.Option(
-            "--resubmit-failed",
             help="Re-submit jobs when failed due to connection issues",
         ),
     ] = False,
