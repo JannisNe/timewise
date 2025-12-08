@@ -30,9 +30,10 @@ class DummyAsyncTAPJob:
     Hacky drop-in replacement for AsyncTAPJob
     """
 
-    def __init__(self, url, *, session=None, delete=True, fail_fetch=False):
+    def __init__(self, url, *, session=None, delete=True, fail_fetch=False, final_phase="COMPLETED"):
         self.url = url
         self.fail_fetch = fail_fetch
+        self.final_phase = final_phase
 
     def _update(self, wait_for_statechange=False, timeout=10.0):
         pass
@@ -86,7 +87,7 @@ class DummyAsyncTAPJob:
     def phase(self):
         created = float(self.url.split("created")[-1])
         if time.time() - created > 1:
-            return "COMPLETED"
+            return self.final_phase
         return "RUNNING"
 
     def fetch_result(self):
