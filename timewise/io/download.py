@@ -5,10 +5,9 @@ from datetime import datetime, timedelta
 from itertools import product
 from pathlib import Path
 from queue import Empty
-from typing import Dict, Iterator, Sequence, cast
+from typing import Dict, Iterator
 
 import numpy as np
-import pandas as pd
 from astropy.table import Table
 from pyvo.utils.http import create_session
 
@@ -204,6 +203,13 @@ class Downloader:
                 break
         if submit is None:
             raise RuntimeError(f"resubmit task {resubmit_task} not found!")
+
+        # remove current info, so the job won't be re-submitted over and over again
+        self.backend.drop_meta(resubmit_task)
+        with self.job_lock:
+            self.jobs.pop(resubmit_task)
+
+        # put task back in resubmit queue
         self.submit_queue.put(submit)
 
     def _polling_worker(self):
