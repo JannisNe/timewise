@@ -136,3 +136,14 @@ class StableTAPService(vo.dal.TAPService):
 
     def get_job_from_url(self, url):
         return StableAsyncTAPJob(url, session=self._session)
+
+    @backoff.on_exception(
+        backoff.expo,
+        (vo.dal.DALServiceError, vo.dal.DALFormatError),
+        max_tries=5,
+        on_backoff=backoff_hndlr,
+    )
+    def run_sync(
+            self, query, *, language="ADQL", maxrec=None, uploads=None,
+            **keywords):
+        return super().run_sync(query, language=language, maxrec=maxrec, uploads=uploads, **keywords)
