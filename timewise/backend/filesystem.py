@@ -52,6 +52,9 @@ class FileSystemBackend(Backend):
     def meta_exists(self, task: TaskID) -> bool:
         return self._meta_path(task).exists()
 
+    def drop_meta(self, task: TaskID) -> None:
+        self._meta_path(task).unlink()
+
     # ----------------------------
     # Markers
     # ----------------------------

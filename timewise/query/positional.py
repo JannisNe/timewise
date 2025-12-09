@@ -36,5 +36,4 @@ class PositionalQuery(Query):
             q = q.strip(" AND \n")
             q += "\t)"
 
-        logger.debug(f"\n{q}")
         return q

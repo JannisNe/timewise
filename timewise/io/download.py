@@ -5,10 +5,9 @@ from datetime import datetime, timedelta
 from itertools import product
 from pathlib import Path
 from queue import Empty
-from typing import Dict, Iterator, Sequence, cast
+from typing import Dict, Iterator
 
 import numpy as np
-import pandas as pd
 from astropy.table import Table
 from pyvo.utils.http import create_session
 
@@ -32,6 +31,7 @@ class Downloader:
         queries: list[QueryType],
         max_concurrent_jobs: int,
         poll_interval: float,
+        resubmit_failed: bool,
     ):
         self.backend = backend
         self.queries = queries
@@ -65,6 +65,7 @@ class Downloader:
         self.service: StableTAPService = StableTAPService(
             service_url, session=self.session
         )
+        self.resubmit_failed = resubmit_failed
 
         self.chunker = Chunker(input_csv=input_csv, chunk_size=chunk_size)
 
@@ -131,7 +132,6 @@ class Downloader:
         logger.debug(f"uploading {len(upload)} objects.")
         job = self.service.submit_job(adql, uploads={query.upload_name: upload})
         job.run()
-        logger.debug(job.url)
 
         return TAPJobMeta(
             url=job.url,
@@ -192,6 +192,26 @@ class Downloader:
     # ----------------------------
     # Polling thread
     # ----------------------------
+
+    def resubmit(self, resubmit_task: TaskID):
+        logger.info(f"resubmitting {resubmit_task}")
+        submit = None
+        for chunk, q in product(self.chunker, self.queries):
+            task = self.get_task_id(chunk, q)
+            if task == resubmit_task:
+                submit = chunk, q
+                break
+        if submit is None:
+            raise RuntimeError(f"resubmit task {resubmit_task} not found!")
+
+        # remove current info, so the job won't be re-submitted over and over again
+        self.backend.drop_meta(resubmit_task)
+        with self.job_lock:
+            self.jobs.pop(resubmit_task)
+
+        # put task back in resubmit queue
+        self.submit_queue.put(submit)
+
     def _polling_worker(self):
         logger.debug("starting polling worker")
         backend = self.backend
@@ -223,6 +243,9 @@ class Downloader:
                         f"No job found under {meta['url']} for {task}! "
                         f"Probably took too long before downloading results."
                     )
+                    if self.resubmit_failed:
+                        self.resubmit(task)
+                        continue
 
                 meta["status"] = status
                 with self.job_lock:

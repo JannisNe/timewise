@@ -5,9 +5,6 @@ from xml.etree import ElementTree
 
 import requests
 
-from timewise.util.backoff import backoff_hndlr
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -26,7 +23,6 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
         backoff.expo,
         requests.exceptions.HTTPError,
         max_tries=5,
-        on_backoff=backoff_hndlr,
     )
     def create(
         cls,
@@ -92,7 +88,6 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
         backoff.expo,
         (vo.dal.DALServiceError, AttributeError),
         max_tries=50,
-        on_backoff=backoff_hndlr,
     )
     def phase(self):
         return super(StableAsyncTAPJob, self).phase
@@ -101,7 +96,6 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
         backoff.expo,
         vo.dal.DALServiceError,
         max_tries=50,
-        on_backoff=backoff_hndlr,
     )
     def _update(self, *args, **kwargs):
         return super(StableAsyncTAPJob, self)._update(*args, **kwargs)
@@ -116,7 +110,6 @@ class StableTAPService(vo.dal.TAPService):
         backoff.expo,
         (vo.dal.DALServiceError, AttributeError, AssertionError),
         max_tries=5,
-        on_backoff=backoff_hndlr,
     )
     def submit_job(
         self, query, *, language="ADQL", maxrec=None, uploads=None, **keywords
@@ -136,3 +129,13 @@ class StableTAPService(vo.dal.TAPService):
 
     def get_job_from_url(self, url):
         return StableAsyncTAPJob(url, session=self._session)
+
+    @backoff.on_exception(
+        backoff.expo,
+        (vo.dal.DALServiceError, vo.dal.DALFormatError),
+        max_tries=5,
+    )
+    def run_sync(
+            self, query, *, language="ADQL", maxrec=None, uploads=None,
+            **keywords):
+        return super().run_sync(query, language=language, maxrec=maxrec, uploads=uploads, **keywords)

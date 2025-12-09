@@ -5,8 +5,6 @@ import logging
 import matplotlib.pyplot as plt
 import backoff
 
-from ..util.backoff import backoff_hndlr
-
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +32,7 @@ def login_to_sciserver():
 
 
 @backoff.on_exception(
-    backoff.expo, requests.RequestException, max_tries=50, on_backoff=backoff_hndlr
+    backoff.expo, requests.RequestException, max_tries=50
 )
 def get_cutout(*args, **kwargs):
     login_to_sciserver()

@@ -2,6 +2,8 @@ import pandas as pd
 import pyvo as vo
 import time
 import logging
+import json
+from hashlib import md5
 from pathlib import Path
 from astropy.table import Table
 
@@ -30,9 +32,18 @@ class DummyAsyncTAPJob:
     Hacky drop-in replacement for AsyncTAPJob
     """
 
-    def __init__(self, url, *, session=None, delete=True, fail_fetch=False):
+    def __init__(
+        self,
+        url,
+        *,
+        session=None,
+        delete=True,
+        fail_fetch=False,
+        final_phase="COMPLETED",
+    ):
         self.url = url
         self.fail_fetch = fail_fetch
+        self.final_phase = final_phase
 
     def _update(self, wait_for_statechange=False, timeout=10.0):
         pass
@@ -86,7 +97,7 @@ class DummyAsyncTAPJob:
     def phase(self):
         created = float(self.url.split("created")[-1])
         if time.time() - created > 1:
-            return "COMPLETED"
+            return self.final_phase
         return "RUNNING"
 
     def fetch_result(self):
@@ -120,6 +131,7 @@ class DummyTAPService(vo.dal.TAPService):
         session=None,
         fail_submit=False,
         fail_fetch=False,
+        final_job_phase="COMPLETED",
         sync_res: Table | None = None,
     ):
         super(DummyTAPService, self).__init__(
@@ -129,12 +141,28 @@ class DummyTAPService(vo.dal.TAPService):
         self.fail_submit = fail_submit
         self.fail_fetch = fail_fetch
         self.sync_res = sync_res
+        self.final_job_phase = final_job_phase
+        self.tries = {}
+        self.keys = {}
 
     def submit_job(
         self, query, *, language="ADQL", maxrec=None, uploads=None, **keywords
     ):
         if self.fail_submit:
             raise vo.dal.exceptions.DALServiceError("failed submit")
+
+        key = md5(
+            (
+                query
+                + json.dumps({k: v.to_pandas().to_dict() for k, v in uploads.items()})
+            ).encode()
+        ).hexdigest()
+        n_try = self.tries.get(key, 0)
+        final_phase = (
+            self.final_job_phase
+            if isinstance(self.final_job_phase, str)
+            else self.final_job_phase[n_try]
+        )
 
         job = DummyAsyncTAPJob.create(
             self.baseurl,
@@ -144,15 +172,26 @@ class DummyTAPService(vo.dal.TAPService):
             uploads=uploads,
             session=self._session,
             chunksize=self.chunksize,
+            final_phase=final_phase,
             **keywords,
         )
         logger.debug(job.url)
+        self.tries[key] = n_try + 1
+        self.keys[job.url] = key
         assert job.phase
         return job
 
     def get_job_from_url(self, url):
+        if isinstance(self.final_job_phase, str):
+            final_phase = self.final_job_phase
+        else:
+            n_try = self.tries[self.keys[url]]
+            final_phase = self.final_job_phase[n_try - 1]
         return DummyAsyncTAPJob(
-            url=url, session=self._session, fail_fetch=self.fail_fetch
+            url=url,
+            session=self._session,
+            fail_fetch=self.fail_fetch,
+            final_phase=final_phase,
         )
 
     def run_sync(

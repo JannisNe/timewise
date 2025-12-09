@@ -53,8 +53,16 @@ def main(
 @app.command(help="Download WISE photometry from IRSA")
 def download(
     config_path: config_path_type,
+    resubmit_failed: Annotated[
+        bool,
+        typer.Option(
+            help="Re-submit jobs when failed due to connection issues",
+        ),
+    ] = False,
 ):
-    TimewiseConfig.from_yaml(config_path).download.build_downloader().run()
+    TimewiseConfig.from_yaml(config_path).download.build_downloader(
+        resubmit_failed=resubmit_failed
+    ).run()
 
 
 # the following commands will only be added if ampel is installed
