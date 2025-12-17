@@ -95,11 +95,31 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
     @backoff.on_exception(
         backoff.expo,
         vo.dal.DALServiceError,
-        max_tries=50,
+        max_tries=5,
     )
-    def _update(self, wait_for_statechange=False, timeout=120.0):
-        return super(StableAsyncTAPJob, self)._update(
-            wait_for_statechange=wait_for_statechange, timeout=timeout
+    def _update(self, wait_for_statechange=False, timeout=60.0):
+        n_tries = 0
+        max_tries = 10
+        while n_tries < max_tries:
+            try:
+                res = super(StableAsyncTAPJob, self)._update(
+                    wait_for_statechange=wait_for_statechange,
+                    timeout=timeout * (1 + n_tries),
+                )
+            except vo.dal.DALServiceError as e:
+                if "Read timed out" in str(e):
+                    n_tries += 1
+                    logger.debug(
+                        f"{self.url} timed out after {timeout * (1 + n_tries):.0f}s"
+                    )
+                    continue
+                else:
+                    raise e
+
+            return res
+
+        raise vo.dal.DALServiceError(
+            f"No success after {max_tries} tries for {self.url}!"
         )
 
 
