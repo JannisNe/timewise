@@ -97,7 +97,7 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
         vo.dal.DALServiceError,
         max_tries=50,
     )
-    def _update(self, wait_for_statechange=False, timeout=60.0):
+    def _update(self, wait_for_statechange=False, timeout=120.0):
         return super(StableAsyncTAPJob, self)._update(
             wait_for_statechange=wait_for_statechange, timeout=timeout
         )
