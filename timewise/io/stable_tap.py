@@ -97,8 +97,10 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
         vo.dal.DALServiceError,
         max_tries=50,
     )
-    def _update(self, *args, **kwargs):
-        return super(StableAsyncTAPJob, self)._update(*args, **kwargs)
+    def _update(self, wait_for_statechange=False, timeout=60.0):
+        return super(StableAsyncTAPJob, self)._update(
+            wait_for_statechange=wait_for_statechange, timeout=timeout
+        )
 
 
 class StableTAPService(vo.dal.TAPService):
@@ -136,6 +138,8 @@ class StableTAPService(vo.dal.TAPService):
         max_tries=5,
     )
     def run_sync(
-            self, query, *, language="ADQL", maxrec=None, uploads=None,
-            **keywords):
-        return super().run_sync(query, language=language, maxrec=maxrec, uploads=uploads, **keywords)
+        self, query, *, language="ADQL", maxrec=None, uploads=None, **keywords
+    ):
+        return super().run_sync(
+            query, language=language, maxrec=maxrec, uploads=uploads, **keywords
+        )
