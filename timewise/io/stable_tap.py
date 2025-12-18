@@ -108,10 +108,10 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
                 )
             except vo.dal.DALServiceError as e:
                 if "Read timed out" in str(e):
-                    n_tries += 1
                     logger.debug(
                         f"{self.url} timed out after {timeout * (1 + n_tries):.0f}s"
                     )
+                    n_tries += 1
                     continue
                 else:
                     raise e
