@@ -95,10 +95,32 @@ class StableAsyncTAPJob(vo.dal.AsyncTAPJob):
     @backoff.on_exception(
         backoff.expo,
         vo.dal.DALServiceError,
-        max_tries=50,
+        max_tries=5,
     )
-    def _update(self, *args, **kwargs):
-        return super(StableAsyncTAPJob, self)._update(*args, **kwargs)
+    def _update(self, wait_for_statechange=False, timeout=60.0):
+        n_tries = 0
+        max_tries = 10
+        while n_tries < max_tries:
+            try:
+                res = super(StableAsyncTAPJob, self)._update(
+                    wait_for_statechange=wait_for_statechange,
+                    timeout=timeout * (1 + n_tries),
+                )
+            except vo.dal.DALServiceError as e:
+                if "Read timed out" in str(e):
+                    logger.debug(
+                        f"{self.url} timed out after {timeout * (1 + n_tries):.0f}s"
+                    )
+                    n_tries += 1
+                    continue
+                else:
+                    raise e
+
+            return res
+
+        raise vo.dal.DALServiceError(
+            f"No success after {max_tries} tries for {self.url}!"
+        )
 
 
 class StableTAPService(vo.dal.TAPService):
@@ -136,6 +158,8 @@ class StableTAPService(vo.dal.TAPService):
         max_tries=5,
     )
     def run_sync(
-            self, query, *, language="ADQL", maxrec=None, uploads=None,
-            **keywords):
-        return super().run_sync(query, language=language, maxrec=maxrec, uploads=uploads, **keywords)
+        self, query, *, language="ADQL", maxrec=None, uploads=None, **keywords
+    ):
+        return super().run_sync(
+            query, language=language, maxrec=maxrec, uploads=uploads, **keywords
+        )
