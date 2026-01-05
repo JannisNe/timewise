@@ -10,6 +10,8 @@ from pymongo import MongoClient, ASCENDING
 from pymongo.collection import Collection
 from pymongo.database import Database
 
+from ..util.path import expand
+
 if find_spec("ampel.core"):
     AMPEL_EXISTS = True
     from ampel.cli.JobCommand import JobCommand
@@ -40,6 +42,10 @@ class AmpelInterface:
         self.template_path = Path(template_path)
         self.uri = uri
 
+    @property
+    def expanded_input_csv(self) -> Path:
+        return expand(self.input_csv)
+
     def import_input(self):
         # if collection already exists, assume import was already done
         if "input" in self.client[self.input_mongo_db_name].list_collection_names():
@@ -48,12 +54,12 @@ class AmpelInterface:
             )
             return
 
-        logger.debug(f"importing {self.input_csv} into {self.input_mongo_db_name}")
+        logger.debug(f"importing {self.expanded_input_csv} into {self.input_mongo_db_name}")
         col = self.client[self.input_mongo_db_name]["input"]
 
         # create an index from stock id
         col.create_index([(self.orig_id_key, ASCENDING)], unique=True)
-        col.insert_many(pd.read_csv(self.input_csv).to_dict(orient="records"))
+        col.insert_many(pd.read_csv(self.expanded_input_csv).to_dict(orient="records"))
 
     def make_ampel_job_file(self, cfg_path: Path) -> Path:
         logger.debug(f"loading ampel job template from {self.template_path}")
