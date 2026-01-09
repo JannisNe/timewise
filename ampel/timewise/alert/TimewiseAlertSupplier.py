@@ -9,7 +9,7 @@
 
 import sys
 from hashlib import blake2b
-from typing import Literal, List
+from typing import Literal, List, Dict, Any
 
 import pandas as pd
 
@@ -88,7 +88,7 @@ class TimewiseAlertSupplier(BaseAlertSupplier, AmpelABC):
         for i, row in table.iterrows():
             # convert table row to dict, convert data types from numpy to native python
             # Respect masked fields and convert to None
-            pp = {k: None if pd.isna(v) else v for k, v in row.to_dict().items()}
+            pp = {str(k): None if pd.isna(v) else v for k, v in row.to_dict().items()}
             pp_hash = blake2b(encode(pp), digest_size=7).digest()
             if self.counter:
                 pp["candid"] = self.counter
