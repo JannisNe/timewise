@@ -61,8 +61,8 @@ class TimewiseAlertSupplier(BaseAlertSupplier, AmpelABC):
         if len(columns_to_rename):
             rename = {
                 c: c.replace("_ep", "")
-                for c in columns_to_rename
-                if c.replace("_ep", "") not in table.columns
+                for c in table.columns
+                if (c.replace("_ep", "") not in table.columns) and (c.endswith("_ep"))
             }
             if rename:
                 # in this case only the allwise column eith the _ep extension exists
