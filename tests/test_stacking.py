@@ -1,16 +1,13 @@
 import logging
 
-from astropy.table import Table, vstack
+import numpy as np
 import pandas as pd
 import pytest
-import numpy as np
+from astropy.table import Table, vstack
 from numpy import typing as npt
-
-from timewise.config import TimewiseConfig
-
 from tests.constants import AMPEL_CONFIG_PATH, DATA_DIR
 from tests.util import get_raw_reference_photometry, get_stacked_reference_photometry
-
+from timewise.config import TimewiseConfig
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +133,12 @@ def test_stacking(
 
         n_epochs_diff = len(reference_lc) - len(stacked_lc)
         diff = reference_lc.astype(float) - stacked_lc.astype(float)
-        m = diff > 1e-10
+
+        # changed to > 9 because scipy v1.17.0 introduced some numerical difference in
+        # calculation of stats.t.interval, introducing a difference O(1e-9) in the RMS
+        # of the stacked fluxes
+        m = diff > 1e-8
+
         n_bad_epochs = (m.any(axis=1) | m.isna().any(axis=1)).sum()
 
         try:
