@@ -11,9 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class Chunk:
-    def __init__(
-        self, chunk_id: int, input_csv, row_indices: npt.NDArray[np.int_]
-    ):
+    def __init__(self, chunk_id: int, input_csv, row_indices: npt.NDArray[np.int_]):
         self.chunk_id = chunk_id
         self.row_numbers = row_indices
         self.input_csv = input_csv
@@ -71,4 +69,4 @@ class Chunker:
         start = chunk_id * self.chunk_size
         stop = min(start + self.chunk_size, self._n_rows)
         logger.debug(f"chunk {chunk_id}: from {start} to {stop}")
-        return Chunk(chunk_id, self.input_csv, np.arange(start=start, stop=stop))
+        return Chunk(chunk_id, self.input_csv, np.arange(start, stop))

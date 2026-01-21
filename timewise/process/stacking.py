@@ -146,7 +146,7 @@ def calculate_epochs(
     bias_correction_function = CORRECTION_FUNCTIONS[correction_name]
 
     one_points_mask = None
-    visits_at_least_two_point: npt.ndarray[tuple[Any, ...]] = []
+    visits_at_least_two_point: npt.NDArray[np.generic] = np.array([])
 
     while n_remaining_outlier > 0:
         # make a mask of values to use
