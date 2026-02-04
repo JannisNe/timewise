@@ -7,17 +7,19 @@
 ![](timewise.png)
 # Infrared light curves from WISE data
 
-This package downloads WISE data for positions on the sky and stacks single-exposure photometry per visit
+This package downloads WISE data for positions on the sky and stacks single-exposure photometry per visit. It is designed to do so for efficiently for large samples of millions of objects.
 
 ## Prerequisites
 Python version 3.11, 3.12 or 3.13.
 
 If you want to not only download individual exposure photometry but also stack detections per visit (see below),
-you must have access to a running [MongoDB](https://www.mongodb.com/)*. 
+you must have access to a running [MongoDB](https://www.mongodb.com/)* **. 
 
 <sub>* On MacOS have alook at the custom `brew` tap 
 [here](https://github.com/mongodb/homebrew-brew)
 to get the MongoDB community edition. </sub>
+
+<sub>** On some systems this is not straight forward to set up. `timewise` requires it nevertheless as an integral part of the AMPEL system which is used to efficiently schedule and store the stacking of lightcurves. If you do not foresee a big overhead in calculating lightcurves for a sample of O(1000) objects, a more lightweight package might be more applicable. </sub>
 
 ## Installation
 
