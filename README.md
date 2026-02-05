@@ -26,12 +26,12 @@ to get the MongoDB community edition. </sub>
 ### If you use timewise only for downloading
 The package can be installed via `pip` (but make sure to install the v1 pre-release):
 ```bash
-pip install --pre timewise==1.0.0a9
+pip install --pre timewise==1.0.0a10
 ```
 ### If you use timewise also for stacking individual exposures
 You must install with the `ampel` extra:
 ```bash
-pip install --pre 'timewise[ampel]==1.0.0a9'
+pip install --pre 'timewise[ampel]==1.0.0a10'
 ```
 To tell AMPEL which modules, aka units, to use, build the corresponding configuration file:
 ```bash
