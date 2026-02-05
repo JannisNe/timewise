@@ -37,6 +37,7 @@ else:
 class T1HDBSCAN(AbsT1CombineUnit):
     input_mongo_db_name: str
     original_id_key: str
+    mongo: str = "mongodb://localhost:27017/"
     whitelist_region_arcsec: float = 1
     cluster_distance_arcsec: float = 0.5
 
@@ -57,7 +58,7 @@ class T1HDBSCAN(AbsT1CombineUnit):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._col = MongoClient()[self.input_mongo_db_name]["input"]
+        self._col = MongoClient(self.mongo)[self.input_mongo_db_name]["input"]
         self._plotter = AuxUnitRegister.new_unit(
             model=self.plotter, sub_type=AuxDiagnosticPlotter
         )
