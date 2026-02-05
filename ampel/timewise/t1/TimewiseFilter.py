@@ -17,7 +17,7 @@ from timewise.process import keys
 
 class TimewiseFilter(AbsAlertFilter):
     det_per_visit: int = 8
-    n_visits = 10
+    n_visits: int = 10
 
     def process(self, alert: AmpelAlertProtocol) -> None | bool | int:
         columns = [
