@@ -1,0 +1,2 @@
+# Ignore Jupyter Notebook files for linguist
+*.ipynb linguist-documentation
