@@ -42,6 +42,8 @@ ampel config build -distributions ampel timewise -stop-on-errors 0 -out <path-to
 
 ## Command line interface
 
+Read the short description below or have a look at the example notebook(s): [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/JannisNe/timewise/examples?urlpath=tree/examples)
+
 ```
  Usage: timewise [OPTIONS] COMMAND [ARGS]...                                                                
                                                                                                             
