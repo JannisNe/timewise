@@ -22,7 +22,7 @@ task:
             config:
               original_id_key: ORIGINAL_ID_KEY
               input_mongo_db_name: INPUT_MONGODB_NAME
-              plot: true
+              plot: false
           unit: TiMongoMuxer
     iter_max: 1000000
     shaper: TiDataPointShaper
