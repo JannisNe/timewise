@@ -2,7 +2,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/JannisNe/timewise/badge.svg?branch=main)](https://coveralls.io/github/JannisNe/timewise?branch=main)
 [![PyPI version](https://badge.fury.io/py/timewise.svg)](https://badge.fury.io/py/timewise)
 [![DOI](https://zenodo.org/badge/449677569.svg)](https://zenodo.org/badge/latestdoi/449677569)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/JannisNe/timewise/examples?urlpath=tree/examples)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/JannisNe/timewise/main?urlpath=tree/examples)
 
 
 
@@ -42,7 +42,7 @@ ampel config build -distributions ampel timewise -stop-on-errors 0 -out <path-to
 
 ## Command line interface
 
-Read the short description below or have a look at the example notebook(s): [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/JannisNe/timewise/examples?urlpath=tree/examples)
+Read the short description below or have a look at the example notebook(s): [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/JannisNe/timewise/main?urlpath=tree/examples)
 
 ```
  Usage: timewise [OPTIONS] COMMAND [ARGS]...                                                                
