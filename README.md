@@ -9,7 +9,7 @@
 ![](timewise.png)
 # Infrared light curves from WISE data
 
-This package downloads WISE data for positions on the sky and stacks single-exposure photometry per visit. It is designed to do so for efficiently for large samples of millions of objects.
+This package downloads WISE data for positions on the sky and stacks single-exposure photometry per visit. It is designed to do so efficiently for large samples of millions of objects.
 
 ## Prerequisites
 Python version 3.11, 3.12 or 3.13.
