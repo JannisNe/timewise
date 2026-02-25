@@ -129,10 +129,15 @@ if AMPEL_EXISTS:
             Literal["sdss", "panstarrs"],
             typer.Option("-c", "--cutout", help="Which survey to use for cutouts"),
         ] = "panstarrs",
+        brightness_key: Annotated[
+            Literal["flux", "mpro"],
+            typer.Option("-b", "--brightness", help="Whether to plot instrument flux or magnitudes"),
+        ] = "flux"
     ):
         make_plot(
             config_path,
             indices=indices,
             cutout=cutout,
             output_directory=output_directory,
+            brightness_key=brightness_key
         )
