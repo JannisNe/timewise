@@ -22,6 +22,13 @@ from timewise.config import TimewiseConfig
 logger = logging.getLogger(__name__)
 
 
+PRETTY_FLUX_KEY_MAP = {
+    keys.FLUX_EXT: "Instrument Flux [DN]",
+    keys.FLUX_DENSITY_EXT: "Flux Density [Jy]",
+    keys.MAG_EXT: "Vega Magnitude"
+}
+
+
 class DiagnosticPlotter(BaseModel):
     cutout: Literal["sdss", "panstarrs"] = "panstarrs"
     band_colors: Dict[str, str] = BAND_PLOT_COLORS
@@ -192,7 +199,7 @@ class DiagnosticPlotter(BaseModel):
 
         # formatting
         title = axs[0].get_title()
-        axs[-1].set_ylabel("Apparent Vega Magnitude")
+        axs[-1].set_ylabel(PRETTY_FLUX_KEY_MAP[self.lum_key])
         axs[-1].grid(ls=":", alpha=0.5)
         axs[0].set_title("")
         axs[0].legend(
