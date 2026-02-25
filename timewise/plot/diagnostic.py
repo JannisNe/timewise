@@ -215,7 +215,7 @@ def make_plot(
 ):
     cfg = TimewiseConfig.from_yaml(config_path)
     ampel_interface = cfg.build_ampel_interface()
-    input_data = pd.read_csv(cfg.download.input_csv).set_index(
+    input_data = pd.read_csv(cfg.download.expanded_input_csv).set_index(
         ampel_interface.orig_id_key
     )
     plotter = DiagnosticPlotter(cutout=cutout)
