@@ -22,6 +22,13 @@ from timewise.config import TimewiseConfig
 logger = logging.getLogger(__name__)
 
 
+PRETTY_FLUX_KEY_MAP = {
+    keys.FLUX_EXT: "Instrument Flux [DN]",
+    keys.FLUX_DENSITY_EXT: "Flux Density [mJy]",
+    keys.MAG_EXT: "Vega Magnitude"
+}
+
+
 class DiagnosticPlotter(BaseModel):
     cutout: Literal["sdss", "panstarrs"] = "panstarrs"
     band_colors: Dict[str, str] = BAND_PLOT_COLORS
@@ -69,20 +76,22 @@ class DiagnosticPlotter(BaseModel):
         self.plot_cutout(ra=source_ra, dec=source_dec, ax=axs[0], radius_arcsec=20)
 
         selected_mask = raw_lightcurve.index.isin(selected_indices)
-        plot_lightcurve(
-            raw_lightcurve=raw_lightcurve[~selected_mask],
-            lum_key=self.lum_key,
-            ax=axs[-1],
-            save=False,
-            colors={"w1": "gray", "w2": "lightgray"},
-            add_to_label=" ignored",
-        )
-        self.plot_lightcurve(
-            stacked_lightcurve=stacked_lightcurve,
-            raw_lightcurve=raw_lightcurve[selected_mask],
-            ax=axs[-1],
-            save=False,
-        )
+        if any(~selected_mask):
+            plot_lightcurve(
+                raw_lightcurve=raw_lightcurve[~selected_mask],
+                lum_key=self.lum_key,
+                ax=axs[-1],
+                save=False,
+                colors={"w1": "gray", "w2": "lightgray"},
+                add_to_label=" ignored",
+            )
+        if any(selected_mask):
+            self.plot_lightcurve(
+                stacked_lightcurve=stacked_lightcurve,
+                raw_lightcurve=raw_lightcurve[selected_mask],
+                ax=axs[-1],
+                save=False,
+            )
 
         # set markers for clusters
         markers_strings = list(Line2D.filled_markers) + [
@@ -192,7 +201,7 @@ class DiagnosticPlotter(BaseModel):
 
         # formatting
         title = axs[0].get_title()
-        axs[-1].set_ylabel("Apparent Vega Magnitude")
+        axs[-1].set_ylabel(PRETTY_FLUX_KEY_MAP[self.lum_key])
         axs[-1].grid(ls=":", alpha=0.5)
         axs[0].set_title("")
         axs[0].legend(
@@ -212,13 +221,14 @@ def make_plot(
     cutout: Literal["sdss", "panstarrs"],
     indices: List[int],
     output_directory: Path,
+    brightness_key: Literal["flux", "mpro", "fluxdensity"],
 ):
     cfg = TimewiseConfig.from_yaml(config_path)
     ampel_interface = cfg.build_ampel_interface()
     input_data = pd.read_csv(cfg.download.expanded_input_csv).set_index(
         ampel_interface.orig_id_key
     )
-    plotter = DiagnosticPlotter(cutout=cutout)
+    plotter = DiagnosticPlotter(cutout=cutout, lum_key=brightness_key)
     for index in indices:
         stacked_lightcurve = ampel_interface.extract_stacked_lightcurve(stock_id=index)
         raw_lightcurve = ampel_interface.extract_datapoints(stock_id=index)
