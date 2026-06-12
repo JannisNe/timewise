@@ -31,9 +31,7 @@ def login_to_sciserver():
     Authentication.login(uid, pw)
 
 
-@backoff.on_exception(
-    backoff.expo, requests.RequestException, max_tries=50
-)
+@backoff.on_exception(backoff.expo, requests.RequestException, max_tries=50)
 def get_cutout(*args, **kwargs):
     login_to_sciserver()
     from SciServer import SkyServer
@@ -92,7 +90,7 @@ def plot_sdss_cutout(
                 fontsize=20,
             )
         else:
-            raise Exception(e)
+            raise e
 
     if title:
         ax.set_title(title)
