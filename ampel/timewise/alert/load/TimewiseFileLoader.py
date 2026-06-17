@@ -7,6 +7,10 @@
 # Last Modified Date:  16.09.2025
 # Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
 import gc
+import time
+import tracemalloc
+import resource
+import sys
 from typing import Dict, get_args
 
 import numpy as np
@@ -59,6 +63,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
 
         self._table_types = get_args(TableType.__origin__)  # type: ignore
         self._gen = self.iter_stocks()
+        self._rss_mb_conversion = 1 / 1024**2 if sys.platform == "darwin" else 1 / 1024
 
     @staticmethod
     def encode_result(res: pd.DataFrame) -> pd.DataFrame:
@@ -83,6 +88,12 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
         backend = self._timewise_backend
         for tasks in self._tasks:
             data = []
+
+            # Profile the in-memory stacking and pandas conversion
+            tracemalloc.start()
+            t_start = time.perf_counter()
+            rss_start = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+
             for task in tasks:
                 self.logger.debug(f"reading {task}")
                 try:
@@ -111,6 +122,24 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
             data_df = stacked_data.to_pandas()
             del stacked_data
             gc.collect()
+
+            t_end = time.perf_counter()
+            current, peak = tracemalloc.get_traced_memory()
+            rss_end = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            tracemalloc.stop()
+
+            runtime_info = {
+                "time": t_end - t_start,
+                "tracemalloc_current": current / 1024 / 1024,
+                "tracemalloc_peak": peak / 1024 / 1024,
+                "rss_start": rss_start * self._rss_mb_conversion,
+                "rss_end": rss_end * self._rss_mb_conversion,
+                "tasks": tasks,
+            }
+            self.logger.info(
+                "file loading done",
+                extra=runtime_info,
+            )
 
             # rename stock id column
             data_df.rename(
