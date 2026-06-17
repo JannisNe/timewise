@@ -6,6 +6,7 @@
 # Date:                16.09.2025
 # Last Modified Date:  16.09.2025
 # Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
+import gc
 from typing import Dict, get_args
 
 import numpy as np
@@ -100,10 +101,21 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
 
                 data.append(idata)
 
-            data = vstack(data).to_pandas()
+                del idata
+                gc.collect()
+
+            stacked_data = vstack(data)
+            del data
+            gc.collect()
+
+            data_df = stacked_data.to_pandas()
+            del stacked_data
+            gc.collect()
 
             # rename stock id column
-            data.rename(columns={self.stock_id_column_name: "stock_id"}, inplace=True)
+            data_df.rename(
+                columns={self.stock_id_column_name: "stock_id"}, inplace=True
+            )
 
             # Find the indices for each stock id. This is much faster than making a mask
             # each loop and accessing the table then. Shown below is a comparison.
@@ -118,11 +130,11 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
             #
             # In [47]: %timeit test_mask()
             # 2.61 ms ± 18 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-            data.set_index(data.stock_id, inplace=True)
+            data_df.set_index(data_df.stock_id, inplace=True)
 
             # iterate over all stock ids
-            for stock_id in np.unique(data["stock_id"]):
-                selection = data.loc[stock_id]
+            for stock_id in np.unique(data_df["stock_id"]):
+                selection = data_df.loc[stock_id]
                 yield self.encode_result(selection)
 
     def __iter__(self):
