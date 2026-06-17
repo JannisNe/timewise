@@ -40,6 +40,10 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
     # optionally skip files that are missing
     skip_missing_files: bool = False
 
+    # save 1/3 of memory consumption at the price of 2.5 times runtime
+    # when loading files
+    optimize_for_memory: bool = False
+
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -112,16 +116,19 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
 
                 data.append(idata)
 
-                del idata
-                gc.collect()
+                if self.optimize_for_memory:
+                    del idata
+                    gc.collect()
 
             stacked_data = vstack(data)
-            del data
-            gc.collect()
+            if self.optimize_for_memory:
+                del data
+                gc.collect()
 
             data_df = stacked_data.to_pandas()
-            del stacked_data
-            gc.collect()
+            if self.optimize_for_memory:
+                del stacked_data
+                gc.collect()
 
             t_end = time.perf_counter()
             current, peak = tracemalloc.get_traced_memory()
