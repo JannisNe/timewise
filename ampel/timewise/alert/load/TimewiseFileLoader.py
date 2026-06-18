@@ -40,10 +40,6 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
     # optionally skip files that are missing
     skip_missing_files: bool = False
 
-    # save 1/3 of memory consumption at the price of 2.5 times runtime
-    # when loading files
-    optimize_for_memory: bool = False
-
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
 
@@ -116,19 +112,11 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
 
                 data.append(idata)
 
-                if self.optimize_for_memory:
-                    del idata
-                    gc.collect()
-
             stacked_data = vstack(data)
-            if self.optimize_for_memory:
-                del data
-                gc.collect()
 
-            data_df = stacked_data.to_pandas()
-            if self.optimize_for_memory:
-                del stacked_data
-                gc.collect()
+            # delete potentially big input data
+            del data, idata
+            gc.collect()
 
             t_end = time.perf_counter()
             current, peak = tracemalloc.get_traced_memory()
@@ -149,28 +137,11 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
             )
 
             # rename stock id column
-            data_df.rename(
-                columns={self.stock_id_column_name: "stock_id"}, inplace=True
-            )
-
-            # Find the indices for each stock id. This is much faster than making a mask
-            # each loop and accessing the table then. Shown below is a comparison.
-            # The top example is the access provided by pandas which would be
-            # again a factor 3 faster.
-            #
-            # In [45]: %timeit test_df()
-            # 5.62 μs ± 47.2 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
-            #
-            # In [46]: %timeit test_index()
-            # 14.6 μs ± 45 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
-            #
-            # In [47]: %timeit test_mask()
-            # 2.61 ms ± 18 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-            data_df.set_index(data_df.stock_id, inplace=True)
+            stacked_data.rename_column(self.stock_id_column_name, "stock_id")
 
             # iterate over all stock ids
-            for stock_id in np.unique(data_df["stock_id"]):
-                selection = data_df.loc[stock_id]
+            for g in stacked_data.group_by("stock_id").groups:
+                selection = g.to_pandas()
                 yield self.encode_result(selection)
 
     def __iter__(self):
