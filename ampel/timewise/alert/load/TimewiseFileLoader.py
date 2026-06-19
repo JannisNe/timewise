@@ -6,6 +6,11 @@
 # Date:                16.09.2025
 # Last Modified Date:  16.09.2025
 # Last Modified By:    Jannis Necker <jannis.necker@gmail.com>
+import gc
+import time
+import tracemalloc
+import resource
+import sys
 from typing import Dict, get_args
 
 import numpy as np
@@ -58,6 +63,7 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
 
         self._table_types = get_args(TableType.__origin__)  # type: ignore
         self._gen = self.iter_stocks()
+        self._rss_mb_conversion = 1 / 1024**2 if sys.platform == "darwin" else 1 / 1024
 
     @staticmethod
     def encode_result(res: pd.DataFrame) -> pd.DataFrame:
@@ -82,6 +88,12 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
         backend = self._timewise_backend
         for tasks in self._tasks:
             data = []
+
+            # Profile the in-memory stacking and pandas conversion
+            tracemalloc.start()
+            t_start = time.perf_counter()
+            rss_start = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+
             for task in tasks:
                 self.logger.debug(f"reading {task}")
                 try:
@@ -100,29 +112,36 @@ class TimewiseFileLoader(AbsAlertLoader[Dict], AmpelABC):
 
                 data.append(idata)
 
-            data = vstack(data).to_pandas()
+            stacked_data = vstack(data)
+
+            # delete potentially big input data
+            del data, idata
+            gc.collect()
+
+            t_end = time.perf_counter()
+            current, peak = tracemalloc.get_traced_memory()
+            rss_end = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            tracemalloc.stop()
+
+            runtime_info = {
+                "time": t_end - t_start,
+                "tracemalloc_current": current / 1024 / 1024,
+                "tracemalloc_peak": peak / 1024 / 1024,
+                "rss_start": rss_start * self._rss_mb_conversion,
+                "rss_end": rss_end * self._rss_mb_conversion,
+                "tasks": tasks,
+            }
+            self.logger.info(
+                "file loading done",
+                extra=runtime_info,
+            )
 
             # rename stock id column
-            data.rename(columns={self.stock_id_column_name: "stock_id"}, inplace=True)
-
-            # Find the indices for each stock id. This is much faster than making a mask
-            # each loop and accessing the table then. Shown below is a comparison.
-            # The top example is the access provided by pandas which would be
-            # again a factor 3 faster.
-            #
-            # In [45]: %timeit test_df()
-            # 5.62 μs ± 47.2 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
-            #
-            # In [46]: %timeit test_index()
-            # 14.6 μs ± 45 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
-            #
-            # In [47]: %timeit test_mask()
-            # 2.61 ms ± 18 μs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-            data.set_index(data.stock_id, inplace=True)
+            stacked_data.rename_column(self.stock_id_column_name, "stock_id")
 
             # iterate over all stock ids
-            for stock_id in np.unique(data["stock_id"]):
-                selection = data.loc[stock_id]
+            for g in stacked_data.group_by("stock_id").groups:
+                selection = g.to_pandas()
                 yield self.encode_result(selection)
 
     def __iter__(self):
