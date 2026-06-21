@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "timewise"
-version = "1.0.0"
+version = "1.0.1"
 description = "Download WISE infrared data for many objects and process them with AMPEL"
 authors = [
     { name = "Jannis Necker", email = "jannis.necker@gmail.com" },
@@ -64,9 +64,9 @@ docs = [
 ampel= [
     "ampel-photometry (==0.10.2a1)",
     "ampel-plot (>=0.9.1,<0.10.0)",
-    "ampel-core (==0.10.6a21)",
+    "ampel-core (==0.10.6a22)",
     "ampel-alerts (==0.10.4a0)",
-    "ampel-interface (==0.10.5a8)"
+    "ampel-interface (==0.10.5a10)"
 ]
 
 [tool.coverage.run]
@@ -81,12 +81,12 @@ pythonpath = "."
 
 # Per-module ignores
 [tool.mypy]
-python_version = "3.11"
 explicit_package_bases = true
 install_types = false
 non_interactive = false
 mypy_path = ["."]
 packages = ["timewise", "ampel"]
+exclude = ["/.cache/"]
 
 [[tool.mypy.overrides]]
 module = [
