@@ -87,6 +87,7 @@ install_types = false
 non_interactive = false
 mypy_path = ["."]
 packages = ["timewise", "ampel"]
+exclude = [".cache/"]
 
 [[tool.mypy.overrides]]
 module = [
