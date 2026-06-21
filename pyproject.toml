@@ -81,13 +81,12 @@ pythonpath = "."
 
 # Per-module ignores
 [tool.mypy]
-python_version = "3.11"
 explicit_package_bases = true
 install_types = false
 non_interactive = false
 mypy_path = ["."]
 packages = ["timewise", "ampel"]
-exclude = [".cache/"]
+exclude = ["/.cache/"]
 
 [[tool.mypy.overrides]]
 module = [
