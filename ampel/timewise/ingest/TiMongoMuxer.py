@@ -56,6 +56,7 @@ class TiMongoMuxer(AbsT0Muxer):
         "body.w2_mag_error": 1,
         "body.ra": 1,
         "body.dec": 1,
+        "body.cntr_mf": 1
     }
 
     channel: None | ChannelId | AnyOf[ChannelId] | AllOf[ChannelId] = None
