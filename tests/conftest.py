@@ -4,12 +4,19 @@ from typing import Generator
 import re
 import os
 import tempfile
+import yaml
 
+import mongomock
 import pytest
+from ampel.core.AmpelContext import AmpelContext
+from ampel.secret.AmpelVault import AmpelVault
+from ampel.config.builder.DisplayOptions import DisplayOptions
 from pymongo import MongoClient
 
 from tests.dummy_tap import get_table_from_query_and_chunk
 from timewise.io import DownloadConfig
+from ampel.dev.DevAmpelContext import DevAmpelContext
+from ampel.config.builder.DistConfigBuilder import DistConfigBuilder
 from timewise.config import TimewiseConfig
 from timewise.process import AmpelInterface
 from tests.constants import DATA_DIR, INPUT_CSV_PATH, V0_KEYMAP
@@ -124,9 +131,68 @@ def timewise_config_path(tmp_path, tmp_db_name) -> Path:
     return timewise_config_path
 
 
+@pytest.fixture(scope="session")
+def ampel_timewise_testing_config(tmp_path_factory, pytestconfig):
+    """Path to an Ampel config file suitable for testing."""
+    config_path = tmp_path_factory.mktemp("config") / "testing-config.yaml"
+    if (config := pytestconfig.cache.get("testing_config", None)) is None:
+        # build a config from all available ampel distributions
+        cb = DistConfigBuilder(
+            DisplayOptions(verbose=False, debug=False),
+        )
+        cb.load_distributions(prefixes=["ampel", "timewise"])
+        config = cb.build_config(
+            stop_on_errors=2,
+            config_validator="ConfigValidator",
+            get_unit_env=False,
+        )
+        assert config is not None
+        # massage db settings for use with mongomock
+        for db in config["mongo"]["databases"]:
+            for collection in db["collections"]:
+                # remove unsuported storageEngine options
+                if "args" in collection and "storageEngine" in collection["args"]:
+                    collection["args"].pop("storageEngine")
+            # ensure that r and w modes share a client
+            db["role"]["r"] = db["role"]["w"]
+        pytestconfig.cache.set("testing_config", config)
+    with open(config_path, "w") as f:
+        yaml.safe_dump(config, f)
+    return config_path
+
+
 @pytest.fixture
-def ampel_interface(timewise_config_path) -> AmpelInterface:
+def ampel_interface(
+    timewise_config_path,
+    monkeypatch,
+    ampel_vault: AmpelVault,
+    ampel_timewise_testing_config: Path,
+) -> AmpelInterface:
+    client = mongomock.MongoClient()
+
+    def get_client(*args, **kwargs):
+        return client
+
+    monkeypatch.setattr("ampel.core.AmpelDB.MongoClient", get_client)
+    monkeypatch.setattr("pymongo.MongoClient", get_client)
+    monkeypatch.setattr("timewise.process.interface.AmpelInterface.client", client)
+
     cfg = TimewiseConfig.from_yaml(timewise_config_path)
+
+    def get_mock_context(*args, **kwargs) -> AmpelContext:
+        return DevAmpelContext.load(
+            config=str(ampel_timewise_testing_config),
+            vault=ampel_vault,
+            purge_db=True,
+            one_db=True,
+            db_prefix=cfg.ampel.mongo_db_name,
+        )
+
+    monkeypatch.setattr(
+        "ampel.cli.AbsCoreCommand.AbsCoreCommand.get_context", get_mock_context
+    )
+    ctx = get_mock_context()
+
     dl = cfg.download.build_downloader()
     for q, c in product(dl.queries, dl.chunker):
         data = get_table_from_query_and_chunk(q.adql, c.chunk_id)

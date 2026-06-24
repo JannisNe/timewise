@@ -14,7 +14,7 @@ def test_download():
         raise res.exc_info[1]
 
 
-def test_make_ampel_job(timewise_config_path):
+def test_make_ampel_job(timewise_config_path, ampel_interface):
     runner = CliRunner()
     res = runner.invoke(app, ["prepare-ampel", str(timewise_config_path)])
     assert res.exit_code == 0

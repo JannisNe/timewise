@@ -4,8 +4,8 @@ from pathlib import Path
 import gzip
 from typing import BinaryIO, cast
 
+import mongomock
 import pandas as pd
-from pymongo import MongoClient
 from bson import decode_file_iter
 
 from tests.constants import DATA_DIR, V0_KEYMAP
@@ -66,7 +66,7 @@ def get_stacked_reference_photometry(i, mode) -> None | pd.DataFrame:
 def restore_from_bson_dir(
     dump_dir: str, target_db_name: str, mongo_uri="mongodb://localhost:27017/"
 ):
-    client = MongoClient(mongo_uri)
+    client = mongomock.MongoClient(mongo_uri)
     db = client[target_db_name]
 
     dump_path = Path(dump_dir)

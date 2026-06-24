@@ -5,7 +5,9 @@ from tests.util import restore_from_bson_dir
 
 
 @pytest.mark.parametrize("cutout", ["sdss", "panstarrs"])
-def test_make_plot(timewise_config_path, tmp_db_name, tmp_path, cutout):
+def test_make_plot(
+    timewise_config_path, tmp_db_name, tmp_path, cutout, ampel_interface
+):
     mongoexport_path = DATA_DIR / "mongodump"
     restore_from_bson_dir(mongoexport_path, tmp_db_name)
     indices = [0, 1]
