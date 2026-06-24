@@ -185,6 +185,7 @@ def mongomock_client(monkeypatch):
     monkeypatch.setattr("ampel.core.AmpelDB.MongoClient", get_client)
     monkeypatch.setattr("pymongo.MongoClient", get_client)
     monkeypatch.setattr("timewise.process.interface.AmpelInterface.client", client)
+    monkeypatch.setattr("ampel.timewise.t1.T1HDBSCAN.MongoClient", get_client)
 
     return client
 
