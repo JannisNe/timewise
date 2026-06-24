@@ -162,12 +162,7 @@ def ampel_timewise_testing_config(tmp_path_factory, pytestconfig):
 
 
 @pytest.fixture
-def ampel_interface(
-    timewise_config_path,
-    monkeypatch,
-    ampel_vault: AmpelVault,
-    ampel_timewise_testing_config: Path,
-) -> AmpelInterface:
+def mongomock_client(monkeypatch):
     # ignore codec_options in DataLoader
     monkeypatch.setattr("mongomock.codec_options.is_supported", lambda *args: None)
     # work around https://github.com/mongomock/mongomock/issues/912
@@ -191,21 +186,31 @@ def ampel_interface(
     monkeypatch.setattr("pymongo.MongoClient", get_client)
     monkeypatch.setattr("timewise.process.interface.AmpelInterface.client", client)
 
+    return client
+
+
+@pytest.fixture
+def ampel_interface(
+    timewise_config_path,
+    monkeypatch,
+    ampel_timewise_testing_config: Path,
+    ampel_vault: AmpelVault,
+    mongomock_client: mongomock.MongoClient,
+) -> AmpelInterface:
     cfg = TimewiseConfig.from_yaml(timewise_config_path)
 
-    def get_mock_context(*args, **kwargs) -> AmpelContext:
+    def get_mock_context(*args, db_prefix: str, **kwargs) -> AmpelContext:
         return DevAmpelContext.load(
             config=str(ampel_timewise_testing_config),
             vault=ampel_vault,
             purge_db=True,
             one_db=True,
-            db_prefix=cfg.ampel.mongo_db_name,
+            db_prefix=db_prefix,
         )
 
     monkeypatch.setattr(
         "ampel.cli.AbsCoreCommand.AbsCoreCommand.get_context", get_mock_context
     )
-    ctx = get_mock_context()
 
     dl = cfg.download.build_downloader()
     for q, c in product(dl.queries, dl.chunker):
