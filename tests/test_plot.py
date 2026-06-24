@@ -6,10 +6,15 @@ from tests.util import restore_from_bson_dir
 
 @pytest.mark.parametrize("cutout", ["sdss", "panstarrs"])
 def test_make_plot(
-    timewise_config_path, tmp_db_name, tmp_path, cutout, ampel_interface
+    timewise_config_path,
+    tmp_db_name,
+    tmp_path,
+    cutout,
+    ampel_interface,
+    mongomock_client,
 ):
     mongoexport_path = DATA_DIR / "mongodump"
-    restore_from_bson_dir(mongoexport_path, tmp_db_name)
+    restore_from_bson_dir(mongoexport_path, tmp_db_name, mongomock_client)
     indices = [0, 1]
     make_plot(timewise_config_path, cutout, indices, tmp_path, "mpro")
     fns = [tmp_path / f"{index}.pdf" for index in indices]
