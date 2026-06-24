@@ -5,18 +5,18 @@ import pandas as pd
 import pytest
 from astropy.table import Table, vstack
 from numpy import typing as npt
-from tests.constants import AMPEL_CONFIG_PATH, DATA_DIR
+from tests.constants import DATA_DIR
 from tests.util import get_raw_reference_photometry, get_stacked_reference_photometry
 from timewise.config import TimewiseConfig
 
 logger = logging.getLogger(__name__)
 
 
-def test_ingest(ampel_interface, timewise_config_path):
+def test_ingest(ampel_interface, timewise_config_path, ampel_timewise_testing_config):
     # switch out the template so only ingestion is run
     ingestion_only_template = DATA_DIR / "template_ingest_only.yml"
     ampel_interface.template_path = ingestion_only_template
-    ampel_interface.run(timewise_config_path, AMPEL_CONFIG_PATH)
+    ampel_interface.run(timewise_config_path, ampel_timewise_testing_config)
 
     # ----------------------------
     # check t0 collection
