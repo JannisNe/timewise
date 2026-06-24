@@ -168,6 +168,20 @@ def ampel_interface(
     ampel_vault: AmpelVault,
     ampel_timewise_testing_config: Path,
 ) -> AmpelInterface:
+    # ignore codec_options in DataLoader
+    monkeypatch.setattr("mongomock.codec_options.is_supported", lambda *args: None)
+    # work around https://github.com/mongomock/mongomock/issues/912
+    add_update = mongomock.collection.BulkOperationBuilder.add_update
+
+    def _add_update(self, *args, sort=None, **kwargs):
+        if sort is not None:
+            raise NotImplementedError("sort not implemented in mongomock")
+        return add_update(self, *args, **kwargs)
+
+    monkeypatch.setattr(
+        "mongomock.collection.BulkOperationBuilder.add_update", _add_update
+    )
+
     client = mongomock.MongoClient()
 
     def get_client(*args, **kwargs):
