@@ -65,9 +65,6 @@ jobs:
       - name: Run Ruff
         run: poetry run ruff check
 
-      - name: Start MongoDB
-        uses: supercharge/mongodb-github-action@1.12.1
-
       - name: build ampel config
         run: |
           poetry run ampel config build -out ampel_config.yml -distributions ampel timewise -stop-on-errors 0 -verbose
