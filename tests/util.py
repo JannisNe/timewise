@@ -64,9 +64,8 @@ def get_stacked_reference_photometry(i, mode) -> None | pd.DataFrame:
 
 
 def restore_from_bson_dir(
-    dump_dir: str, target_db_name: str, mongo_uri="mongodb://localhost:27017/"
+    dump_dir: str, target_db_name: str, client: mongomock.MongoClient
 ):
-    client = mongomock.MongoClient(mongo_uri)
     db = client[target_db_name]
 
     dump_path = Path(dump_dir)
