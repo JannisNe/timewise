@@ -52,6 +52,7 @@ def test_ingest(ampel_interface, timewise_config_path, ampel_timewise_testing_co
 def test_stacking(
     ampel_interface,
     timewise_config_path,
+    ampel_timewise_testing_config,
     mode,
 ):
     if mode == "unmasked":
@@ -61,7 +62,7 @@ def test_stacking(
 
     mongo_db_name = ampel_interface.mongo_db_name + "_" + mode
     ampel_interface.mongo_db_name = mongo_db_name
-    ampel_interface.run(timewise_config_path, AMPEL_CONFIG_PATH)
+    ampel_interface.run(timewise_config_path, ampel_timewise_testing_config)
 
     # ----------------------------
     # check t1 collection
