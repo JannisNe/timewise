@@ -65,6 +65,14 @@ jobs:
       - name: Run Ruff
         run: poetry run ruff check
 
+      - name: Set pytest flags
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "PYTEST_FLAGS=-m full" >> $GITHUB_ENV
+          else
+            echo  "PYTEST_FLAGS=-m 'not full'" >> $GITHUB_ENV
+          fi
+
       # Runs a set of commands using the runners shell
       - name: Test the code
         env:
@@ -73,6 +81,8 @@ jobs:
           TIMEWISE_DATA: ~/timewise_data
           TIMEWISE_BIGDATA: ~/timewise_bigdata
         run: |
+          echo $PYTEST_FLAGS
+          pytest $PYTEST_FLAGS
           poetry run coverage run -m pytest ./tests
           poetry run coverage combine
           poetry run coverage report

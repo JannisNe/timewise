@@ -12,6 +12,7 @@ from timewise.config import TimewiseConfig
 logger = logging.getLogger(__name__)
 
 
+@pytest.mark.full
 def test_ingest(ampel_interface, timewise_config_path, ampel_timewise_testing_config):
     # switch out the template so only ingestion is run
     ingestion_only_template = DATA_DIR / "template_ingest_only.yml"
@@ -48,6 +49,7 @@ def test_ingest(ampel_interface, timewise_config_path, ampel_timewise_testing_co
     assert n_in_db == len(file_contents)
 
 
+@pytest.mark.full
 @pytest.mark.parametrize("mode", ["masked", "unmasked"])
 def test_stacking(
     ampel_interface,
