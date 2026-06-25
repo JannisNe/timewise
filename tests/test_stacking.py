@@ -4,7 +4,6 @@ from pathlib import Path
 import pandas as pd
 import numpy.typing as npt
 
-from timewise.process.stacking import stack_visits
 from timewise.config import TimewiseConfig
 from tests.util import (
     get_raw_reference_photometry,
