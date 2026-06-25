@@ -82,7 +82,7 @@ jobs:
           TIMEWISE_BIGDATA: ~/timewise_bigdata
         run: |
           echo $PYTEST_FLAGS
-          eval "poetry run coverage run -m pytest $PYTEST_FLAGS ./tests"
+          eval "poetry run coverage run -m pytest $PYTEST_FLAGS -v ./tests"
           poetry run coverage combine
           poetry run coverage report
 
