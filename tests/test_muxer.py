@@ -11,10 +11,10 @@ from ampel.types import DataPointId, StockId
 from ampel.content.DataPoint import DataPoint
 from ampel.content.MetaRecord import MetaRecord
 from ampel.log.AmpelLogger import DEBUG, AmpelLogger
-from ampel.test.conftest import mock_context, _patch_mongo, testing_config
 
 from tests.constants import DATA_DIR
 from tests.dummy_tap import DummyTAPService
+from tests.util import dataframe_to_dps
 
 
 DUPLICATE_FILENAME = DATA_DIR / "duplicate_mep_data.csv"
@@ -41,25 +41,6 @@ def _populate_photo_col_from_dps(muxer: TiMongoMuxer, dps: list[DataPoint]) -> N
     muxer._photo_col.insert_many(docs)
 
 
-def dataframe_to_dps(df: pd.DataFrame, table_name: str) -> list[DataPoint]:
-    dps = []
-    for _, row in df.iterrows():
-        pp = {k: None if pd.isna(v) else v for k, v in row.to_dict().items()}
-        pp_hash = blake2b(encode(pp), digest_size=7).digest()
-        dp_id = int.from_bytes(pp_hash, byteorder=sys.byteorder)
-        meta = MetaRecord()
-        dp = DataPoint(
-            id=DataPointId(dp_id),
-            stock=STOCK_ID,
-            channel=["test_channel"],
-            body=row.to_dict(),
-            meta=[meta],
-            tag=["TIMEWISE", table_name],
-        )
-        dps.append(dp)
-    return dps
-
-
 def load_duplicate_data() -> pd.DataFrame:
     return pd.read_csv(DUPLICATE_FILENAME)
 
@@ -73,7 +54,9 @@ def test_muxer_fails_with_duplicates(mock_context):
         context=mock_context,
     )
     with pytest.raises(RuntimeError, match="Duplicate photopoints"):
-        muxer.process(dataframe_to_dps(data, "neowiser_p1bs_psd"), stock_id=STOCK_ID)
+        muxer.process(
+            dataframe_to_dps(data, "neowiser_p1bs_psd", STOCK_ID), stock_id=STOCK_ID
+        )
 
 
 def test_muxer_combines(mock_context):
@@ -81,8 +64,8 @@ def test_muxer_combines(mock_context):
     unique_cntrs = data["cntr_mf"].unique()
     data = data[data.cntr_mf == unique_cntrs[0]].reset_index(drop=True)
     i_dps = len(data) // 2
-    dps_in_db = dataframe_to_dps(data.iloc[:i_dps], "neowiser_p1bs_psd")
-    alert_dps = dataframe_to_dps(data.iloc[i_dps:], "neowiser_p1bs_psd")
+    dps_in_db = dataframe_to_dps(data.iloc[:i_dps], "neowiser_p1bs_psd", STOCK_ID)
+    alert_dps = dataframe_to_dps(data.iloc[i_dps:], "neowiser_p1bs_psd", STOCK_ID)
     logger = AmpelLogger.get_logger(console=dict(level=DEBUG))
     muxer = TiMongoMuxer(logger=logger, context=mock_context)
     _populate_photo_col_from_dps(muxer, dps_in_db)
@@ -101,7 +84,7 @@ def test_muxer_combines(mock_context):
 def test_muxer_skips_redundant_allwise_mep_data(mock_context, data_in_db: bool):
     data = load_duplicate_data()
     data["table_name"] = "allwise_p3as_mep"
-    alert_dps = dataframe_to_dps(data, "allwise_p3as_mep")
+    alert_dps = dataframe_to_dps(data, "allwise_p3as_mep", STOCK_ID)
     logger = AmpelLogger.get_logger(console=dict(level=DEBUG))
     muxer = TiMongoMuxer(logger=logger, context=mock_context)
     valid_cntr = data["cntr_mf"].unique()[0]
@@ -116,7 +99,9 @@ def test_muxer_skips_redundant_allwise_mep_data(mock_context, data_in_db: bool):
     muxer._tap_service = DummyTAPService(sync_res=sync_res, baseurl="", chunksize=1)
     dps_to_insert, dps_to_combine = muxer.process(alert_dps, stock_id=STOCK_ID)
 
-    ref_dps = dataframe_to_dps(data[data.cntr_mf == valid_cntr], "allwise_p3as_mep")
+    ref_dps = dataframe_to_dps(
+        data[data.cntr_mf == valid_cntr], "allwise_p3as_mep", STOCK_ID
+    )
 
     assert dps_to_combine == ref_dps
     assert dps_to_insert == ref_dps
