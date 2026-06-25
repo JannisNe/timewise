@@ -5,6 +5,7 @@ import gzip
 from typing import BinaryIO, cast
 import sys
 from hashlib import blake2b
+import numpy as np
 
 import mongomock
 import pandas as pd
@@ -117,3 +118,44 @@ def dataframe_to_dps(
         )
         dps.append(dp)
     return dps
+
+
+def check_stacking_result(result: pd.DataFrame, expected_result: pd.DataFrame):
+    # ----------------------------
+    # check stacking result
+    # ----------------------------
+
+    if expected_result is None:
+        # in this case all datapoints were masked so we just have to make sure that the
+        # stacked lightcurve also contains no data
+        assert len(result) == 0, "Found too many datapoints"
+        return
+
+    n_epochs_diff = len(expected_result) - len(result)
+    diff = expected_result.astype(float) - result.astype(float)
+
+    # changed to > 9 because scipy v1.17.0 introduced some numerical difference in
+    # calculation of stats.t.interval, introducing a difference O(1e-9) in the RMS
+    # of the stacked fluxes
+    m = diff > 1e-8
+
+    n_bad_epochs = (m.any(axis=1) | m.isna().any(axis=1)).sum()
+
+    try:
+        datapoints_diff = min(
+            [
+                (
+                    result[f"{b}fluxdensitynpoints"]
+                    - expected_result[f"{b}fluxdensitynpoints"]
+                ).sum()
+                for b in ["W1", "W2"]
+            ]
+        )
+    except KeyError:
+        datapoints_diff = np.nan
+
+    return {
+        "n_epochs_diff": n_epochs_diff,
+        "n_bad_epochs": n_bad_epochs,
+        "datapoints_diff": datapoints_diff,
+    }

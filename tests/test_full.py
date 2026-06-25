@@ -6,7 +6,11 @@ import pytest
 from astropy.table import Table, vstack
 from numpy import typing as npt
 from tests.constants import DATA_DIR
-from tests.util import get_raw_reference_photometry, get_stacked_reference_photometry
+from tests.util import (
+    get_raw_reference_photometry,
+    get_stacked_reference_photometry,
+    check_stacking_result,
+)
 from timewise.config import TimewiseConfig
 
 logger = logging.getLogger(__name__)
@@ -52,8 +56,13 @@ def test_ingest(ampel_interface, timewise_config_path, ampel_timewise_testing_co
 @pytest.mark.parametrize(
     "mode",
     [
-        pytest.param("masked", marks=pytest.mark.ampel_template_filename("template_stack.yml")),
-        pytest.param("unmasked", marks=pytest.mark.ampel_template_filename("template_stack_all.yml")),
+        pytest.param(
+            "masked", marks=pytest.mark.ampel_template_filename("template_stack.yml")
+        ),
+        pytest.param(
+            "unmasked",
+            marks=pytest.mark.ampel_template_filename("template_stack_all.yml"),
+        ),
     ],
 )
 def test_stacking(
@@ -130,43 +139,9 @@ def test_stacking(
         stacked_lc = ampel_interface.extract_stacked_lightcurve(i)
         reference_lc = get_stacked_reference_photometry(i, mode)
 
-        if reference_lc is None:
-            # in this case all datapoints were masked so we just have to make sure that the
-            # stacked lightcurve also contains no data
-            assert len(stacked_lc) == 0, f"Found too many datapoints for {i}"
-            continue
-
-        n_epochs_diff = len(reference_lc) - len(stacked_lc)
-        diff = reference_lc.astype(float) - stacked_lc.astype(float)
-
-        # changed to > 9 because scipy v1.17.0 introduced some numerical difference in
-        # calculation of stats.t.interval, introducing a difference O(1e-9) in the RMS
-        # of the stacked fluxes
-        m = diff > 1e-8
-
-        n_bad_epochs = (m.any(axis=1) | m.isna().any(axis=1)).sum()
-
-        try:
-            datapoints_diff = min(
-                [
-                    (
-                        stacked_lc[f"{b}fluxdensitynpoints"]
-                        - reference_lc[f"{b}fluxdensitynpoints"]
-                    ).sum()
-                    for b in ["W1", "W2"]
-                ]
-            )
-        except KeyError:
-            datapoints_diff = np.nan
-
-        records.append(
-            {
-                "n_epochs_diff": n_epochs_diff,
-                "n_bad_epochs": n_bad_epochs,
-                "datapoints_diff": datapoints_diff,
-            }
-        )
-        index.append(i)
+        if (check := check_stacking_result(stacked_lc, reference_lc)) is not None:
+            records.append(check)
+            index.append(i)
 
     res = pd.DataFrame(records, index=index)
     logger.info("\n" + res.to_string())
