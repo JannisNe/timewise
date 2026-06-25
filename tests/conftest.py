@@ -115,7 +115,7 @@ def tmp_db_name(
 
 
 @pytest.fixture
-def timewise_config_path(tmp_path, tmp_db_name) -> Path:
+def timewise_config_path(tmp_path, tmp_db_name, request) -> Path:
     timewise_config_template_path = DATA_DIR / "test_download.yml"
     with timewise_config_template_path.open("r") as f:
         timewise_config = f.read()
@@ -124,6 +124,10 @@ def timewise_config_path(tmp_path, tmp_db_name) -> Path:
         .replace("INPUT_CSV", str(INPUT_CSV_PATH))
         .replace("MONGODB_NAME", tmp_db_name)
     )
+    if (
+        marker := request.node.get_closest_marker("ampel_template_filename")
+    ) is not None:
+        timewise_config += f"  template_path: {DATA_DIR / marker.args[0]}\n"
     timewise_config_path = tmp_path / "timewise_config.yml"
     with timewise_config_path.open("w") as f:
         f.write(timewise_config)

@@ -19,6 +19,7 @@ def test_make_ampel_job(timewise_config_path, ampel_interface):
     assert Path(res.output.split(" file: ")[-1].strip()).exists()
 
 
+@pytest.mark.ampel_template_filename("template_ingest_only_short.yml")
 def test_run_ampel(
     timewise_config_path, ampel_interface, ampel_timewise_testing_config
 ):
