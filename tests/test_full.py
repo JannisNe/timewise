@@ -13,10 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.full
+@pytest.mark.ampel_template_filename("template_ingest_only.yml")
 def test_ingest(ampel_interface, timewise_config_path, ampel_timewise_testing_config):
     # switch out the template so only ingestion is run
-    ingestion_only_template = DATA_DIR / "template_ingest_only.yml"
-    ampel_interface.template_path = ingestion_only_template
     ampel_interface.run(timewise_config_path, ampel_timewise_testing_config)
 
     # ----------------------------
@@ -50,17 +49,20 @@ def test_ingest(ampel_interface, timewise_config_path, ampel_timewise_testing_co
 
 
 @pytest.mark.full
-@pytest.mark.parametrize("mode", ["masked", "unmasked"])
+@pytest.mark.parametrize(
+    "mode",
+    [
+        pytest.param("masked", marks=pytest.mark.ampel_template_filename("template_stack.yml")),
+        pytest.param("unmasked", marks=pytest.mark.ampel_template_filename("template_stack_all.yml")),
+    ],
+)
 def test_stacking(
     ampel_interface,
     timewise_config_path,
     ampel_timewise_testing_config,
     mode,
 ):
-    if mode == "unmasked":
-        ampel_interface.template_path = DATA_DIR / "template_stack_all.yml"
-    if mode == "masked":
-        ampel_interface.template_path = DATA_DIR / "template_stack.yml"
+    # ponytail: use pytest marker to set template_path via timewise_config fixture
 
     mongo_db_name = ampel_interface.mongo_db_name + "_" + mode
     ampel_interface.mongo_db_name = mongo_db_name
