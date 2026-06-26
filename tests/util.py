@@ -3,10 +3,19 @@ import logging
 from pathlib import Path
 import gzip
 from typing import BinaryIO, cast
+import sys
+from hashlib import blake2b
+import numpy as np
 
+import mongomock
 import pandas as pd
-from pymongo import MongoClient
-from bson import decode_file_iter
+from bson import decode_file_iter, encode
+from ampel.timewise.ingest.TiMongoMuxer import TiMongoMuxer
+from ampel.types import DataPointId, StockId
+from ampel.content.DataPoint import DataPoint
+from ampel.content.MetaRecord import MetaRecord
+from ampel.log.AmpelLogger import DEBUG, AmpelLogger
+
 
 from tests.constants import DATA_DIR, V0_KEYMAP
 
@@ -14,7 +23,7 @@ from tests.constants import DATA_DIR, V0_KEYMAP
 logger = logging.getLogger(__name__)
 
 
-def get_raw_reference_photometry(i) -> pd.DataFrame:
+def get_single_exposure_photometry(i) -> pd.DataFrame:
     chunk_id = i // 32
 
     reference_phot_files = [
@@ -24,24 +33,27 @@ def get_raw_reference_photometry(i) -> pd.DataFrame:
     all_reference_photometry = pd.concat(
         [pd.read_csv(fn) for fn in reference_phot_files]
     ).reset_index()
+    return all_reference_photometry[all_reference_photometry.orig_id == i]
+
+
+def get_raw_reference_photometry(i) -> pd.DataFrame:
+    chunk_id = i // 32
     reference_mask_file = DATA_DIR / "masks" / f"position_mask_c{chunk_id}.json"
     with open(reference_mask_file, "r") as f:
         reference_bad_mask = json.load(f)
-    reference_mask = all_reference_photometry.orig_id == i
+
+    single_exposure_photometry = get_single_exposure_photometry(i)
     if (si := str(i)) in reference_bad_mask:
-        reference_mask = reference_mask & ~all_reference_photometry.index.isin(
-            reference_bad_mask[si]
-        )
-    reference_photometry: pd.DataFrame = all_reference_photometry.loc[
-        reference_mask
-    ].reset_index()
+        single_exposure_photometry = single_exposure_photometry[
+            ~single_exposure_photometry.index.isin(reference_bad_mask[si])
+        ]
 
     # rename columns to v1
     for ol, nl in V0_KEYMAP:
-        if ol in reference_photometry.columns:
-            reference_photometry.rename(columns={ol: nl}, inplace=True)
+        if ol in single_exposure_photometry.columns:
+            single_exposure_photometry.rename(columns={ol: nl}, inplace=True)
 
-    return reference_photometry
+    return single_exposure_photometry.reset_index()
 
 
 def get_stacked_reference_photometry(i, mode) -> None | pd.DataFrame:
@@ -64,9 +76,8 @@ def get_stacked_reference_photometry(i, mode) -> None | pd.DataFrame:
 
 
 def restore_from_bson_dir(
-    dump_dir: str, target_db_name: str, mongo_uri="mongodb://localhost:27017/"
+    dump_dir: str, target_db_name: str, client: mongomock.MongoClient
 ):
-    client = MongoClient(mongo_uri)
     db = client[target_db_name]
 
     dump_path = Path(dump_dir)
@@ -86,3 +97,65 @@ def restore_from_bson_dir(
         num += 1
 
     logger.info(f"Restored {num} collections to {target_db_name}")
+
+
+def dataframe_to_dps(
+    df: pd.DataFrame, table_name: str, stock_id: StockId
+) -> list[DataPoint]:
+    dps = []
+    for _, row in df.iterrows():
+        pp = {k: None if pd.isna(v) else v for k, v in row.to_dict().items()}
+        pp_hash = blake2b(encode(pp), digest_size=7).digest()
+        dp_id = int.from_bytes(pp_hash, byteorder=sys.byteorder)
+        meta = MetaRecord()
+        dp = DataPoint(
+            id=DataPointId(dp_id),
+            stock=stock_id,
+            channel=["test_channel"],
+            body=row.to_dict(),
+            meta=[meta],
+            tag=["TIMEWISE", table_name],
+        )
+        dps.append(dp)
+    return dps
+
+
+def check_stacking_result(result: pd.DataFrame, expected_result: pd.DataFrame):
+    # ----------------------------
+    # check stacking result
+    # ----------------------------
+
+    if expected_result is None:
+        # in this case all datapoints were masked so we just have to make sure that the
+        # stacked lightcurve also contains no data
+        assert len(result) == 0, "Found too many datapoints"
+        return
+
+    n_epochs_diff = len(expected_result) - len(result)
+    diff = expected_result.astype(float) - result.astype(float)
+
+    # changed to > 9 because scipy v1.17.0 introduced some numerical difference in
+    # calculation of stats.t.interval, introducing a difference O(1e-9) in the RMS
+    # of the stacked fluxes
+    m = diff > 1e-8
+
+    n_bad_epochs = (m.any(axis=1) | m.isna().any(axis=1)).sum()
+
+    try:
+        datapoints_diff = min(
+            [
+                (
+                    result[f"{b}fluxdensitynpoints"]
+                    - expected_result[f"{b}fluxdensitynpoints"]
+                ).sum()
+                for b in ["W1", "W2"]
+            ]
+        )
+    except KeyError:
+        datapoints_diff = np.nan
+
+    return {
+        "n_epochs_diff": n_epochs_diff,
+        "n_bad_epochs": n_bad_epochs,
+        "datapoints_diff": datapoints_diff,
+    }
