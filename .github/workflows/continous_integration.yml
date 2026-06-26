@@ -87,7 +87,6 @@ jobs:
         run: |
           echo $PYTEST_FLAGS
           eval "poetry run pytest $PYTEST_FLAGS -v --cov=. --cov-report=xml:py${{ matrix.python-version }}.xml ./tests"
-          poetry run coverage combine
           poetry run coverage report
 
       - name: Coveralls Parallel
