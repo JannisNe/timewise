@@ -4,6 +4,8 @@ from typing import Generator
 import re
 import os
 import tempfile
+
+import pymongo
 import yaml
 
 import mongomock
@@ -165,8 +167,25 @@ def ampel_timewise_testing_config(tmp_path_factory, pytestconfig):
     return config_path
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--mongodb-uri",
+        action="store",
+        default=None,
+        help="URI of the MongoDB instance to use for tests",
+    )
+
+
 @pytest.fixture
-def mongomock_client(monkeypatch):
+def mongomock_client(
+    monkeypatch, request
+) -> mongomock.MongoClient | pymongo.MongoClient:
+    mongodb_uri = request.config.getoption("--mongodb-uri")
+
+    if mongodb_uri:
+        # User provided a real MongoDB URI, don't patch.
+        return MongoClient(mongodb_uri)
+
     # ignore codec_options in DataLoader
     monkeypatch.setattr("mongomock.codec_options.is_supported", lambda *args: None)
     # work around https://github.com/mongomock/mongomock/issues/912
