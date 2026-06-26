@@ -26,7 +26,7 @@ jobs:
     # Specify the python versions to test
     strategy:
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.11", "3.13"]
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -86,7 +86,7 @@ jobs:
           TIMEWISE_BIGDATA: ~/timewise_bigdata
         run: |
           echo $PYTEST_FLAGS
-          eval "poetry run pytest $PYTEST_FLAGS -v --cov=. --cov-report=xml:py${{ matrix.python-version }}.xml -k test_cli ./tests"
+          eval "poetry run pytest $PYTEST_FLAGS -v --cov=. --cov-report=xml:py${{ matrix.python-version }}.xml ./tests"
           poetry run coverage debug data
           poetry run coverage report
 
