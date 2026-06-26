@@ -93,8 +93,10 @@ jobs:
       - name: Coveralls Parallel
         uses: coverallsapp/github-action@v2
         with:
-          flag-name: run-${{ join(matrix.*, '-') }}
+          flag-name: py-${{ join(matrix.*, '-') }}
           parallel: true
+          file: py${{ matrix.python-version }}.xml
+          format: cobertura
           debug: true
 
   finish:
