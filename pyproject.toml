@@ -76,9 +76,13 @@ omit = ["timewise/v0"]
 parallel = true
 concurrency = ["thread", "multiprocessing"]
 
-[tool.pytest]
+[tool.pytest.ini_options]
 testpaths = "tests"
 pythonpath = "."
+markers = [
+    "ampel_template_filename: change the template file that is being used to configure the ampel job",
+    "full: run full integration test (slow!)",
+]
 
 # Per-module ignores
 [tool.mypy]
