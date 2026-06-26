@@ -65,10 +65,14 @@ jobs:
       - name: Run Ruff
         run: poetry run ruff check
 
+      - name: Start MongoDB
+        if: "${{ github.event_name }}" = "pull_request"
+        uses: supercharge/mongodb-github-action@1.12.1
+
       - name: Set pytest flags
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "PYTEST_FLAGS=-m full" >> $GITHUB_ENV
+            echo "PYTEST_FLAGS=--mongodb-uri mongodb://localhost:27017/" >> $GITHUB_ENV
           else
             echo  "PYTEST_FLAGS=-m 'not full'" >> $GITHUB_ENV
           fi
