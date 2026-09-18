@@ -67,7 +67,7 @@ ampel= [
     "ampel-plot (>=0.9.1,<0.10.0)",
     "ampel-core (==0.10.6a22)",
     "ampel-alerts (==0.10.4a0)",
-    "ampel-interface (==0.10.5a10)"
+    "ampel-interface (>=0.10.5a10)"
 ]
 
 [tool.coverage.run]
