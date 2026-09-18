@@ -131,9 +131,9 @@ def calculate_epochs(
     n_remaining_outlier = np.inf
 
     # ---------------------   flag upper limits   ---------------------- #
-    bin_n_ulims: npt.NDArray[np.float64] = np.bincount(
+    bin_n_ulims: npt.NDArray[np.int64] = np.bincount(
         visit_mask, weights=u_lims, minlength=len(counts)
-    )
+    ).astype(int)
     bin_ulim_bool = cast(npt.NDArray[np.bool_], (counts - bin_n_ulims) == 0)
     use_mask_ul = ~u_lims | (u_lims & bin_ulim_bool[visit_mask])
 
