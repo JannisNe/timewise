@@ -1,15 +1,15 @@
 import logging
-from typing import cast, Dict, Any, Literal
+from typing import Any, Dict, Literal, cast
 
+import numpy as np
+import pandas as pd
+from numpy import typing as npt
 from scipy import stats
 from scipy.special import gamma
-import numpy as np
-from numpy import typing as npt
-import pandas as pd
 
-from ..util.visits import get_visit_map
 from timewise.process import keys
 
+from ..util.visits import get_visit_map
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ def calculate_epochs(
     n_remaining_outlier = np.inf
 
     # ---------------------   flag upper limits   ---------------------- #
-    bin_n_ulims: npt.NDArray[np.int64] = np.bincount(
+    bin_n_ulims: npt.NDArray[np.float64] = np.bincount(
         visit_mask, weights=u_lims, minlength=len(counts)
     )
     bin_ulim_bool = cast(npt.NDArray[np.bool_], (counts - bin_n_ulims) == 0)
@@ -151,7 +151,7 @@ def calculate_epochs(
     while n_remaining_outlier > 0:
         # make a mask of values to use
         use_mask = ~outlier_mask & use_mask_ul & ~nan_mask  # type: ignore[operator]
-        n_points = np.bincount(visit_mask, weights=use_mask)
+        n_points = np.bincount(visit_mask, weights=use_mask).astype(int)
         zero_points_mask = cast(npt.NDArray[np.bool_], n_points == 0)
 
         # -------------------------   calculate median   ------------------------- #
